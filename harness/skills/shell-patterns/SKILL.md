@@ -16,8 +16,9 @@ the execution model, ShellCheck and shfmt mapping) shared by the writer and
 ## Rules of thumb
 
 - Decide first whether it should be shell. In this repository a script stays
-  shell only when it is under 100 lines with no output helpers of its own,
-  or when it must change the calling shell's state (`cd`, environment,
+  shell only when it is a thin entry point that hands off to another program
+  with no output helpers of its own (whatever its length), or when it must
+  change the calling shell's state (`cd`, environment,
   prompt hooks); anything that prints, logs or reports errors to the user is
   a `dotctl` subcommand in Go
   (`harness/rules/decisions/2026-09-25-dotctl-owns-every-command-with-output.md`).

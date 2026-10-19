@@ -46,7 +46,7 @@ Honor any existing declared preference without asking. If the user declines cons
 
 ## Step 1: Create Isolated Workspace
 
-**One way, in every harness.** Claude Code, Codex, pi, omp and the Swarm all isolate the same way, so the owner never has to remember which harness does what: a git worktree at `.claude/worktrees/<name>` on a branch named `<name>`, made with plain git. Do not use a harness's own isolation (Codex's detached-HEAD worktrees, omp's `isolated` copies, a native `EnterWorktree` that names things differently) — the owner's ruling of 2026-09-27 trades that convenience for one layout everywhere.
+**One way, in every harness.** Claude Code, Codex, pi and omp all isolate the same way, so the owner never has to remember which harness does what: a git worktree at `.claude/worktrees/<name>` on a branch named `<name>`, made with plain git. Do not use a harness's own isolation (Codex's detached-HEAD worktrees, omp's `isolated` copies, a native `EnterWorktree` that names things differently) — the owner's ruling of 2026-09-27 trades that convenience for one layout everywhere.
 
 ```bash
 root=$(git rev-parse --show-toplevel)

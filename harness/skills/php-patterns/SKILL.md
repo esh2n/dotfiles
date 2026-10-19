@@ -42,7 +42,7 @@ Writing or reviewing PHP: read `references/review-standard.md` first — the sin
 
 ### Reference
 
-See skill: `backend-patterns` for broader service/repository layering guidance.
+See skill: `clean-architecture` for broader service/repository layering guidance.
 
 ## Patterns
 
@@ -99,4 +99,4 @@ See skill: `laravel-patterns` for Laravel-specific architecture guidance.
 
 ### Reference
 
-See skill: `laravel-security` for Laravel-specific security guidance.
+See skill: `laravel-verification` (Phase 4, security and dependency checks) for Laravel-specific security checks.

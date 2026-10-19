@@ -200,6 +200,6 @@ Note: overfitting the prompt to known scenarios, measuring only the happy path, 
 
 ## Related
 
-- `writing-skills` — the TDD approach to writing skills. Essentially the same as this skill's "subagent baseline → fix → re-run"
+- `skill-creator` — writing and testing a new skill, with evals that run the skill and compare against a baseline. Close to this skill's "subagent baseline → fix → re-run"
 - `retrospective-codify` — pinning learnings after a task. This skill is for prompt development; retrospective-codify is for after the task ends
 - Run multiple scenarios in parallel by launching Agents concurrently (several Task calls in one message)

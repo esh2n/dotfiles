@@ -17,22 +17,7 @@ Check if Python is installed:
 python3 --version || python --version
 ```
 
-If Python is not installed, install it based on user's OS:
-
-**macOS:**
-```bash
-brew install python3
-```
-
-**Ubuntu/Debian:**
-```bash
-sudo apt update && sudo apt install python3
-```
-
-**Windows:**
-```powershell
-winget install Python.Python.3.12
-```
+If Python is not installed, stop and report it to the user. Do not install it yourself: language runtimes are installed with `mise` by the owner, Homebrew is for GUI apps only, and `sudo` is refused by the guard.
 
 ---
 

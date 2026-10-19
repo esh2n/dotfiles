@@ -1,6 +1,6 @@
 ---
 name: skill-stocktake
-description: "Use when auditing Claude skills and commands for quality. Supports Quick Scan (changed skills only) and Full Stocktake modes with sequential subagent batch evaluation."
+description: "Use when auditing Claude skills for quality. Supports Quick Scan (changed skills only) and Full Stocktake modes with sequential subagent batch evaluation."
 metadata:
   namespaces: [agent]
   origin: ECC
@@ -8,7 +8,7 @@ metadata:
 
 # skill-stocktake
 
-Skill (invoked via the Skill tool as `skill-stocktake`) that audits all Claude skills and commands using a quality checklist + AI holistic judgment. Supports two modes: Quick Scan for recently changed skills, and Full Stocktake for a complete review.
+Skill (invoked via the Skill tool as `skill-stocktake`) that audits all Claude skills using a quality checklist + AI holistic judgment. Supports two modes: Quick Scan for recently changed skills, and Full Stocktake for a complete review.
 
 ## Scope
 
@@ -30,7 +30,7 @@ cd ~/path/to/my-project
 # then invoke the skill-stocktake skill (Skill tool)
 ```
 
-If the project has no `.claude/skills/` directory, only global skills and commands are evaluated.
+If the project has no `.claude/skills/` directory, only global skills are evaluated.
 
 ## Modes
 
@@ -39,22 +39,20 @@ If the project has no `.claude/skills/` directory, only global skills and comman
 | Quick Scan | `results.json` exists (default) | 5–10 min |
 | Full Stocktake | `results.json` absent, or skill invoked with arg `full` | 20–30 min |
 
-**Results cache:** `~/.claude/skills/skill-stocktake/results.json`
+**Results cache:** `${XDG_CACHE_HOME:-$HOME/.cache}/skill-stocktake/results.json` (below, `$RESULTS`). Never write it under `~/.claude/skills/skill-stocktake/`: that path is a link into the dotfiles repository, so the file would land in the working tree.
 
 ## Quick Scan Flow
 
 Re-evaluate only skills that have changed since the last run (5–10 min).
 
-1. Read `~/.claude/skills/skill-stocktake/results.json`
-2. Run: `bash ~/.claude/skills/skill-stocktake/scripts/quick-diff.sh \
-         ~/.claude/skills/skill-stocktake/results.json`
+1. Read `$RESULTS`
+2. Run: `bash ~/.claude/skills/skill-stocktake/scripts/quick-diff.sh "$RESULTS"`
    (Project dir is auto-detected from `$PWD/.claude/skills`; pass it explicitly only if needed)
 3. If output is `[]`: report "No changes since last run." and stop
 4. Re-evaluate only those changed files using the same Phase 2 criteria
 5. Carry forward unchanged skills from previous results
 6. Output only the diff
-7. Run: `bash ~/.claude/skills/skill-stocktake/scripts/save-results.sh \
-         ~/.claude/skills/skill-stocktake/results.json <<< "$EVAL_RESULTS"`
+7. Run: `bash ~/.claude/skills/skill-stocktake/scripts/save-results.sh "$RESULTS" <<< "$EVAL_RESULTS"`
 
 ## Full Stocktake Flow
 
@@ -148,7 +146,7 @@ Evaluation is **holistic AI judgment** — not a numeric rubric. Guiding dimensi
   - Good: `"276 lines; Section 'Framework Comparison' (L80–140) duplicates ai-era-architecture-principles; delete it to reach ~150 lines."`
 - For **Keep** (mtime-only change in Quick Scan): restate the original verdict rationale, do not write "unchanged"
   - Bad: `"Unchanged"`
-  - Good: `"mtime updated but content unchanged. Unique Python reference explicitly imported by rules/python/; no overlap found."`
+  - Good: `"mtime updated but content unchanged. Unique Python reference; no other skill covers the same ground."`
 
 ### Phase 3 — Summary Table
 
@@ -181,7 +179,7 @@ When the request is a periodic stocktake of the whole harness (not only skills),
 
 ## Results File Schema
 
-`~/.claude/skills/skill-stocktake/results.json`:
+`$RESULTS` (`${XDG_CACHE_HOME:-$HOME/.cache}/skill-stocktake/results.json`):
 
 **`evaluated_at`**: Must be set to the actual UTC time of evaluation completion.
 Obtain via Bash: `date -u +%Y-%m-%dT%H:%M:%SZ`. Never use a date-only approximation like `T00:00:00Z`.

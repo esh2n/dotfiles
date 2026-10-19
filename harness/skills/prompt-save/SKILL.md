@@ -20,8 +20,11 @@ $DOTFILES_ROOT/harness/skills/<name>/SKILL.md   # global → /<name> everywhere
 <repo>/.claude/skills/<name>/SKILL.md                            # project-local → /<name> in that repo
 ```
 
-No symlinks and no `commands/` directory: the harness generator delivers
-`skills/` to every harness as-is, so the file above is the only thing to write.
+No hand-made symlinks and no `commands/` directory: the file above is the only
+thing to write. A new global skill becomes callable only after `jig apply` runs,
+because jig creates the per-skill links (`~/.claude/skills/<name>` and the other
+harnesses' skill directories); tell the user to run it, or run it when allowed.
+A project-local skill needs no apply.
 
 ## Process
 

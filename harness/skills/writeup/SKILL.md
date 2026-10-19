@@ -22,6 +22,7 @@ Everything runs on `node` alone. Resolve the kit first:
 ```bash
 SELF="<this skill's own directory>"
 KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/writeup-kit"; [ -d "$KIT" ] || KIT=""
+KREF="${DOTFILES_ROOT:-$HOME/dotfiles}/harness/skills/writeup-kit/references"  # kinds, components, writing, page-contract
 ```
 
 If `$KIT` is empty, run in **kit-less fallback mode**: hand-write a minimal
@@ -56,8 +57,8 @@ into `private`.
    report (a research record, a `change-review` report) becomes step 3's
    `--from` path ("Input from Markdown").
 2. **Read the contract for this kind.** The matching row of
-   `$KIT/references/kinds.md` (required sections, use/avoid components,
-   length, where a figure helps) and `$KIT/references/components.md`
+   `$KREF/kinds.md` (required sections, use/avoid components,
+   length, where a figure helps) and `$KREF/components.md`
    (the 20 role-named components) — both short tables.
 3. **Write the page.**
    - Copy `$KIT/kit/template.html` with its `.wu-nav` back-link, and set the
@@ -66,7 +67,7 @@ into `private`.
      renders unstyled is that placeholder and nothing worse: `build` (step 7)
      rewrites it, and re-depths it and `.wu-nav` on every later run. Never
      edit `.wu-header` / `.wu-footer` structure — only their text.
-   - Read `$KIT/references/writing.md` (reader, one takeaway, sentence
+   - Read `$KREF/writing.md` (reader, one takeaway, sentence
      and card rules), then write the body in Japanese with role-named
      `.wu-*` components, covering this kind's required sections in order.
    - For each figure, pick the type first (`writing.md` §4: what must the
@@ -192,7 +193,7 @@ uploads but leaves the reference unrewritten. Use publish's own printed
 hint, which is already shaped `(cd '<folder>' && gh pr create --body-file
 '<slug>.md' --attach 'figures/...')` for exactly this reason (`gh`
 version: one that carries `--attach` — no release does yet, so the dotfiles
-nix overlay (`core/nix/overlays.nix`) pins `gh` to a cli/cli trunk commit on
+nix overlay (`overlays/default.nix`) pins `gh` to a cli/cli trunk commit on
 every machine; drop the override once a release ships it. GHES does not support
 `--attach`; on GHES, or an older `gh`, drag the same `figures/` files into
 the PR editor by hand instead). It runs the same private-word check as

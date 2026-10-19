@@ -76,9 +76,13 @@ When the user asks about nvim keybindings, shortcuts, or keymaps:
    without a description show the rhs command). mode: n=normal, i=insert,
    v=visual, x=visual-block family, o=operator, t=terminal, c=command.
 
-### Fallback when spawn fails in the sandbox (important)
+### Fallback when spawn fails in the sandbox (containers only)
 
-If Bash fails with an **`E2BIG` / `posix_spawn` / sandbox-related spawn error**, the script
+This applies only inside a container (sbx), where Claude Code's OS sandbox is on. On the
+host the sandbox is off (`sandbox.enabled: false`), so an `E2BIG` there has another cause;
+report it instead of retrying.
+
+Inside a container, if Bash fails with an **`E2BIG` / `posix_spawn` / sandbox-related spawn error**, the script
 is not at fault: **Claude Code's sandbox wrapper inflated argv** (the seatbelt profile
 balloons in large monorepos). The script itself never started.
 

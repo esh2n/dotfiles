@@ -211,7 +211,7 @@ index.md の内容（サマリー、Deep Dive候補、Action Items）をター�
 
 ### 7c. Notionに書き出し (Notion MCP接続時)
 
-`notion-create-page` skillでカテゴリごとにサブページを作成する。
+Ask the owner first: a Notion page is a write other people may see, and the guard asks for it (`ask-mcp-shared-write`). Only after the owner agrees, create one subpage per category with the Notion MCP tool `notion-create-pages`.
 
 - 親ページ: `Morning Brief - YYYY-MM-DD`（新規作成）
 - 子ページ: 各カテゴリ名（tech, ai-llm, politics, ...）

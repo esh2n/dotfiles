@@ -43,4 +43,4 @@ swift test --enable-code-coverage
 
 ## Reference
 
-See skill: `swift-protocol-di-testing` for protocol-based dependency injection and mock patterns with Swift Testing.
+See skill: `swift-patterns` for the language patterns the code under test follows.

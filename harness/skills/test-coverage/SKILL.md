@@ -48,7 +48,8 @@ For each under-covered file, generate tests following this priority:
 
 - Place tests adjacent to source: `foo.ts` → `foo.test.ts` (or project convention)
 - Use existing test patterns from the project (import style, assertion library, mocking approach)
-- Mock external dependencies (database, APIs, file system)
+- Prefer real objects. Integration tests (API endpoints, database operations) run against the real dependency or a test instance of it (for example a container); mock only what cannot run in a test (third-party services you do not control)
+- Every generated test must fail if the behaviour it covers breaks. Never add a test only to raise the coverage number; a gap left open beats a test that cannot fail
 - Each test should be independent — no shared mutable state between tests
 - Name tests descriptively: `test_create_user_with_duplicate_email_returns_409`
 
@@ -56,7 +57,7 @@ For each under-covered file, generate tests following this priority:
 
 1. Run the full test suite — all tests must pass
 2. Re-run coverage — verify improvement
-3. If still below 80%, repeat Step 3 for remaining gaps
+3. If still below 80%, repeat Step 3 for remaining gaps that have behaviour worth testing; report any gap you leave open and why, rather than padding it
 
 ## Step 5: Report
 

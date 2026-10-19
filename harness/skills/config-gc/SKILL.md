@@ -28,15 +28,29 @@ Do NOT activate for: cleaning project source code (that's refactoring), clearing
 5. **Forced human-in-the-loop.** Every candidate gets its own `[y/n/skip]` confirmation. No "yes to all" shortcut.
 6. **Keep a log.** Every GC run appends to `~/.claude/gc_log.md`: what was touched, why, and how to undo it.
 
+## What jig manages (out of scope here)
+
+`jig apply` generates much of `~/.claude` from `$DOTFILES_ROOT/harness/`. Renaming, moving or deleting a generated item by hand is undone by the next apply. For these, never touch `~/.claude`; report the candidate and, if the user confirms, change the source and run `jig apply`:
+
+| Generated item | Source to change |
+|---|---|
+| Skill links in `~/.claude/skills/` pointing into the repository or the pstack pack | `harness/skills/<name>/` (the house skills); pstack's skills are upstream and never edited |
+| Hook registrations in `settings.json` (the five `jig hooks …` commands) | `harness/rules/decisions/2026-09-22-hooks-five-events.md` and the jig generator; there are no hook scripts under `~/.claude/hooks/` |
+| `permissions.allow` in `~/.claude/settings.json` | the permit rules in `harness/policy/guard-rules.json` (`to-claude-permissions.ts` generates the list) |
+| MCP servers jig wrote into `~/.claude.json` `mcpServers` | `harness/mcp/servers.json` |
+| `~/.claude/CLAUDE.md`, agents, rules | `harness/rules/`, `harness/agents/` |
+
+A symlink's target tells you whether it is generated: anything resolving under the dotfiles repository or `~/.local/share/jig/` is jig's. What remains in scope is what the user or a tool wrote by hand: real (non-link) skill directories, `settings.local.json`, MCP servers jig did not write, memory files, project history and caches.
+
 ## Scan Channels
 
 | # | Channel | Path | Staleness / redundancy signals |
 |---|---------|------|--------------------------------|
-| 1 | Skills | `~/.claude/skills/*/` | Heavily overlapping names; never triggered in recent transcripts; domain mismatch with the user's actual work; broken or empty SKILL.md |
+| 1 | Skills | real directories in `~/.claude/skills/` (not jig's links) | Heavily overlapping names; never triggered in recent transcripts; domain mismatch with the user's actual work; broken or empty SKILL.md |
 | 2 | Memory | `~/.claude/**/memory/*.md` + its index | Multiple index entries for one topic; contents contradicting newer entries; dates that have passed; orphan files missing from the index; sub-100-word fragments that should merge |
-| 3 | Hooks | `~/.claude/hooks/` + settings | Scripts present on disk but referenced by no hook config; old versions superseded by rewrites |
-| 4 | Permissions | `permissions.allow` in `settings.json` / `settings.local.json` | Duplicate entries; specific entries already covered by a wildcard (e.g. `Bash(git push)` when `Bash(*)` is allowed); one-off grants from past experiments |
-| 5 | MCP servers | `~/.claude.json` or project `.mcp.json` | Servers that fail to connect; functional duplicates; long-unused |
+| 3 | Hooks | `~/.claude/hooks/` and hooks in `settings.local.json` or project settings | Leftover scripts from before jig (jig registers its own five and keeps no scripts there); entries referencing missing scripts |
+| 4 | Permissions | `permissions.allow` in `settings.local.json` (the `settings.json` list is generated) | Duplicate entries; specific entries already covered by a wildcard (e.g. `Bash(git push)` when `Bash(*)` is allowed); one-off grants from past experiments |
+| 5 | MCP servers | servers in `~/.claude.json` that jig did not write, or project `.mcp.json` | Servers that fail to connect; functional duplicates; long-unused |
 | 6 | Scheduled reminders / jobs | wherever the user keeps them | Fired one-shots older than 30 days; jobs whose target scripts no longer exist |
 | 7 | Project history | `~/.claude/projects/*/` | Stale handoff snapshots; session records superseded by newer state |
 | 8 | Runtime caches | `cache/`, `file-history/`, `logs/`, `shell-snapshots/` | Sort by size and mtime; propose items >30 days old and large |
@@ -103,7 +117,8 @@ jq '.permissions.allow -= ["Bash(git push)"]' ~/.claude/settings.local.json.bak 
 - **Hard-deleting on first pass.** If there's no `_gc_trash/` copy or `.disabled` rename, you did it wrong.
 - **Treating "old" as "dead".** A skill untouched for 60 days may be seasonal (tax season, quarterly reviews). Age is a signal, not a verdict — that's why a human confirms.
 - **Cleaning memory by truncation.** Merging two contradicting memory files requires reading both and keeping the newer truth, not deleting the longer one.
-- **Touching anything outside `~/.claude`** (or the project's `.claude/`). Config GC never wanders into source trees.
+- **Touching anything outside `~/.claude`** (or the project's `.claude/`). Config GC never wanders into source trees; the one exception is a confirmed change to a jig-managed item, made in its `harness/` source (see "What jig manages").
+- **Hand-editing a jig-generated item.** Renaming a linked skill, deleting a generated allow entry or removing an MCP server jig wrote is reverted by the next `jig apply`.
 
 ## Best Practices
 
@@ -115,5 +130,4 @@ jq '.permissions.allow -= ["Bash(git push)"]' ~/.claude/settings.local.json.bak 
 ## Related Skills
 
 - `skill-stocktake` — audits skill *quality*; config-gc audits skill *existence*. Run stocktake on what survives GC.
-- `continuous-learning-v2` — produces the memory files this skill later audits.
 - `security-review` — pairs well with the permissions channel.

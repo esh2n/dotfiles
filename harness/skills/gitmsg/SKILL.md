@@ -12,8 +12,9 @@ CRITICAL RULES:
 - Use imperative mood (add/fix/update, NOT added/fixed/updated)
 - Actor is me (the developer)
 - Be precise and specific
+- Subject is lowercase, no trailing period, max 50 characters
 
-Types: feat, fix, docs, style, refactor, perf, test, chore
+Types: feat, fix, refactor, docs, test, chore, perf, ci
 
 Process silently:
 1. Run `git diff --cached` to analyze changes
@@ -21,6 +22,6 @@ Process silently:
 3. Output ONLY the commit message
 
 Examples:
-feat(auth): add JWT token refresh mechanism
+feat(auth): add jwt token refresh
 fix(api): handle null response in user endpoint
-chore(deps): upgrade React to v18.2.0
+chore(deps): upgrade react to v18.2.0

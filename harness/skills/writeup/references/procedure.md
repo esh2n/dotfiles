@@ -195,7 +195,7 @@ always just a page that has not been built yet: run Step 7's
 A figure has a `type:`, and the type is a decision, not a default. Ask
 what the reader must see faster than prose — a structure, a flow or time,
 a state, a quantity or comparison, a containment or scope, a hierarchy, a
-cause — and map the answer with the table in `$KIT/references/writing.md`
+cause — and map the answer with the table in `$KREF/writing.md`
 §4 (`kinds.md` names the 2–4 types that usually fit the page's kind). Then
 confirm against the renderer, which is the authority on what exists:
 
@@ -595,7 +595,7 @@ leaves the existing pages alone — then retry the commit.
 ## Decision records: writing 決まったこと
 
 For kind 決定記録 the decisions are headings and prose, not cards
-(`$KIT/references/kinds.md` has the skeleton, `writing.md` §7 the
+(`$KREF/kinds.md` has the skeleton, `writing.md` §7 the
 sentence shape). Write them in this order:
 
 1. `.wu-lede`, then `.wu-summary` with no signal phrase (`結論から言うと`

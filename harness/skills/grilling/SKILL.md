@@ -20,7 +20,7 @@ agreement is this skill's only failure mode.
 ## 2. Input
 
 - **Target** — text or a file path. When omitted, use the design discussed most recently in the conversation.
-- `--out <path>` — where the decision record is written. sdd's `spec/requirements.md`, any md in a product's own SDD, or omitted (= chat only).
+- `--out <path>` — where the decision record is written. Any md the caller names (a product's own design or spec file), or omitted (= chat only).
 - `--hints "..."` — angles passed by a calling skill. Use them as the initial seed of the frontier.
 
 ## 3. Design tree and frontier
@@ -36,7 +36,7 @@ Hold the target as a **decision tree**. Node = something to decide; edge = "B ca
 
 Whatever can be learned by reading code, environment, config, or docs, **do not ask the user**.
 
-- Delegate investigation to subagents (`Explore` or `general-purpose`, model sonnet). Bundle several questions into one parallel batch.
+- Delegate investigation to subagents (`Explore` or `general-purpose`, main tier, medium effort). Bundle several questions into one parallel batch.
 - Pull questions that depend on a fact still under investigation off the frontier until the result is back.
 - Ask the user **only for decisions that involve a choice or trade-off**. Not "what do you want?" but "which of A and B do you give up?".
 - Push back on soft or vague answers: "which of the two do you mean?", "what breaks if that assumption fails?", "where does that number come from?". Do not agree and move on.
@@ -44,7 +44,7 @@ Whatever can be learned by reading code, environment, config, or docs, **do not 
 
 ## 5. Sources
 
-- When a recommendation cites external literature (official docs, papers, authoritative design guides), have a sonnet subagent WebFetch it and confirm **the URL exists and the passage says what is claimed** before citing.
+- When a recommendation cites external literature (official docs, papers, authoritative design guides), have a subagent (main tier, medium effort) WebFetch it and confirm **the URL exists and the passage says what is claimed** before citing.
 - Never write a source you could not verify. A quote from memory is not a source.
 - **When an external document (an internal wiki page, a ticket, meeting minutes) is
   the basis, never reference it by identifier alone.** Assume the reader does not
@@ -60,7 +60,7 @@ Whatever can be learned by reading code, environment, config, or docs, **do not 
 
 Where the questions go. `local` and `artifact` both put out **one page per round**
 (**3–6** frontier questions). In both, the main session writes **only the round
-document**; HTML generation is delegated to a **sonnet subagent**. Never hand-write
+document**; HTML generation is delegated to a **subagent on the main tier, medium effort**. Never hand-write
 HTML or SVG.
 
 The renderer lives outside the skill at `$DOTFILES_ROOT/harness/tools/grilling-render/`
@@ -83,13 +83,13 @@ company traces. When unsure, **ask once**.
 
 ### local (default; any machine with a browser)
 
-Finish these two before serving. Both are spots that actually got stuck in a sandbox.
+Finish these two before serving.
 
-1. **Materialize the renderer.** If `<render>/node_modules` is missing,
-   `pnpm install` is needed, but when `~/.claude/skills` is a symlink into dotfiles
-   the target is not writable and it fails with `EPERM` (same with a `!` prefix).
-   In that case copy the whole `<render>` into the scratchpad, `pnpm install` there,
-   and use the copy's `render.mjs` from then on. Do not ask to lift the sandbox.
+1. **Materialize the renderer.** If `<render>/node_modules` is missing, run
+   `pnpm install` in `<render>`. Inside a container (sbx), where the OS sandbox is on
+   and the checkout may not be writable, a failure with `EPERM` means: copy the whole
+   `<render>` into the scratchpad, `pnpm install` there, and use the copy's
+   `render.mjs` from then on. Do not ask to lift the sandbox.
 2. **Render and validate without serving.** Confirm
    `node <render>/render.mjs <round.md> -o <scratchpad>/round-<n>.html`
    exits 0 before serving. Exit 2 is a schema violation; the typical case is a
@@ -99,7 +99,7 @@ Finish these two before serving. Both are spots that actually got stuck in a san
    wait: even if it exits immediately, the result never comes back.
 
 Serve with `node <render>/render.mjs serve <round.md> --no-open`.
-Inside a sandbox `open` never reaches the browser, so do not rely on auto-open;
+Inside a container (sbx) `open` never reaches the browser, and a subagent's run may not either, so do not rely on auto-open;
 relay the URL from stderr to the user right away (the reliable way is a
 `run_in_background` Bash in the main session that dumps stderr to a scratchpad file
 and reads it. Delegated to a subagent, the URL comes back only after every
@@ -319,16 +319,16 @@ through `writeup`'s build / commit. grilling stops at producing the `--out` file
 
 Just call `grilling <対象> --out <path> --hints "..."`.
 
-Example (sdd clarify):
+Example (settling a design file's open points):
 
 ```
-grilling "spec/requirements.md の要件" --out spec/requirements.md \
+grilling "docs/design.md の未決事項" --out docs/design.md \
   --hints "入出力の形式 / エッジケース / 非機能要件 / 既存コードとの統合点 / スコープ境界"
 ```
 
 The caller proceeds to the next phase only after grilling reports "共通理解に達した".
 
-From Codex, use `@grilling` (or the /skills menu). `codex/SKILL.md` references the same round-format and render.
+From Codex, use `@grilling` (or the /skills menu).
 
 ## References
 

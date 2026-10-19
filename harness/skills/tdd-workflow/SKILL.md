@@ -56,18 +56,15 @@ ALWAYS write tests first, then implement code to make tests pass.
 - **E2E (Playwright)** — critical user flows, complete workflows, browser automation
 
 ### 4. Git Checkpoints
-- If the repository is under Git, create a checkpoint commit after each TDD stage
-- Do not squash or rewrite these checkpoint commits until the workflow is complete
-- Each checkpoint commit message must describe the stage and the exact evidence captured
-- Count only commits created on the current active branch for the current task
-- Do not treat commits from other branches, earlier unrelated work, or distant branch history as valid checkpoint evidence
-- Before treating a checkpoint as satisfied, verify that the commit is reachable from the current `HEAD` on the active branch and belongs to the current task sequence
+- Never commit a failing test on its own: the house rule is "never commit with failing tests". The reproducer is committed together with the fix that turns it GREEN
+- If the repository is under Git, commit once GREEN is validated, and again after a refactor that keeps tests green
+- Each commit message follows the project's format (`<type>(<scope>): <subject>`) and the body states the evidence captured (the RED failure and the GREEN pass)
+- Count only commits created on the current active branch for the current task; verify that each is reachable from the current `HEAD`
 - The preferred compact workflow is:
-  - one commit for failing test added and RED validated
-  - one commit for minimal fix applied and GREEN validated
+  - one commit for the failing test plus the minimal fix, after RED and GREEN are both validated
   - one optional commit for refactor complete
-- Separate evidence-only commits are not required if the test commit clearly corresponds to RED and the fix commit clearly corresponds to GREEN
-- Squash merges are allowed only after the workflow evidence has been preserved in Step 8. If checkpoint commits will be squashed, copy the RED/GREEN/refactor summary into the PR body, squash commit body, or evidence report so reviewers can still answer what was verified and how.
+- Record the RED result (command and failure output) in the session or the evidence report before writing the fix, since no commit captures it on its own
+- If commits will be squashed, copy the RED/GREEN/refactor summary into the PR body, squash commit body, or evidence report (Step 8) so reviewers can still answer what was verified and how.
 
 ## TDD Workflow Steps
 
@@ -124,14 +121,10 @@ A test that was only written but not compiled and executed does not count as RED
 
 Do not edit production code until this RED state is confirmed.
 
-If the repository is under Git, create a checkpoint commit immediately after this stage is validated.
-Recommended commit message format:
-- `test: add reproducer for <feature or bug>`
-- This commit may also serve as the RED validation checkpoint if the reproducer was compiled and executed and failed for the intended reason
-- Verify that this checkpoint commit is on the current active branch before continuing
+Do not commit yet. Record the command and the failure output as RED evidence; the test is committed together with the fix after GREEN (Step 5).
 
 ### Step 4: Implement Code
-Write minimal code to make tests pass. If the repository is under Git, stage the minimal fix now but defer the checkpoint commit until GREEN is validated in Step 5.
+Write minimal code to make tests pass. If the repository is under Git, leave the test and the fix uncommitted until GREEN is validated in Step 5.
 
 ### Step 5: Run Tests Again
 ```bash
@@ -143,18 +136,17 @@ Rerun the same relevant test target after the fix and confirm the previously fai
 
 Only after a valid GREEN result may you proceed to refactor.
 
-If the repository is under Git, create a checkpoint commit immediately after GREEN is validated.
+If the repository is under Git, commit the test and the fix together immediately after GREEN is validated.
 Recommended commit message format:
-- `fix: <feature or bug>`
-- The fix commit may also serve as the GREEN validation checkpoint if the same relevant test target was rerun and passed
-- Verify that this checkpoint commit is on the current active branch before continuing
+- `fix(<scope>): <feature or bug>` (or `feat(<scope>): …`), with the RED and GREEN evidence in the body
+- Verify that this commit is on the current active branch before continuing
 
 ### Step 6: Refactor
 Improve code quality while keeping tests green: remove duplication, improve naming, optimize performance, enhance readability.
 
 If the repository is under Git, create a checkpoint commit immediately after refactoring is complete and tests remain green.
 Recommended commit message format:
-- `refactor: clean up after <feature or bug> implementation`
+- `refactor(<scope>): <what was cleaned up>`
 - Verify that this checkpoint commit is on the current active branch before considering the TDD cycle complete
 
 ### Step 7: Verify Coverage

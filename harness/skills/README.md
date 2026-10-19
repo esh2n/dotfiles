@@ -9,7 +9,9 @@ Rulings that shape this directory:
 
 - no `core`/`packs`/`personal` split and no per-machine pack switch — every
   skill is present, the judgment service picks per task
-  (`../rules/decisions/2026-09-22-config-layout-no-personal-layer.md`)
+  (`../rules/decisions/2026-09-24-harness-top-level-dir.md`, which replaces
+  the location part of `2026-09-22-config-layout-no-personal-layer.md` and keeps
+  the rest)
 - no `commands/`: a slash command is a skill with
   `disable-model-invocation: true`; a model-only background skill is
   `user-invocable: false`

@@ -5,7 +5,7 @@ report) — or any Markdown the user hands over — into a
 writeup page. Read the file, map it with the table below, then continue
 at `SKILL.md` step 3 (write the body into the copied template, render
 figures, lint, self-check, save, commit). This is the mirror image of
-the kit's own `to-md.mjs` mapping (`$KIT/references/page-contract.md`
+the kit's own `to-md.mjs` mapping (`$KREF/page-contract.md`
 §7) — reading that table backwards is a useful cross-check.
 
 ## Markdown → component mapping

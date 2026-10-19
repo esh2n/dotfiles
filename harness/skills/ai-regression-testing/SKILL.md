@@ -196,10 +196,18 @@ describe("GET /api/user/messages (conversation list)", () => {
 
 ## Integrating Tests into Bug-Check Workflow
 
-### Custom Command Definition
+### Skill Definition
+
+A slash command is a skill with `disable-model-invocation: true`; there is no `commands/` directory.
 
 ```markdown
-<!-- .claude/commands/bug-check.md -->
+<!-- .claude/skills/bug-check/SKILL.md -->
+---
+name: bug-check
+description: Run tests and build, then review for known AI blind spots
+disable-model-invocation: true
+---
+
 # Bug Check
 
 ## Step 1: Automated Tests (mandatory, cannot skip)

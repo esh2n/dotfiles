@@ -12,7 +12,7 @@ Topic: $ARGUMENTS
 
 Explain the topic to a capable adult (about thirty) who is new to the field, as a **picture-first HTML Artifact**: one diagram per panel, short text, one idea per panel. The name is kept for the trigger; the reader is not a child. The reader should be able to retell the mechanism in their own words, using the real terms, afterwards.
 
-Default language follows the conversation (this harness: Japanese). If the argument contains `--en`, write in English. Japanese text follows the `plain-japanese` skill.
+Default language follows the conversation (this harness: Japanese). If the argument contains `--en`, write in English. Japanese text follows the always-on writing rules (`rules/common/90-writing.md`); use the `plain-japanese` skill only when the owner asks for it.
 
 ## Non-negotiables
 
@@ -68,7 +68,7 @@ Re-read the page once as the reader and check:
 - [ ] nothing stated is actually false (step 1 bullets still hold)
 - [ ] the "say it back" sentence alone is a correct summary
 
-For Japanese, run the `plain-japanese` checks on the page text. Fix what fails, republish to the same path, then report: the link, the concrete instance you chose, and what you deliberately left out.
+For Japanese, reread the page text against the always-on writing rules (`rules/common/90-writing.md`); run the `plain-japanese` checks only when the owner asked for them. Fix what fails, republish to the same path, then report: the link, the concrete instance you chose, and what you deliberately left out.
 
 ## Options
 
