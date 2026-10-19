@@ -30,6 +30,7 @@ Domain knowledge, by what the diff touches:
 | API surfaces: HTTP/REST, gRPC/protobuf, GraphQL schemas, public library or SDK signatures, webhooks, CLI flags and machine-readable output | `api-design/references/review-checklist.md` (compatibility, versioning and deprecation items go to `rollout-reviewer`; silences in a design go to `spec-reviewer`) |
 | network calls, timeouts, retries, queues sizing, health checks | `resilience-patterns/references/review-checklist.md` |
 | events, topics, consumers, outbox, sagas | `event-driven-patterns/references/review-checklist.md` |
+| writes to two stores or services that must agree, cross-service workflows, caches, read replicas, timestamps compared across hosts, leader election, distributed locks or leases, exactly-once or idempotency claims | `distributed-correctness/references/review-checklist.md` |
 | metrics, logs, traces, alerts | `observability-patterns/references/review-checklist.md` |
 | a new service, endpoint, job, consumer or scheduled task; a data migration or backfill; a feature flag or config rollout; secrets, backups, deletion or decommissioning; deployment, scaling or on-call behaviour | `ops-readiness/references/review-checklist.md` (read by `rollout-reviewer` and `workload-reviewer`) |
 | aggregates, entities, bounded contexts | `ddd-modeling-review` |
