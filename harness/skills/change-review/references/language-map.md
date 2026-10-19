@@ -31,6 +31,7 @@ Domain knowledge, by what the diff touches:
 | metrics, logs, traces, alerts | `observability-patterns/references/review-checklist.md` |
 | aggregates, entities, bounded contexts | `ddd-modeling-review` |
 | layer boundaries, ports and adapters | `clean-architecture` |
+| `.github/workflows/*.yml`, `action.yml`, reusable workflows | `github-actions-patterns/references/review-checklist.md` (security items go to `security-reviewer`) |
 | Kubernetes manifests | `k8s-patterns` |
 | GCP resources, IAM | `gcp-patterns` |
 | Cloudflare Workers | `cloudflare-patterns` |
