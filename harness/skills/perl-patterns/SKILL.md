@@ -119,9 +119,9 @@ my @users = @{ $data->{users} };
 my @roles = @{ $data->{users}[0]{roles} };
 ```
 
-### 5. The `isa` Operator (5.32+)
+### 5. The `isa` Operator (5.36+)
 
-Infix type-check — replaces `blessed($o) && $o->isa('X')`.
+Infix type-check — replaces `blessed($o) && $o->isa('X')`. Added in 5.32 as an experimental feature that needs `use feature 'isa'`; stable and enabled by `use v5.36` and later ([perlop: Class Instance Operator](https://perldoc.perl.org/perlop#Class-Instance-Operator), [perl5360delta](https://perldoc.perl.org/perl5360delta#use-v5.36)).
 
 ```perl
 use v5.36;
@@ -132,14 +132,21 @@ if ($obj isa 'My::Class') { $obj->do_something }
 
 ### eval/die Pattern
 
+Test the return value of `eval`, not `$@`. A `DESTROY` that runs its own `eval` during unwinding can clear `$@`, and an exception object can be false; a block that ends in `1` returns false only when it died ([Try::Tiny: BACKGROUND](https://metacpan.org/pod/Try::Tiny#BACKGROUND), [perlfunc eval](https://perldoc.perl.org/functions/eval)).
+
 ```perl
 use v5.36;
 
 sub parse_config($path) {
-    my $content = eval { path($path)->slurp_utf8 };
-    die "Config error: $@" if $@;
+    my $content;
+    eval { $content = path($path)->slurp_utf8; 1 }
+        or do { my $e = $@ || 'unknown error'; die "Config error: $e" };
     return decode_json($content);
 }
+
+# Bad: $@ may already be cleared, or be a false object
+my $content = eval { path($path)->slurp_utf8 };
+die "Config error: $@" if $@;
 ```
 
 ### Try::Tiny (Reliable Exception Handling)
@@ -161,7 +168,9 @@ sub fetch_user($id) {
 }
 ```
 
-### Native try/catch (5.40+)
+### Native try/catch (stable in 5.40)
+
+The `try` feature exists since 5.34; it was experimental (and warned) until 5.40, where it became stable and joined the `use v5.40` bundle. `return` inside `try` returns from the enclosing sub, unlike `eval` or Try::Tiny. A `finally` block is still experimental in 5.44 and warns in `experimental::try`. On perls older than 5.34, Feature::Compat::Try provides the same syntax ([feature: try](https://perldoc.perl.org/feature#The-'try'-feature), [perlsyn: Try Catch](https://perldoc.perl.org/perlsyn#Try-Catch-Exception-Handling), [Feature::Compat::Try](https://metacpan.org/pod/Feature::Compat::Try)).
 
 ```perl
 use v5.40;
@@ -178,12 +187,12 @@ sub divide($x, $y) {
 }
 ```
 
-## Modern OO with Moo
+## Object-Oriented Code
 
-Prefer Moo for lightweight, modern OO. Use Moose only when its metaprotocol is needed.
+Core Perl has two object systems: `bless` (stable; always pass the class as the second argument, per [perlfunc bless](https://perldoc.perl.org/functions/bless)) and the `class` feature (5.38+, still experimental; see below). Moo and Moose are CPAN modules; this skill has not checked their docs, so choosing one is the project's decision, not a rule. Follow whatever the codebase already uses. The examples below use Moo.
 
 ```perl
-# Good: Moo class
+# Moo class (CPAN)
 package User;
 use Moo;
 use Types::Standard qw(Str Int ArrayRef);
@@ -211,7 +220,7 @@ my $user = User->new(
     roles => ['admin', 'user'],
 );
 
-# Bad: Blessed hashref (no validation, no accessors)
+# Plain bless (core): no validation or generated accessors, so write them yourself
 package User;
 sub new {
     my ($class, %args) = @_;
@@ -240,7 +249,9 @@ sub TO_HASH($self) { { name => $self->name, email => $self->email } }
 1;
 ```
 
-### Native `class` Keyword (5.38+, Corinna)
+### Native `class` Keyword (5.38+, experimental)
+
+The `class` feature is experimental: it warns unless `experimental::class` is silenced, its implementation may change, roles are not implemented yet, and perlclass lists open bugs, including one where declaring fields after a nested subclass corrupts object storage. Do not use it in code that must survive perl upgrades. `field :reader` needs 5.40, `:writer` 5.42 ([perlclass](https://perldoc.perl.org/perlclass), [feature: class](https://perldoc.perl.org/feature#The-'class'-feature)).
 
 ```perl
 use v5.38;
@@ -311,9 +322,11 @@ my $config = {
     },
 };
 
-# Safe deep access (returns undef if any level missing)
+# Deep access returns undef when a level is missing, but reading
+# $config->{cache}{host} autovivifies $config->{cache} = {} on the way
+# (perlref: Autovivification). Test each level with exists when that matters.
 my $port = $config->{database}{port};           # 5432
-my $missing = $config->{cache}{host};           # undef, no error
+my $missing = exists $config->{cache} ? $config->{cache}{host} : undef;
 
 # Hash slices
 my %subset;
@@ -415,16 +428,20 @@ sub trim($str) { $str =~ s/^\s+|\s+$//gr }
 -i=4        # 4-space indent
 -l=100      # 100-char line length
 -ci=4       # continuation indent
--ce         # cuddled else
+-nce        # uncuddled else (perlstyle); style choice, use -ce only if the project's .perltidyrc does
 -bar        # opening brace on same line
 -nolq       # don't outdent long quoted strings
 ```
 
 ### perlcritic Configuration (.perlcriticrc)
 
+Theme expressions use `&&`, `||`, `!` (or `and`, `or`, `not`); the old `core + pbp + security` form is a union, which selects every `core` policy, so it filters nothing ([Perl::Critic: POLICY THEMES](https://metacpan.org/pod/Perl::Critic)). Severity 3 enables `ValuesAndExpressions::ProhibitConstantPragma` (default severity 4), which flags `use constant`; this config disables it because `use constant` is core and is what the anti-patterns section below recommends.
+
 ```ini
 severity = 3
-theme = core + pbp + security
+
+# use constant is core; Readonly (the policy's suggestion) is a CPAN dependency
+[-ValuesAndExpressions::ProhibitConstantPragma]
 
 [InputOutput::RequireCheckedSyscalls]
 functions = :builtins
@@ -467,13 +484,13 @@ on test => sub {
 | `@{ $ref }` | `$ref->@*` |
 | `%{ $ref }` | `$ref->%*` |
 | `open FH, "< $file"` | `open my $fh, '<:encoding(UTF-8)', $file` |
-| `blessed hashref` | `Moo` class with types |
+| Hand-written accessors on a blessed hashref | The OO system the codebase already uses (Moo/Moose from CPAN, or `class` once it is no longer experimental) |
 | `$1, $2, $3` | `$+{name}` (named captures) |
-| `eval { }; if ($@)` | `Try::Tiny` or native `try/catch` (5.40+) |
+| `eval { }; if ($@)` | `eval { ...; 1 } or do { ... }`, Try::Tiny, or core `try/catch` (stable 5.40, experimental 5.34–5.38) |
 | `BEGIN { require Exporter; }` | `use Exporter 'import';` |
 | Manual file ops | `Path::Tiny` |
-| `blessed($o) && $o->isa('X')` | `$o isa 'X'` (5.32+) |
-| `builtin::true / false` | `use builtin 'true', 'false';` (5.36+, experimental) |
+| `blessed($o) && $o->isa('X')` | `$o isa 'X'` (5.36+; experimental with `use feature 'isa'` on 5.32–5.34) |
+| `!!1` / `!!0` as booleans | `builtin::true` / `builtin::false` (added 5.36 as experimental; stable since 5.40 and imported by `use v5.40`) ([builtin](https://perldoc.perl.org/builtin)) |
 
 ## Anti-Patterns
 
@@ -496,8 +513,8 @@ ${"My::Package::$var"} = $value;         # Use a hash instead
 
 # 5. Global variables as configuration
 our $TIMEOUT = 30;                       # Bad: mutable global
-use constant TIMEOUT => 30;              # Better: constant
-# Best: Moo attribute with default
+use constant TIMEOUT => 30;              # Better: constant (see the .perlcriticrc note on ProhibitConstantPragma)
+# Or pass the value in: a constructor argument or attribute with a default
 
 # 6. String eval for module loading
 eval "require $module";                  # Bad: code injection risk
@@ -506,7 +523,7 @@ use Module::Runtime 'require_module';    # Good: safe module loading
 require_module($module);
 ```
 
-**Remember**: Modern Perl is clean, readable, and safe. Let `use v5.36` handle the boilerplate, use Moo for objects, and prefer CPAN's battle-tested modules over hand-rolled solutions.
+**Remember**: Modern Perl is clean, readable, and safe. Let `use v5.36` handle the boilerplate (on a 5.36+ interpreter; macOS `/usr/bin/perl` was 5.34.1 when checked), use the object system the codebase already has, and prefer CPAN's battle-tested modules over hand-rolled solutions.
 
 ## Folded from rules/perl (2026-09-23)
 
@@ -585,8 +602,8 @@ $sth->execute($email);
 
 #### Security Scanning
 
-Run **perlcritic** with the security theme at severity 4+:
+Perl::Critic's `security` theme holds only two policies (`InputOutput::ProhibitTwoArgOpen` and `InputOutput::RequireEncodingWithUTF8Layer`, in Perl::Critic 1.156), so `--theme security` is not a security scan. Run perlcritic at the project's severity and review shell, `eval STRING`, SQL and regex use by hand (`references/review-standard.md` section 4.3):
 
 ```bash
-perlcritic --severity 4 --theme security lib/
+perlcritic --severity 3 lib/
 ```
