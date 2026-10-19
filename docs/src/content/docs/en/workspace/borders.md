@@ -11,7 +11,7 @@ Borders draws a border around the active window on macOS. Combined with AeroSpac
 |---------|-------|
 | Style | Round |
 | Width | 7.0px |
-| HiDPI | On |
+| HiDPI | Off |
 | Active color | Theme-dependent |
 | Inactive color | Theme-dependent |
 
@@ -25,7 +25,7 @@ source "$(dirname "$0")/colors.sh"
 options=(
     style=round
     width=7.0
-    hidpi=on
+    hidpi=off
     active_color="$active_color"
     inactive_color="$inactive_color"
 )

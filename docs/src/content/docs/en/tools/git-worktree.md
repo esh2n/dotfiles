@@ -20,34 +20,30 @@ wtp list
 # Add a worktree for a feature branch
 wtp add feature/user-auth
 
-# Specify a custom path
-wtp add feature/api-refactor ../project-api-refactor
+# Create a new branch and its worktree
+wtp add -b feature/api-refactor
 
 # Remove after merging
 wtp remove feature/user-auth
 
 # Switch to a worktree
-wtp switch feature/user-auth
-
-# Clean up stale entries
-wtp prune
+cd "$(wtp cd feature/user-auth)"
 ```
 
-## Directory naming convention
+## Where worktrees go
 
-```text
-../project-<type>-<description>
-```
+Worktrees are created under `base_dir` (default `../worktrees`), named after the branch. Move into one with `cd "$(wtp cd <branch>)"`.
 
-Types: `feature`, `bugfix`, `hotfix`, `experiment`, `refactor`
+Branch types: `feature`, `bugfix`, `hotfix`, `experiment`, `refactor`
 
 ## Config
 
-Create `.wtp.local.yml` for personal overrides (already gitignored):
+Settings live in `.wtp.yml` at the repository root (`wtp init` writes a template):
 
 ```yaml
-default_path: "../worktrees"
-auto_cleanup: true
+version: "1.0"
+defaults:
+  base_dir: ../worktrees
 ```
 
 ## Recipes
@@ -59,8 +55,8 @@ auto_cleanup: true
 cd ~/project-feature-auth
 
 # Urgent bug comes in
-wtp add hotfix/critical-bug
-cd ../project-hotfix-critical-bug
+wtp add -b hotfix/critical-bug
+cd "$(wtp cd hotfix/critical-bug)"
 
 # Fix, push, go back to feature
 cd ~/project-feature-auth
@@ -73,12 +69,12 @@ wtp remove hotfix/critical-bug
 
 ```bash
 # Approach A
-wtp add experiment/approach-a
-cd ../project-experiment-approach-a
+wtp add -b experiment/approach-a
+cd "$(wtp cd experiment/approach-a)"
 
 # Approach B
-wtp add experiment/approach-b
-cd ../project-experiment-approach-b
+wtp add -b experiment/approach-b
+cd "$(wtp cd experiment/approach-b)"
 
 # Compare and keep the better one
 ```
@@ -86,8 +82,8 @@ cd ../project-experiment-approach-b
 ### Local PR review
 
 ```bash
-wtp add review/pr-123 origin/pull/123
-cd ../project-review-pr-123
+wtp add -b review/pr-123 origin/pull/123
+cd "$(wtp cd review/pr-123)"
 
 # Review, then clean up
 wtp remove review/pr-123

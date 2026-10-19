@@ -14,7 +14,7 @@ Git と共存する次世代 VCS。Git の `g` prefix に対応させて `j` pre
 | staging | `git add` | 不要 (working copy = stage) |
 | stash | `git stash` | 不要 (`jj new` するだけ) |
 | amend | `git commit --amend` | `jj describe` / `jj squash` |
-| revert | `git revert` | `jj backout` |
+| revert | `git revert` | `jj revert` |
 | reflog | `git reflog` | `jj operation log` |
 | worktree | `git worktree` | `jj workspace` |
 | blame | `git blame` | `jj file annotate` |

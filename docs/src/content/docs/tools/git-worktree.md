@@ -20,34 +20,30 @@ wtp list
 # feature branch の worktree を追加
 wtp add feature/user-auth
 
-# custom path を指定
-wtp add feature/api-refactor ../project-api-refactor
+# 新しい branch を作って追加
+wtp add -b feature/api-refactor
 
 # merge 後に削除
 wtp remove feature/user-auth
 
 # worktree に switch
-wtp switch feature/user-auth
-
-# stale な entry を cleanup
-wtp prune
+cd "$(wtp cd feature/user-auth)"
 ```
 
-## Directory naming convention
+## Directory の置き場所
 
-```text
-../project-<type>-<description>
-```
+worktree は `base_dir`（既定は `../worktrees`）の下に branch 名で作られる。移動は `cd "$(wtp cd <branch>)"`。
 
-Types: `feature`, `bugfix`, `hotfix`, `experiment`, `refactor`
+branch の type: `feature`, `bugfix`, `hotfix`, `experiment`, `refactor`
 
 ## Config
 
-`.wtp.local.yml` で個人設定 (gitignore 済み):
+リポジトリ直下の `.wtp.yml` に書く（`wtp init` が雛形を作る）:
 
 ```yaml
-default_path: "../worktrees"
-auto_cleanup: true
+version: "1.0"
+defaults:
+  base_dir: ../worktrees
 ```
 
 ## Recipes
@@ -59,8 +55,8 @@ auto_cleanup: true
 cd ~/project-feature-auth
 
 # 緊急の bug が来た
-wtp add hotfix/critical-bug
-cd ../project-hotfix-critical-bug
+wtp add -b hotfix/critical-bug
+cd "$(wtp cd hotfix/critical-bug)"
 
 # 修正、push、feature に戻る
 cd ~/project-feature-auth
@@ -73,12 +69,12 @@ wtp remove hotfix/critical-bug
 
 ```bash
 # Approach A
-wtp add experiment/approach-a
-cd ../project-experiment-approach-a
+wtp add -b experiment/approach-a
+cd "$(wtp cd experiment/approach-a)"
 
 # Approach B
-wtp add experiment/approach-b
-cd ../project-experiment-approach-b
+wtp add -b experiment/approach-b
+cd "$(wtp cd experiment/approach-b)"
 
 # 比較して良い方を残す
 ```
@@ -86,8 +82,8 @@ cd ../project-experiment-approach-b
 ### Local PR review
 
 ```bash
-wtp add review/pr-123 origin/pull/123
-cd ../project-review-pr-123
+wtp add -b review/pr-123 origin/pull/123
+cd "$(wtp cd review/pr-123)"
 
 # review 後に cleanup
 wtp remove review/pr-123

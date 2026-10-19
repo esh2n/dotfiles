@@ -1,9 +1,9 @@
 ---
 title: VSCode
-description: 97 の extension を含む VSCode の構成。
+description: 98 の extension を含む VSCode の構成。
 ---
 
-VSCode の extension list を dotfiles で管理している。テーマ系、言語サポート、Git 連携、生産性ツールなど 97 の extension。
+VSCode の extension list を dotfiles で管理している。テーマ系、言語サポート、Git 連携、生産性ツールなど 98 の extension。
 
 ## Extension 一覧
 
@@ -139,12 +139,12 @@ VSCode の extension list を dotfiles で管理している。テーマ系、�
 
 ## Extension の管理
 
-extension list は `~/.config/vscode/extensions.txt` に保持。install / export は script で行う。
+extension list は `~/.config/vscode/extensions.txt` に保持。install は `dotctl editor extensions`（別名 `install-extensions`）が、入っている VS Code と Cursor の両方に行う。
 
 ```bash
 # export
 code --list-extensions > extensions.txt
 
 # install
-cat extensions.txt | xargs -L 1 code --install-extension
+dotctl editor extensions
 ```

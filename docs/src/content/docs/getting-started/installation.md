@@ -12,10 +12,10 @@ cd dotfiles
 make up    # = ./bootstrap.sh
 ```
 
-`bootstrap.sh` は、Nix が無ければ公式のインストーラー（multi-user）で入れ、あとを `dotctl up` に渡します。`dotctl up` がすることは次のとおりです。
+`bootstrap.sh` は、Nix が無ければ公式のインストーラー（multi-user）で入れて止まります（終了コード 2）。新しいシェルを開いて `make up` をもう一度実行すると、あとを `dotctl up` に渡します。`dotctl up` がすることは次のとおりです。
 
 1. 役割ファイル（下記）を確かめる
-2. 移動したディレクトリに残った、この機械だけのファイルを新しい場所へ運ぶ
+2. 旧構成が残した切れたリンクを消す
 3. macOS は nix-darwin、Linux は home-manager で構成を作って切り替える
 4. Nix では宣言できない手順（`dotctl setup` の各手順）を走らせる
 5. ログインシェルを zsh にし、mise で言語の実行環境を入れる

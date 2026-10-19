@@ -5,6 +5,8 @@ description: Unified keybindings across WezTerm, Zellij, and Herdr.
 
 The same keybindings work across WezTerm, Zellij, and Herdr. Prefix key is `Ctrl+q`.
 
+Herdr follows this scheme for splits (`Prefix + \` / `-`), pane navigation (`Prefix + h/j/k/l`) and tab switching (`Alt+h`/`Alt+l`). For Herdr's own keys and agent integration, see [Herdr](/dotfiles/terminal/herdr/).
+
 ## Pane operations
 
 | Action | Key | Note |
@@ -12,7 +14,7 @@ The same keybindings work across WezTerm, Zellij, and Herdr. Prefix key is `Ctrl
 | Split right | `Prefix + \` | |
 | Split down | `Prefix + -` | |
 | Navigate panes | `Prefix + h/j/k/l` | |
-| Resize panes | `Prefix + H/J/K/L` | |
+| Resize panes | `Prefix + H/J/K/L` | Zellij only; Herdr: `Prefix + r` |
 | Zoom pane | `Prefix + z` | |
 | Toggle floating | `Prefix + w` | Zellij only |
 | Toggle embed/float | `Prefix + e` | Zellij only |
@@ -22,8 +24,8 @@ The same keybindings work across WezTerm, Zellij, and Herdr. Prefix key is `Ctrl
 
 | Action | Key | Note |
 |--------|-----|------|
-| Previous tab | `Ctrl+h` | No prefix needed |
-| Next tab | `Ctrl+l` | No prefix needed |
+| Previous tab | Zellij `Prefix + Shift+Tab`, WezTerm `Cmd+[`, Herdr `Alt+h` | |
+| Next tab | Zellij `Prefix + Tab`, WezTerm `Cmd+]`, Herdr `Alt+l` | |
 | Tab 1-5 | `Ctrl+1-5` | No prefix, Zellij only |
 | New tab | `Prefix + t` | Zellij only |
 
@@ -42,9 +44,9 @@ The same keybindings work across WezTerm, Zellij, and Herdr. Prefix key is `Ctrl
 
 ## Session
 
-| Action | Key |
-|--------|-----|
-| Detach | `Prefix + d` |
+| Action | Key | Note |
+|--------|-----|------|
+| Detach | `Prefix + d` | Zellij only; Herdr: `Prefix + q` |
 
 ## Zellij plugins
 

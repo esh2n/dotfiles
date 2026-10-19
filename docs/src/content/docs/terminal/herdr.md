@@ -8,7 +8,7 @@ description: コーディングエージェント向けターミナルマルチ�
 状態（working / blocked / idle）を認識し、SSH 越しのリモートマシンでも同じセッションを扱える。
 
 - 設定ファイル: `~/.config/herdr/config.toml`（dotfiles では `home/shared/herdr/config/config.toml`）
-- インストール: `homebrew.nix` の `brew "herdr"`（nixpkgs 未収録のため Homebrew 経由）
+- インストール: macOS は `pkgs.herdr`（`home/darwin/herdr/default.nix`）、Linux は Omarchy の `/usr/bin/herdr`
 - prefix key は tmux / Zellij / WezTerm と統一で `Ctrl+q`
 
 ## 概念
@@ -83,10 +83,10 @@ dotfiles では popup を 4 つ定義している：
 
 | Key | 開くもの | サイズ |
 |-----|---------|--------|
-| `Alt+e` | nvim | 92% |
-| `Alt+g` | lazygit | 90% |
-| `f` | yazi | 85% |
-| `t` | スクラッチシェル | 70%×60% |
+| `Prefix + Alt+e` | nvim | 92% |
+| `Prefix + Alt+g` | lazygit | 90% |
+| `Prefix + f` | yazi | 85% |
+| `Prefix + t` | スクラッチシェル | 70%×60% |
 
 popup は cwd を引き継がないため、各コマンドが `HERDR_ACTIVE_PANE_CWD`
 （Herdr がフォーカス中 pane の cwd として export する変数）へ自分で `cd` している。

@@ -1,9 +1,9 @@
 ---
 title: Browser Extensions
-description: Chrome / Arc で使用している browser extension の一覧。
+description: Chrome / Dia で使用している browser extension の一覧。
 ---
 
-browser (Chrome / Arc) で使用している extension。security、development、navigation、productivity の 4 category。
+browser (Chrome / Dia) で使用している extension。security、development、navigation、customization、productivity の 5 category。
 
 ## Extension 一覧
 

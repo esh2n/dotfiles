@@ -14,10 +14,11 @@ make up    # = ./bootstrap.sh
 ```
 
 `bootstrap.sh` installs Nix with the official multi-user installer when it
-is missing, then hands over to `dotctl up`, which:
+is missing and stops (exit code 2); open a new shell and run `make up` again.
+With Nix present it hands over to `dotctl up`, which:
 
 1. checks the roles file (below)
-2. carries machine-local files left in moved directories to their new place
+2. removes the broken links the old layout left behind
 3. builds and switches the configuration: nix-darwin on macOS, home-manager on Linux
 4. runs the steps Nix cannot declare (`dotctl setup`)
 5. makes zsh the login shell and installs mise's runtimes

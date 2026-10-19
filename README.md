@@ -12,7 +12,8 @@ The same command installs a new machine and updates an existing one; running
 it again changes nothing:
 
 ```bash
-make up          # = ./bootstrap.sh: installs Nix when missing, then `dotctl up`
+make up          # = ./bootstrap.sh: installs Nix when missing and stops (open a
+                 #   new shell and run it again); with Nix, runs `dotctl up`
 ```
 
 `dotctl up` builds and switches this machine's configuration, runs the setup
@@ -45,7 +46,7 @@ make tailscale-acl   # render the tailnet policy, copy it, open the admin page
 ```
 dotfiles/
 ├── flake.nix, flake.lock    # the flake: darwinConfigurations.mac, homeConfigurations.linux, packages
-├── bootstrap.sh             # make up: installs Nix when missing, then dotctl up
+├── bootstrap.sh             # make up: installs Nix when missing (then stops), else dotctl up
 ├── lib/                     # facts (the one impure read), builders, services, setup steps
 ├── roles/                   # what each role turns on
 ├── system/darwin/           # nix-darwin: defaults, Homebrew, browsers
@@ -118,7 +119,7 @@ export DOTFILES_ROOT="/path/to/your/checkout" # the directory that holds flake.n
 - WezTerm, Ghostty, Warp
 - Zellij (terminal multiplexer with rich plugins)
 - Herdr (agent multiplexer, unified keybindings with Zellij/WezTerm)
-- Zsh, Fish
+- Zsh
 - Starship prompt
 
 ### CLI Tools
@@ -131,7 +132,6 @@ export DOTFILES_ROOT="/path/to/your/checkout" # the directory that holds flake.n
 - **vivid** - LS_COLORS generator
 - **btop** - Modern system monitor
 - **pay-respects** - Command correction
-- **mo** - Markdown viewer (browser, live-reload, Mermaid/KaTeX)
 - **diffnav** - File-tree git diff pager (delta-based, GitHub-style)
 - **ov** - Feature-rich terminal pager (section jump, column mode, filter)
 
@@ -343,7 +343,7 @@ Next-generation VCS coexisting with git. Pattern: `j` prefix mirrors `g` prefix 
 | Staging area | `git add` | (automatic, working copy = staging) |
 | Stash | `git stash` | (not needed, just `jj new`) |
 | Commit amend | `git commit --amend` | `jj describe` / `jj squash` |
-| Revert | `git revert` | `jj backout` |
+| Revert | `git revert` | `jj revert` |
 | Reflog | `git reflog` | `jj operation log` |
 | Worktree | `git worktree` | `jj workspace` |
 | Blame | `git blame` | `jj file annotate` |
@@ -467,34 +467,30 @@ wtp list
 # Add new worktree for feature development
 wtp add feature/user-auth
 
-# Add worktree with custom path
-wtp add feature/api-refactor ../project-api-refactor
+# Create a new branch and its worktree
+wtp add -b feature/api-refactor
 
 # Remove worktree after merging
 wtp remove feature/user-auth
 
 # Switch to a worktree
-wtp switch feature/user-auth
-
-# Clean up stale worktrees
-wtp prune
+cd "$(wtp cd feature/user-auth)"
 ```
 
-#### Worktree Naming Convention
+#### Where Worktrees Go
 
-```
-../project-<type>-<description>
-```
+Worktrees are created under `base_dir` (default `../worktrees`), named after the branch. Move into one with `cd "$(wtp cd <branch>)"`.
 
-Types: feature, bugfix, hotfix, experiment, refactor
+Branch types: feature, bugfix, hotfix, experiment, refactor
 
 #### Configuration
 
-Create `.wtp.local.yml` for personal overrides (already in `.gitignore`):
+Settings live in `.wtp.yml` at the repository root (`wtp init` writes a template):
 
 ```yaml
-default_path: "../worktrees"
-auto_cleanup: true
+version: "1.0"
+defaults:
+  base_dir: ../worktrees
 ```
 
 #### Real-World Scenarios
@@ -505,8 +501,8 @@ auto_cleanup: true
 cd ~/project-feature-auth
 
 # Critical bug reported - need immediate fix
-wtp add hotfix/critical-bug
-cd ../project-hotfix-critical-bug
+wtp add -b hotfix/critical-bug
+cd "$(wtp cd hotfix/critical-bug)"
 
 # Fix bug, test, commit, push
 # Return to feature work
@@ -519,13 +515,13 @@ wtp remove hotfix/critical-bug
 **Scenario 2: Comparing Two Implementations**
 ```bash
 # Implementation A in worktree
-wtp add experiment/approach-a
-cd ../project-experiment-approach-a
+wtp add -b experiment/approach-a
+cd "$(wtp cd experiment/approach-a)"
 # Write code for approach A
 
 # Implementation B in another worktree
-wtp add experiment/approach-b
-cd ../project-experiment-approach-b
+wtp add -b experiment/approach-b
+cd "$(wtp cd experiment/approach-b)"
 # Write code for approach B
 
 # Compare side-by-side with diff or IDE
@@ -535,10 +531,10 @@ cd ../project-experiment-approach-b
 **Scenario 3: Review Pull Request Locally**
 ```bash
 # Add worktree from PR branch
-wtp add review/pr-123 origin/pull/123
+wtp add -b review/pr-123 origin/pull/123
 
 # Test and review code
-cd ../project-review-pr-123
+cd "$(wtp cd review/pr-123)"
 
 # After review, cleanup
 wtp remove review/pr-123
@@ -663,8 +659,8 @@ Combined workflow for isolated project environments:
 
 ```bash
 # Create feature worktree
-wtp add feature/new-api
-cd ../project-feature-new-api
+wtp add -b feature/new-api
+cd "$(wtp cd feature/new-api)"
 
 # Create environment for this worktree
 cat > .envrc << EOF
@@ -688,13 +684,13 @@ Keybindings unified across WezTerm, Zellij, and Herdr (`~/.config/herdr/config.t
 | Split horizontal | `Prefix + \` | |
 | Split vertical | `Prefix + -` | |
 | Navigate panes | `Prefix + h/j/k/l` | |
-| Resize panes | `Prefix + H/J/K/L` | |
+| Resize panes | `Prefix + H/J/K/L` | Zellij only; Herdr: `Prefix + r` |
 | Zoom pane | `Prefix + z` | |
 | Floating panes toggle | `Prefix + w` | Zellij only |
 | Embed/float current pane | `Prefix + e` | Zellij only |
 | Close pane | `Prefix + x` | |
-| Previous tab | `Ctrl+h` | No prefix |
-| Next tab | `Ctrl+l` | No prefix |
+| Previous tab | Zellij `Prefix + Shift+Tab`, WezTerm `Cmd+[`, Herdr `Alt+h` | |
+| Next tab | Zellij `Prefix + Tab`, WezTerm `Cmd+]`, Herdr `Alt+l` | |
 | Go to tab 1-5 | `Ctrl+1-5` | No prefix, Zellij only |
 | New tab | `Prefix + t` | Zellij only |
 | Copy/scroll mode | `Prefix + [` | WezTerm: `Prefix + c` |
@@ -704,7 +700,7 @@ Keybindings unified across WezTerm, Zellij, and Herdr (`~/.config/herdr/config.t
 | Begin selection | `v` / `V` / `Ctrl+v` | Cell / Line / Block |
 | Copy and exit | `y` | Copies to clipboard |
 | Exit copy mode | `Esc` or `q` | |
-| Detach session | `Prefix + d` | |
+| Detach session | `Prefix + d` | Zellij only; Herdr: `Prefix + q` |
 | Monocle plugin | `Prefix + f` | Zellij only (file finder) |
 | Pane picker plugin | `Prefix + b` | Zellij only (starred panes) |
 
@@ -799,10 +795,8 @@ Move Window to Workspace:
 - `Alt+Shift+1-5` - Move to workspace and follow
 - `Alt+Shift+w/b/c/g/m/n/s/d` - Move to named workspace and follow
 
-**Service Mode** (`Alt+Shift+;`):
+**Service Mode** (no key bound; enter with `aerospace mode service`):
 - `Esc` - Reload config and return to main mode
-- `r` - Reset workspace tree layout
-- `f` - Toggle floating/tiling
 - `Backspace` - Close all windows except current
 
 **Configuration:**
@@ -982,8 +976,8 @@ The list is `home/shared/browsers/config/extensions.json`. On macOS nix-darwin f
 ## Safety
 
 All existing configurations are backed up:
-- Format: `{filename}.backup.{timestamp}`
-- Example: `.zshrc.backup.20250123_012345`
+- Format: `<file>.pre-dotfiles` (home-manager's backup extension on both macOS and Linux)
+- Example: `.zshrc.pre-dotfiles`
 
 ## Custom Configuration
 

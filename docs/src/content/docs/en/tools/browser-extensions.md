@@ -1,9 +1,9 @@
 ---
 title: Browser Extensions
-description: Chrome / Arc browser extensions for development and productivity.
+description: Chrome / Dia browser extensions for development and productivity.
 ---
 
-Browser extensions used in Chrome and Arc. Organized into security, development, navigation, and productivity categories.
+Browser extensions used in Chrome and Dia. Organized into security, development, navigation, customization, and productivity categories.
 
 ## Extensions
 

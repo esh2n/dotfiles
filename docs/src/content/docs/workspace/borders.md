@@ -11,7 +11,7 @@ Borders は macOS の active window に border を描画するツール。AeroSp
 |------|------|
 | Style | round |
 | Width | 7.0px |
-| HiDPI | on |
+| HiDPI | off |
 | Active color | テーマに連動 |
 | Inactive color | テーマに連動 |
 
@@ -25,7 +25,7 @@ source "$(dirname "$0")/colors.sh"
 options=(
     style=round
     width=7.0
-    hidpi=on
+    hidpi=off
     active_color="$active_color"
     inactive_color="$inactive_color"
 )

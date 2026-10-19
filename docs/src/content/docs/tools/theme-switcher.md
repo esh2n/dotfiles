@@ -3,22 +3,25 @@ title: Theme Switcher
 description: 全 application のテーマを 1 command で切り替える。
 ---
 
-`theme-switch` は、対応する全 application のテーマを一括で切り替える command。
+`dotctl theme set` は、対応する全 application のテーマを一括で切り替える command。`theme-switch` はその別名で、引数なしなら `dotctl theme list` と同じ。
 
 ## 対応テーマ
 
-| Theme | 雰囲気 |
-|-------|--------|
-| Catppuccin Mocha | warm な soft pastel |
-| Nord | cool な arctic palette |
-| Tokyo Night | dark で vibrant |
+13 種（`home/shared/theme/themes/`）。`dotctl theme list` で一覧を出せる。
+
+| Theme | 備考 |
+|-------|------|
+| `catppuccin` / `catppuccin-latte` | Mocha（dark）と Latte（light） |
+| `tokyonight` / `tokyonight-day` | dark と light |
+| `everforest` / `everforest-light` | dark と light |
+| `nord`, `dracula`, `gruvbox`, `kanagawa`, `onedark`, `rosepine`, `solarized` | |
 
 ## Usage
 
 ```bash
-theme-switch nord
-theme-switch catppuccin
-theme-switch tokyonight
+dotctl theme set nord
+dotctl theme set catppuccin
+theme-switch tokyonight   # dotctl theme set の別名
 ```
 
 ## 切り替え対象
@@ -30,15 +33,16 @@ theme-switch tokyonight
 - Sketchybar
 - Borders
 - Zellij (layout + zjstatus colors)
+- Warp、Starship、VSCode、Neovim、CLI の色、wallpaper、Orca、OmniWM（Linux では Omarchy も）
 
 ## 仕組み
 
-各 application にはテーマ固有の config file がある。`theme-switch` は symlink と config 値を選択したテーマに向けて更新し、必要に応じて service を restart する。
+`~/.config/theme/current` を、選んだテーマの palette（`~/.config/theme/palettes/<name>/`、home-manager が作る）へのリンクに張り替える。WezTerm、Ghostty、Sketchybar、Borders は `current` の中のファイルを読む。そのあと `sketchybar --reload`、borders の再起動、WezTerm の設定 file の touch で読み直させる。ほかの application は設定値を書き換える（`pkgs/dotctl/internal/theme/`）。
 
-Zellij では default layout の symlink が切り替わる:
+Zellij では `~/.config/zellij/config.kdl` の `default_layout` が書き換わる:
 
 ```text
-~/.config/zellij/layouts/default.kdl → active theme の layout
+default_layout "<theme>"   # layouts/<theme>.kdl を使う
 ```
 
 ## Wallpaper

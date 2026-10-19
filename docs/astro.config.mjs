@@ -123,6 +123,7 @@ export default defineConfig({
 					translations: { ja: 'Workspace' },
 					items: [
 						{ label: 'AeroSpace', slug: 'workspace/aerospace' },
+						{ label: 'OmniWM', slug: 'workspace/omniwm' },
 						{ label: 'Sketchybar', slug: 'workspace/sketchybar' },
 						{ label: 'Borders', slug: 'workspace/borders' },
 						{

@@ -3,9 +3,9 @@ title: CLI Tools
 description: Modern replacements for standard Unix commands.
 ---
 
-## Multi-shell support
+## Shell
 
-Both Zsh and Fish share the same aliases and environment variables. The common config is shared between shells, so you get the same experience regardless of which one you use.
+Zsh is the only shell. Aliases and environment variables live in `home/shared/zsh`.
 
 ## Tool list
 
@@ -36,4 +36,4 @@ Gray text appears as you type showing suggestions (zsh-autosuggestions).
 
 ## Prompt
 
-Starship is the shared prompt for both Zsh and Fish. It shows git status, language versions, command duration, and error codes.
+Starship is the Zsh prompt. It shows git status, language versions, command duration, and error codes.

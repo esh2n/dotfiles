@@ -100,8 +100,8 @@ worktree ごとに独立した環境を持たせる:
 
 ```bash
 # feature worktree を作成
-wtp add feature/new-api
-cd ../project-feature-new-api
+wtp add -b feature/new-api
+cd "$(wtp cd feature/new-api)"
 
 # この worktree 用の環境を setup
 cat > .envrc << EOF

@@ -4,10 +4,10 @@ description: 一つのソースツリーから Claude Code / Codex / omp / pi / 
 ---
 
 jig は `harness/` にあるハーネスの生成器とガード。ソースは
-`llm/harness/{skills,rules,agents,mcp,policy,scripts,workflows}` の一つの平らな
+`harness/{skills,rules,agents,mcp,policy,scripts,workflows}` の一つの平らな
 ツリーで、層もパックも無い。言語ごとの指針は `skills/<lang>-*` の中にあり
-（`rules/` に残るのは常時読み込みの `common/`、決定メモ、調査記録だけ）、
-skills は判断サービスが選ぶ。yoki(`claude-profiles/` の
+（`rules/` に残るのは常時読み込みの `common/`、決定メモ、調査記録、`knowledge/` だけ）、
+skills は判断サービスが選ぶ。退役した yoki(`claude-profiles/` の
 3層合成と `yoki-switch`)の後継で、置き換えの経緯と各マイルストーンの詳細は
 `harness/jig/README.md` にある。
 
@@ -33,13 +33,13 @@ jig box new|list|resume|fetch|rm           # sbx microVM の中でこのリポ�
   導かない。
 - **dry-run が既定**: `--write` を付けるまで何も書かない。
 - **管理外は保つ**: `settings.json` の未管理キー、`config.toml` の他のテーブル、
-  `mcp.json` の他のエントリはバイト単位で残る。`~/.claude.json` には触れない。
+  `mcp.json` の他のエントリはバイト単位で残る。`~/.claude.json` は `mcpServers` キーだけを書き、他のキーは読んだまま戻す。
 
 ## 5つのターゲット
 
 | ターゲット | 配るもの | 触らないもの |
 |---|---|---|
-| `claude` (`~/.claude`) | `settings.json` の `hooks` / `permissions` / `sandbox`、`AGENTS.md`(`CLAUDE.md` → `AGENTS.md`)、`skills/` `rules/` `agents/` `scripts/` `workflows/` のリンクディレクトリ。MCP は `claude mcp add` 行を印字するだけ | `~/.claude.json`、他の settings キー |
+| `claude` (`~/.claude`) | `settings.json` の `hooks` / `permissions` / `sandbox`、`AGENTS.md`(`CLAUDE.md` → `AGENTS.md`)、`skills/` `rules/` `agents/` `scripts/` `workflows/` のリンクディレクトリ、`~/.claude.json` の `mcpServers`(jig が書いたものだけ) | `~/.claude.json` の他のキー、他の settings キー |
 | `codex` (`~/.codex`) | `AGENTS.md`、`agents/*.toml`(モデルは `agents/models.json`)、`~/.agents/skills` のマウント、`config.toml` の `[mcp_servers.*]` ブロック。ガードは `jig codex register` が `hooks.json` に登録 | ブロック外の `[mcp_servers.*]`(報告のみ)、`~/.codex/skills` |
 | `omp` (`~/.omp/agent`) | `agents/*.md`、`mcp.json` の jig エントリ、同じ `~/.agents/skills` マウント、`extensions/jig.ts` → jig の omp 拡張 | `config.yml`(報告のみ) |
 | `pi` (`~/.pi/agent`) | `AGENTS.md`(旧 symlink を実ファイルで置換)、pi-mcp-adapter の `~/.config/mcp/mcp.json`、同じ skills マウント | `settings.json` / `models.json` / `extensions/`(home-manager のリンク、`home/shared/harness`) |
@@ -51,22 +51,13 @@ jig box new|list|resume|fetch|rm           # sbx microVM の中でこのリポ�
 
 ## ガードと判断
 
-- **ガード**: `llm/harness/policy/guard-rules.json` が唯一のルール源。
+- **ガード**: `harness/policy/guard-rules.json` が唯一のルール源。
   `~/.config/jig/policy` へのリンクを home-manager が張り、
   Claude Code の PreToolUse hook、Codex の hook、omp の `jig.ts`、pi の
   `guard.ts`、DSH の cordis プラグインが同じファイルを読む。
 - **判断サービス**: `jig serve`(launchd `com.esh2n.jig-decision`)が loopback で
   判断を返し、各ハーネスは `JIG_DECISION_URL` で問い合わせる。
 
-## yoki からの移行(所有者の一回きりの手順)
+## yoki からの移行
 
-1. `jig apply --target claude --write` — `scripts` / `workflows` のリンクを
-   yoki-switch の `.<x>-merged` から jig のものに置き換える
-2. `jig retire yoki` で一覧を確認し、`jig retire yoki --write` で削除
-   (`.<x>-merged`、`.yoki/`、`.claude-packs`、Codex の `# yoki:begin` ブロックと
-   hook グループ、omp の `yoki-*.ts` / `RULES.md` / `yoki-hooks.json`、
-   Cursor の rules リンク)。証拠に合わないパスは SKIP で止まらない
-3. `jig apply --target codex --write` — yoki のブロックが消えると
-   `[mcp_servers.*]` の衝突が解ける。Codex が再信頼を求めたら
-   `jig codex register --write`
-4. `domains/dev/bin/yoki-switch` と `claude-profiles/` のツリーを削除
+完了した(834c0d71 で `yoki-switch` と `claude-profiles/` を削除)。yoki が残した成果物の一覧と削除には、今も `jig retire yoki [--write]` を使える。

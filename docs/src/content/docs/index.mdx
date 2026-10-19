@@ -26,7 +26,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     Switch between Custom / LazyVim / NvChad / AstroVim instantly with `dotctl nvim`.
   </Card>
   <Card title="Theme Sync" icon="sun">
-    `dotctl theme set` applies Catppuccin / Nord / Tokyo Night across WezTerm, Ghostty, Sketchybar, Borders, Zellij.
+    `dotctl theme set` applies one of 13 themes (Catppuccin, Nord, Tokyo Night, Gruvbox and more) across WezTerm, Ghostty, Sketchybar, Borders, Zellij.
   </Card>
   <Card title="Nix Managed" icon="setting">
     All packages declared via Nix flake. Reproducible build environment.
@@ -38,7 +38,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 ```text
 dotfiles/
 ├── flake.nix, flake.lock    # flake: darwinConfigurations.mac、homeConfigurations.linux、packages
-├── bootstrap.sh             # make up: Nix が無ければ入れて dotctl up に渡す
+├── bootstrap.sh             # make up: Nix が無ければ入れて止まる。Nix があれば dotctl up に渡す
 ├── lib/                     # facts（唯一の不純な読み取り）、組み立て、常駐サービス、setup の手順
 ├── roles/                   # 役割ごとに何を有効にするか
 ├── system/darwin/           # nix-darwin (defaults、Homebrew、browser)
@@ -60,7 +60,7 @@ cd dotfiles
 make up
 ```
 
-Installs Nix when missing, then builds and switches this machine. See [Installation](/dotfiles/getting-started/installation/) for details.
+Installs Nix when missing and stops; open a new shell and run `make up` again to build and switch this machine. See [Installation](/dotfiles/getting-started/installation/) for details.
 
 ## Included Tools
 

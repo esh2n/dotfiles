@@ -14,11 +14,21 @@ A next-generation VCS that coexists with git. The `j` prefix mirrors git's `g` p
 | Staging | `git add` | Not needed (working copy = stage) |
 | Stash | `git stash` | Not needed (just `jj new`) |
 | Amend | `git commit --amend` | `jj describe` / `jj squash` |
-| Revert | `git revert` | `jj backout` |
+| Revert | `git revert` | `jj revert` |
 | Reflog | `git reflog` | `jj operation log` |
 | Worktree | `git worktree` | `jj workspace` |
 | Blame | `git blame` | `jj file annotate` |
 | Remote | `git push/fetch` | `jj git push/fetch` |
+
+## Config (config.toml)
+
+| Setting | Value |
+|---------|-------|
+| Default command | `log` |
+| Pager | `less -FRX` |
+| Diff editor | `:builtin` |
+| Merge editor | `:builtin` |
+| Auto local bookmark | `false` |
 
 ## Basics
 
@@ -87,6 +97,33 @@ A next-generation VCS that coexists with git. The `j` prefix mirrors git's `g` p
 | `jfl` | `jj file list` | Like `git ls-files` |
 | `jop` | `jj operation log` | Like `git reflog` |
 | `lj` | `lazyjj` | TUI |
+
+## Revset aliases
+
+Revset aliases defined in `config.toml`. Use them like `jj log -r "wip"`.
+
+| Alias | Definition | Description |
+|-------|------------|-------------|
+| `wip` | `description(regex:"^\\[(wip\|WIP\|todo\|TODO)\\]")` | Changes starting with `[wip]` or `[TODO]` |
+| `recent` | `committer_date(after:"1 month ago")` | Changes from the last month |
+| `today` | `committer_date(after:"today 00:00")` | Today's changes |
+| `unpushed` | `mine() & mutable()` | Your changes not yet pushed |
+| `ready` | `mutable() & ~wip & ~empty()` | Changes ready to push (not WIP, not empty) |
+| `immutable_heads()` | `trunk() \| tags()` | Immutable heads |
+
+```bash
+# Show only WIP changes
+jj log -r "wip"
+
+# Check today's work
+jj log -r "today"
+
+# Changes ready to push
+jj log -r "ready"
+
+# Your unpushed changes
+jj log -r "unpushed"
+```
 
 ## Interactive (skim-based)
 

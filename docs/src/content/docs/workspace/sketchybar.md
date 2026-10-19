@@ -13,7 +13,7 @@ Figma 風の floating pill bar。
 |------|------|
 | Height | 36px |
 | Corner radius | 12px |
-| Blur radius | 20 |
+| Blur radius | 0 |
 | Border | 2px (blue) |
 | Margin | 12px |
 | Y offset | 8px |
@@ -28,7 +28,7 @@ Figma 風の floating pill bar。
 ├── bar.lua             # bar 本体の設定
 ├── default.lua         # default item style
 ├── settings.lua        # font, padding の設定
-├── colors.lua          # color definition (→ theme link)
+├── colors.lua          # color definition (→ ~/.config/theme/current/sketchybar.lua)
 ├── icons.lua           # SF Symbols / Nerd Font icon
 ├── items/
 │   ├── init.lua        # item loader
@@ -95,4 +95,4 @@ CPU usage、battery 残量などの system 情報。
 
 ## テーマ連動
 
-`colors.lua` が `themes/` 内のテーマファイルへの symlink になっている。`theme-switch` で symlink 先を切り替え、Sketchybar を restart することでテーマが反映される。
+`colors.lua` は `~/.config/theme/current/sketchybar.lua` への symlink になっている。`dotctl theme set`（別名 `theme-switch`）は `current` を選んだテーマの palette に張り替え、`sketchybar --reload` でテーマを反映させる。

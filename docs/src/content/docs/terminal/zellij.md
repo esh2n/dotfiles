@@ -7,7 +7,7 @@ Theme sync、status bar、fuzzy finder、pane bookmark を組み込んだ Zellij
 
 ## Theme Sync
 
-`theme-switch` command で Catppuccin / Tokyo Night / Nord を切り替えると、Zellij の layout と status bar の色も自動的に変わる。
+`dotctl theme set`（別名 `theme-switch`）でテーマを切り替えると、`config.kdl` の `default_layout` が書き換わり、Zellij の layout と status bar の色も変わる。
 
 ## Plugin
 
@@ -77,10 +77,8 @@ zjstatus と monocle は `make up`（setup の `zellij-plugins`）が download �
 ~/.config/zellij/
 ├── config.kdl           # main の設定
 ├── layouts/
-│   ├── catppuccin.kdl   # Catppuccin theme
-│   ├── tokyonight.kdl   # Tokyo Night theme
-│   ├── nord.kdl         # Nord theme
-│   └── default.kdl      # active theme への symlink
+│   ├── <theme>.kdl      # テーマごとの layout（catppuccin、nord、tokyonight など 11 個）
+│   └── default.kdl
 └── plugins/
     ├── zjstatus.wasm    # status bar
     └── monocle.wasm     # fuzzy finder
@@ -107,14 +105,14 @@ zjstatus と monocle は `make up`（setup の `zellij-plugins`）が download �
 
 1. file permission を確認: `ls -la ~/.config/zellij/layouts/`
 2. session を再起動: `zellij kill-all-sessions`
-3. theme-switch script を確認: `which theme-switch`
+3. `config.kdl` の `default_layout` を確認: `grep default_layout ~/.config/zellij/config.kdl`
 
 ## Customize
 
 ### テーマの追加
 
 1. `layouts/theme-name.kdl` を作成
-2. `theme-switch` script に新テーマを追加
+2. `home/shared/theme/themes/` と各 application のテーマ file にも同名のテーマを足す（`dotctl theme set` はその名前の layout を探す）
 3. 既存テーマの color pattern に合わせて設定
 
 ### Keybinding の変更

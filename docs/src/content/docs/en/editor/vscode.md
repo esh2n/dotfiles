@@ -1,9 +1,9 @@
 ---
 title: VSCode
-description: VSCode setup with 97 extensions.
+description: VSCode setup with 98 extensions.
 ---
 
-VSCode extensions are managed as a list in dotfiles. Includes themes, language support, Git integration, and productivity tools — 97 extensions total.
+VSCode extensions are managed as a list in dotfiles. Includes themes, language support, Git integration, and productivity tools — 98 extensions total.
 
 ## Extensions
 
@@ -137,12 +137,12 @@ VSCode extensions are managed as a list in dotfiles. Includes themes, language s
 
 ## Managing extensions
 
-The extension list is stored in `~/.config/vscode/extensions.txt`.
+The extension list is stored in `~/.config/vscode/extensions.txt`. `dotctl editor extensions` (alias `install-extensions`) installs it into VS Code and Cursor, whichever are present.
 
 ```bash
 # Export
 code --list-extensions > extensions.txt
 
 # Install
-cat extensions.txt | xargs -L 1 code --install-extension
+dotctl editor extensions
 ```

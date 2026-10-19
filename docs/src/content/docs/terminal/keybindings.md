@@ -6,7 +6,7 @@ description: WezTerm / Zellij / Herdr で統一された keybinding。
 WezTerm, Zellij, Herdr で共通の keybinding を使えるようにしている。prefix key は `Ctrl+q`。
 
 Herdr は分割 (`Prefix + \` / `-`)・pane 移動 (`Prefix + h/j/k/l`)・タブ移動 (`Alt+h`/`Alt+l`) を
-この共通スキームに合わせている。Herdr 固有のキー・エージェント連携は [Herdr](/terminal/herdr/) を参照。
+この共通スキームに合わせている。Herdr 固有のキー・エージェント連携は [Herdr](/dotfiles/terminal/herdr/) を参照。
 
 ## Pane 操作
 
@@ -15,7 +15,7 @@ Herdr は分割 (`Prefix + \` / `-`)・pane 移動 (`Prefix + h/j/k/l`)・タブ
 | 横分割 | `Prefix + \` | |
 | 縦分割 | `Prefix + -` | |
 | pane 移動 | `Prefix + h/j/k/l` | |
-| pane resize | `Prefix + H/J/K/L` | |
+| pane resize | `Prefix + H/J/K/L` | Zellij のみ。Herdr は `Prefix + r` |
 | pane 最大化 | `Prefix + z` | |
 | floating 切替 | `Prefix + w` | Zellij のみ |
 | 埋込/float 切替 | `Prefix + e` | Zellij のみ |
@@ -25,8 +25,8 @@ Herdr は分割 (`Prefix + \` / `-`)・pane 移動 (`Prefix + h/j/k/l`)・タブ
 
 | 操作 | Key | 備考 |
 |------|-----|------|
-| 前の tab | `Ctrl+h` | prefix 不要 |
-| 次の tab | `Ctrl+l` | prefix 不要 |
+| 前の tab | Zellij `Prefix + Shift+Tab`、WezTerm `Cmd+[`、Herdr `Alt+h` | |
+| 次の tab | Zellij `Prefix + Tab`、WezTerm `Cmd+]`、Herdr `Alt+l` | |
 | Tab 1-5 | `Ctrl+1-5` | prefix 不要、Zellij のみ |
 | 新規 tab | `Prefix + t` | Zellij のみ |
 
@@ -45,9 +45,9 @@ Herdr は分割 (`Prefix + \` / `-`)・pane 移動 (`Prefix + h/j/k/l`)・タブ
 
 ## Session
 
-| 操作 | Key |
-|------|-----|
-| detach | `Prefix + d` |
+| 操作 | Key | 備考 |
+|------|-----|------|
+| detach | `Prefix + d` | Zellij のみ。Herdr は `Prefix + q` |
 
 ## Zellij plugin
 

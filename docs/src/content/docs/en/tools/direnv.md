@@ -100,8 +100,8 @@ Give each worktree its own isolated environment:
 
 ```bash
 # Create a feature worktree
-wtp add feature/new-api
-cd ../project-feature-new-api
+wtp add -b feature/new-api
+cd "$(wtp cd feature/new-api)"
 
 # Set up environment for this worktree
 cat > .envrc << EOF

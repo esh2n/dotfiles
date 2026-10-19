@@ -10,7 +10,7 @@ Ghostty は GPU accelerated な高速 terminal emulator。背景透過、blur、
 | 項目 | 値 |
 |------|------|
 | Font | JetBrainsMono Nerd Font (15pt) |
-| Background opacity | 0.6 |
+| Background opacity | 0.8 |
 | Blur radius | 30 |
 | Cursor | block, blink |
 | Window theme | dark |
@@ -50,10 +50,10 @@ quick-terminal-autohide = true
 
 ## Shell integration
 
-Fish shell との integration が有効。cursor, title, sudo の feature を使う。
+Zsh との integration が有効。cursor, title, sudo の feature を使う。
 
 ```ini
-shell-integration = fish
+shell-integration = zsh
 shell-integration-features = cursor,title,sudo
 ```
 

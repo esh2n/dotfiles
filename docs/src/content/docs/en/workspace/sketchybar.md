@@ -13,7 +13,7 @@ Figma-inspired floating pill bar.
 |---------|-------|
 | Height | 36px |
 | Corner radius | 12px |
-| Blur radius | 20 |
+| Blur radius | 0 |
 | Border | 2px (blue) |
 | Margin | 12px |
 | Y offset | 8px |
@@ -28,7 +28,7 @@ Figma-inspired floating pill bar.
 ├── bar.lua             # Bar configuration
 ├── default.lua         # Default item style
 ├── settings.lua        # Font, padding settings
-├── colors.lua          # Color definitions (→ theme symlink)
+├── colors.lua          # Color definitions (→ ~/.config/theme/current/sketchybar.lua)
 ├── icons.lua           # SF Symbols / Nerd Font icons
 ├── items/
 │   ├── init.lua        # Item loader
@@ -95,4 +95,4 @@ CPU usage, battery level, and other system info.
 
 ## Theme integration
 
-`colors.lua` is a symlink to a theme file in `themes/`. Running `theme-switch` changes the symlink target and restarts Sketchybar.
+`colors.lua` is a symlink to `~/.config/theme/current/sketchybar.lua`. `dotctl theme set` (alias `theme-switch`) relinks `current` to the chosen theme's palette and runs `sketchybar --reload`.

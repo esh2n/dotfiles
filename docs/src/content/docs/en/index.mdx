@@ -20,13 +20,13 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
   <Card title="Multi-Shell" icon="terminal">
-    Both Zsh and Fish with shared aliases and env vars. Bundled with skim, eza, bat, zoxide, atuin, yazi, and more.
+    Zsh, with shared aliases and env vars. Bundled with skim, eza, bat, zoxide, atuin, yazi, and more.
   </Card>
   <Card title="Neovim Switching" icon="pencil">
-    Four distributions — Custom, LazyVim, NvChad, AstroVim — switchable instantly with `nvim-switch`.
+    Four distributions — Custom, LazyVim, NvChad, AstroVim — switchable instantly with `dotctl nvim`.
   </Card>
   <Card title="Unified Theming" icon="sun">
-    One `theme-switch` command applies Catppuccin, Nord, or Tokyo Night across WezTerm, Ghostty, Sketchybar, Borders, and Zellij.
+    One `dotctl theme set` command applies one of 13 themes (Catppuccin, Nord, Tokyo Night, Gruvbox and more) across WezTerm, Ghostty, Sketchybar, Borders, and Zellij.
   </Card>
   <Card title="Nix Package Management" icon="setting">
     Every package is declared in a Nix flake. Reproducible builds, always.
@@ -60,14 +60,14 @@ cd dotfiles
 make up
 ```
 
-The installer handles everything from Homebrew and Nix setup to symlink creation. See [Installation](/dotfiles/en/getting-started/installation/) for details.
+Installs Nix when missing and stops; open a new shell and run `make up` again to build and switch this machine. See [Installation](/dotfiles/en/getting-started/installation/) for details.
 
 ## Included tools
 
 | Category | Tools |
 |----------|-------|
-| Terminal | WezTerm, Ghostty, Warp |
-| Multiplexer | Zellij |
+| Terminal | WezTerm, Ghostty |
+| Multiplexer | Zellij, Herdr |
 | Shell | Zsh, Starship |
 | CLI | eza, bat, skim, zoxide, atuin, yazi, btop |
 | Editor | Neovim (4 distributions), VSCode, Cursor |

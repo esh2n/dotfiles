@@ -70,13 +70,11 @@ macOS 用の tiling window manager。名前付き workspace でアプリを整�
 
 ## Service mode
 
-`Alt+Shift+;` で入る。
+入るキーは割り当てていない。`aerospace mode service` で入る。
 
 | Key | 操作 |
 |-----|------|
 | `Esc` | config reload して main mode に戻る |
-| `r` | workspace tree の layout を reset |
-| `f` | floating / tiling 切替 |
 | `Backspace` | 現在以外の window をすべて閉じる |
 
 ## 設定メモ

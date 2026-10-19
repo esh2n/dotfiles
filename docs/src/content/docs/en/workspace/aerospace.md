@@ -70,13 +70,11 @@ A tiling window manager for macOS. Apps are organized into named workspaces and 
 
 ## Service mode
 
-Enter with `Alt+Shift+;`:
+No key enters it; run `aerospace mode service`.
 
 | Key | Action |
 |-----|--------|
 | `Esc` | Reload config, back to main mode |
-| `r` | Reset workspace tree layout |
-| `f` | Toggle floating/tiling |
 | `Backspace` | Close all windows except current |
 
 ## Notes

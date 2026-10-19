@@ -7,7 +7,7 @@ A Zellij setup with automatic theme integration, a rich status bar, fuzzy findin
 
 ## Theme integration
 
-Running `theme-switch` with Catppuccin, Tokyo Night, or Nord automatically updates the Zellij layout and status bar colors.
+Switching themes with `dotctl theme set` (alias `theme-switch`) rewrites `default_layout` in `config.kdl`, which updates the Zellij layout and status bar colors.
 
 ## Plugins
 
@@ -77,10 +77,8 @@ With 2-3 panes, `Ctrl+q` then `h/j/k/l` is enough. The picker becomes useful whe
 ~/.config/zellij/
 ├── config.kdl           # Main config
 ├── layouts/
-│   ├── catppuccin.kdl   # Catppuccin theme
-│   ├── tokyonight.kdl   # Tokyo Night theme
-│   ├── nord.kdl         # Nord theme
-│   └── default.kdl      # Symlink to active theme
+│   ├── <theme>.kdl      # one layout per theme (catppuccin, nord, tokyonight, ... 11 in all)
+│   └── default.kdl
 └── plugins/
     ├── zjstatus.wasm    # Status bar
     └── monocle.wasm     # Fuzzy finder
@@ -102,14 +100,14 @@ Shows mode indicator (colored background), session name, git branch (refreshes e
 
 1. Check permissions: `ls -la ~/.config/zellij/layouts/`
 2. Restart sessions: `zellij kill-all-sessions`
-3. Verify script: `which theme-switch`
+3. Check `default_layout`: `grep default_layout ~/.config/zellij/config.kdl`
 
 ## Customization
 
 ### Adding themes
 
 1. Create `layouts/theme-name.kdl`
-2. Add the theme to `theme-switch`
+2. Add the same theme name under `home/shared/theme/themes/` and each app's theme files (`dotctl theme set` looks for a layout of that name)
 3. Follow the color pattern from existing themes
 
 ### Changing keybindings
