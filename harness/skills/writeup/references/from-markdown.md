@@ -19,7 +19,7 @@ the kit's own `to-md.mjs` mapping (`$KIT/references/page-contract.md`
 | `> [!IMPORTANT]` blockquote | `.wu-callout` `data-tone="decision"`, or `.wu-decision` if it has the decision/trade-off/basis shape below |
 | A plain `>` blockquote with a source line | `.wu-quote` (original / translation / source) |
 | `##` / `###` / `####` | `.wu-section > h2` / `h3` / `h4` |
-| `- **name** — definition` list (3+ items) | `.wu-terms` (`<dl>`) |
+| `- **name** — definition` list (a glossary) | No component: move each definition into the body, in the sentence where the term first appears or the next one (`writing.md` §5); drop the list |
 | `- **決定**: … / 重視したトレードオフ: … / 根拠: …` block | `.wu-decision` |
 | GFM table, ≤4 columns, rows = options judged on the same axes | `.wu-compare` |
 | GFM table, otherwise (≤5 columns) | `.wu-table` |

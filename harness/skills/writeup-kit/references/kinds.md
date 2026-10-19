@@ -8,7 +8,7 @@ literal h2 headings in the page. Each is glossed once in English below.
 
 grilling's round pages and show-me's single-page output are skill-specific
 shapes and are **not** in this table — grilling round HTML is assembled from
-kit components (`compare` / `figure` / `terms` / `open`) but does not follow
+kit components (`compare` / `figure` / `open`) but does not follow
 one of these 8 kind contracts.
 
 ## Kind table
@@ -25,7 +25,7 @@ names the 2–4 types that usually fit each kind; it is guidance, not a cap.
 | kind | Required sections | Use | Avoid | Length / where a figure helps |
 |---|---|---|---|---|
 | 決定記録 (decision record) | 決まったこと／却下した案／未決・前提／次のステップ | summary, table (the 一覧表), figure, meta, open, steps | chip; decision (cards) for the list of decisions; compare unless 3+ options × 3+ criteria | 2,000-4,000 chars. 図が効く場面: `diagram` twice (before/after) for a decision that changes a structure; `state` when it changes which state may become which; `sequence` when it changes who calls whom; `matrix` when it compares options by criteria (a table when qualitative). Wording, numbers, and scope need none. One 決定の関係図 (`diagram`, a DAG) closes the decisions |
-| 設計 (design) | 目的と読者／用語／現状とギャップ／あるべき姿／決定点／進め方 | terms, figure, compare, code, open | chip | 3,000-8,000 chars. 図が効く場面: `zones` for the parts and which links cross a boundary (現状とギャップ / あるべき姿, same type twice); `sequence` for the call order the design fixes; `schema` when the data model is the decision; `state` for a lifecycle |
+| 設計 (design) | 目的と読者／現状とギャップ／あるべき姿／決定点／進め方 | figure, compare, code, open | chip, terms | 3,000-8,000 chars. 図が効く場面: `zones` for the parts and which links cross a boundary (現状とギャップ / あるべき姿, same type twice); `sequence` for the call order the design fixes; `schema` when the data model is the decision; `state` for a lifecycle |
 | 調査まとめ (research summary) | 問い／結論／根拠（表）／未確認／含意 | summary, table, quote, meta | decision | 2,000-6,000 chars. 図が効く場面: `bar` for measured magnitudes across categories; `line` for a trend or a two-state slopegraph; `scatter` when each item has two measures; `matrix` for which pairs hold; `timeline` for the events behind the question. The flow under investigation is a `diagram` only when a measurement point must be located on it |
 | 参考資料まとめ (reference roundup) | 資料一覧（表）／各資料の要点／取るもの・置き先 | table, quote, meta, chip | steps | 3,000-8,000 chars. 図が効く場面: `tree` for how the references decompose or derive from each other; `matrix` for reference × topic coverage; `venn` when 2–3 references overlap and the overlap has a name |
 | PBI 資料 (PBI doc) | 背景／決めたこと／未決／関係する文書 | summary, decision, meta, open | chip | 1,000-3,000 chars. 図が効く場面: `swimlane` for the affected flow and its hand-offs; `journey` when the user's experience per stage is the point; `board` (`story-map`) for where the release is cut. The scope boundary is a `nested` only when words keep misreading it |
@@ -103,13 +103,17 @@ decisions here. self-check enforces the shape: `decision-index`,
 
 ### 設計 (design)
 
-Required sections: 目的と読者 (purpose and audience) / 用語 (terms) /
-現状とギャップ (current state and gap) / あるべき姿 (desired state) / 決定点
-(decision points) / 進め方 (how to proceed).
+Required sections: 目的と読者 (purpose and audience) / 現状とギャップ
+(current state and gap) / あるべき姿 (desired state) / 決定点 (decision
+points) / 進め方 (how to proceed).
+
+There is no 用語 (terms) section and no `.wu-terms` list. Each technical
+term is explained in the sentence where it first appears, or the next one
+(`writing.md` §5; owner ruling 2026-10-19); self-check `terms-block` warns
+on a glossary block.
 
 ```html
 <section class="wu-section"><h2>目的と読者</h2><p>...</p></section>
-<section class="wu-section"><h2>用語</h2><dl class="wu-terms">...</dl></section>
 <section class="wu-section"><h2>現状とギャップ</h2>
   <figure class="wu-figure">...</figure>
 </section>

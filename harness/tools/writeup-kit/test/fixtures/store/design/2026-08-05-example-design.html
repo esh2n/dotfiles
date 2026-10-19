@@ -26,16 +26,7 @@
 <section class="wu-section">
 <h2>目的と読者</h2>
 <p>実装担当者向けに、アップロード経路の段構成を1つに決める。</p>
-</section>
-
-<section class="wu-section">
-<h2>用語</h2>
-<dl class="wu-terms">
-<dt>ワーカー</dt>
-<dd>再試行を専門に受け持つバックエンドの処理単位。</dd>
-<dt>委譲</dt>
-<dd>APIが受けた処理をワーカーに渡すこと。</dd>
-</dl>
+<p>再試行はワーカーに任せる。ワーカーは再試行を専門に受け持つバックエンドの処理単位である。APIは受けた処理をワーカーに渡し、これを委譲と呼ぶ。</p>
 </section>
 
 <section class="wu-section">

@@ -35,7 +35,7 @@ export const KIND_VALUES = [
 // since a real page may add detail after the required word, e.g. "根拠（表）").
 export const KIND_SECTIONS = {
   '決定記録': ['決まったこと', '却下した案', '未決・前提', '次のステップ'],
-  '設計': ['目的と読者', '用語', '現状とギャップ', 'あるべき姿', '決定点', '進め方'],
+  '設計': ['目的と読者', '現状とギャップ', 'あるべき姿', '決定点', '進め方'],
   '調査まとめ': ['問い', '結論', '根拠', '未確認', '含意'],
   '参考資料まとめ': ['資料一覧', '各資料の要点', '取るもの・置き先'],
   'PBI 資料': ['背景', '決めたこと', '未決', '関係する文書'],
@@ -92,6 +92,7 @@ const HINTS = {
   'chrome': 'copy .wu-header/.wu-footer verbatim from kit/template.html and change only the text',
   'figure-pass': 're-render with render-diagram.mjs --figure and paste its <figure> as-is',
   'svg-a11y': 'never hand-edit generated diagram markup — re-render with render-diagram.mjs --figure',
+  'terms-block': 'explain each term in the same or next sentence where it first appears, and drop the block — writing.md §5',
   'accent-budget': 'keep exactly one .wu-accent on the page; move the emphasis into the prose instead of adding a second',
   'shot': (detail) => {
     if (/is missing alt text/.test(detail)) return 'add alt text describing what the screenshot shows'
@@ -165,6 +166,7 @@ export function runSelfCheckText(raw, filePath) {
   checkCalloutRuns(root, add)
   checkTableColumns(root, add)
   checkLabelRepeat(root, add)
+  checkTermsBlock(root, add)
   checkDecisionRecord(root, add)
   const proseBlocks = mainProseBlocks(root)
   checkSentenceLength(proseBlocks, add)
@@ -475,6 +477,28 @@ function checkRoleStructure(root, add) {
     const bad = classList(n).filter((c) => !c.startsWith('wu-') && !ALLOWED_NON_WU_CLASSES.has(c))
     if (bad.length) {
       add('error', 'role-structure', `<${n.tag}> has non-wu- class: ${bad.join(', ')}`)
+    }
+  }
+}
+
+// --- 5b. terms block (warn) ----------------------------------------------------
+//
+// Owner ruling 2026-10-19: a technical term is explained where it first
+// appears, never in a glossary or prerequisites block. A `.wu-terms` list or
+// an h2 that is only 用語 / 用語集 / 前提知識 is that block. `.wu-terms` still
+// renders (CSS, to-md) so older pages keep working; new pages get this warn.
+
+const TERMS_HEADING_RE = /^(用語|用語集|用語の定義|用語と前提|前提知識|glossary|terms)$/i
+
+function checkTermsBlock(root, add) {
+  const lists = findAll(root, (n) => isElement(n) && hasClass(n, 'wu-terms'))
+  if (lists.length) {
+    add('warn', 'terms-block', `${lists.length} .wu-terms block(s) — terms are explained inline at first use, not in a list`)
+  }
+  for (const h of findAll(root, (n) => tagName(n) === 'h2')) {
+    const text = textContent(h).trim()
+    if (TERMS_HEADING_RE.test(text)) {
+      add('warn', 'terms-block', `h2 "${text}" is a glossary/prerequisites section`)
     }
   }
 }
