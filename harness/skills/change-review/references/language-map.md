@@ -28,6 +28,7 @@ Domain knowledge, by what the diff touches:
 | When the diff touches | Read |
 | --- | --- |
 | API surfaces: HTTP/REST, gRPC/protobuf, GraphQL schemas, public library or SDK signatures, webhooks, CLI flags and machine-readable output | `api-design/references/review-checklist.md` (compatibility, versioning and deprecation items go to `rollout-reviewer`; silences in a design go to `spec-reviewer`) |
+| dependency manifests and lock files (package.json, pnpm-lock.yaml, go.mod/go.sum, Cargo.toml/Cargo.lock, pyproject.toml, uv.lock, requirements*.txt, Gemfile.lock, composer.lock, flake.lock and the like), a Dockerfile `FROM`, `vendor/` or `third_party/`, install or build scripts, LICENSE or NOTICE files | `supply-chain-review/references/review-checklist.md` (origin, install-time code, lock integrity, vulnerability, provenance and base-image items go to `security-reviewer`; need, pins, vendoring and licence items to `code-reviewer`) |
 | network calls, timeouts, retries, queues sizing, health checks | `resilience-patterns/references/review-checklist.md` |
 | events, topics, consumers, outbox, sagas | `event-driven-patterns/references/review-checklist.md` |
 | writes to two stores or services that must agree, cross-service workflows, caches, read replicas, timestamps compared across hosts, leader election, distributed locks or leases, exactly-once or idempotency claims | `distributed-correctness/references/review-checklist.md` |
