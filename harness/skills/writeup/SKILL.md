@@ -53,8 +53,8 @@ into `private`.
 
 1. **Decide kind and audience.** Map the request to one of the 8 kinds
    (heuristics and kind table: `references/procedure.md`). A Markdown
-   report from a workflow (research / design-review / acceptance /
-   deliberate) becomes step 3's `--from` path ("Input from Markdown").
+   report (a research record, a `change-review` report) becomes step 3's
+   `--from` path ("Input from Markdown").
 2. **Read the contract for this kind.** The matching row of
    `$KIT/references/kinds.md` (required sections, use/avoid components,
    length, where a figure helps) and `$KIT/references/components.md`

@@ -1,7 +1,7 @@
 # Input from Markdown (`--from <md> --kind <kind>`)
 
-Used for turning a workflow's Markdown report (research / design-review /
-acceptance / deliberate) — or any Markdown the user hands over — into a
+Used for turning a Markdown report (a research record, a `change-review`
+report) — or any Markdown the user hands over — into a
 writeup page. Read the file, map it with the table below, then continue
 at `SKILL.md` step 3 (write the body into the copied template, render
 figures, lint, self-check, save, commit). This is the mirror image of

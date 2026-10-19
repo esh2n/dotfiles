@@ -160,9 +160,9 @@ recipients cannot track one person across pages. The resolver
 When reading `--json`, never assume `author` is present; handle each returned line as it comes.
 
 When what a comment asks for goes beyond a single edit and amounts to a design rethink or a
-re-implementation, do not settle it on the spot: hand it to a workflow such as
-`yoki-graph run review` or `yoki-graph run design-review` (see the yoki-graph skill)
-and come back afterwards.
+re-implementation, do not settle it on the spot: take it through the `change-review`
+skill (its design review covers a design or spec before code exists) or the planning
+skills, and come back afterwards.
 
 ### 4. Hand over a writeup page
 

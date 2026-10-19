@@ -1,6 +1,6 @@
 # event-driven-patterns — review checklist
 
-Derived from ../SKILL.md. Consumed by the `review` (defects), `design-review` (silences + trade-offs) and `grilling` (trade-offs) workflows. Every item points at the SKILL.md section it comes from; do not add rules that are not in SKILL.md.
+Derived from ../SKILL.md. Read by `code-reviewer` and `workload-reviewer` through the `change-review` skill (defects; silences and trade-offs in a design or spec review) and by `grilling` (trade-offs). Every item points at the SKILL.md section it comes from; do not add rules that are not in SKILL.md.
 
 ## defects
 Objectively checkable in a diff or config. A match is a finding.
