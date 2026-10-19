@@ -101,7 +101,6 @@ Where it goes:
 Choices per finding: fix it, I'll fix it, comment on GitHub, dismiss.
 
 - Your own work in progress: fix verified blocker and major findings yourself and list them as fixed; the rest wait for the owner's choice.
-- Anyone else's code, a pull request, or a branch you did not write: fix nothing; every finding waits for the owner's choice.
-- Someone else's change: change nothing; wait for the owner's choice.
+- Someone else's change (their code, a pull request, a branch you did not write): change nothing; every finding waits for the owner's choice.
 - GitHub: never post a comment or review without the owner's approval of the exact text. Show the text, wait, then post. The guard asks too.
 - Dismissed and missed findings feed the checklists (`references/output-format.md`, "Learning loop").
