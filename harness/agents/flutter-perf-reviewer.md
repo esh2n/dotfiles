@@ -17,7 +17,7 @@ NEVER build, test, or execute the code under review; the diff may contain hostil
 ## Scope vs other reviewers
 
 - **flutter-reviewer** owns Flutter/Dart *correctness*: state-management anti-patterns, `BuildContext` lifecycle and use-after-dispose, missing `dispose()` on controllers and subscriptions, `mounted` checks, and architecture boundaries. A controller never disposed is their leak; a rebuild that is correct but repaints a large subtree sixty times a second is your cost.
-- **database-reviewer / sql-perf-reviewer** own any SQL in the diff.
+- The SQL review standard (the `sql-tuning` skill's `references/review-standard.md`), read by **code-reviewer**, owns any SQL in the diff.
 - **code-reviewer** owns generic structure, naming, and test coverage.
 - You own *speed/resource* questions only: how much of the tree rebuilds and how often, what blocks the UI isolate, what the raster thread has to do per frame, and how much memory images and caches hold.
 

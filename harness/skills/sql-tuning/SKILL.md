@@ -9,11 +9,10 @@ metadata:
 
 Judgment criteria for diagnosing and fixing performance problems in
 PostgreSQL and Cloud Spanner. This goes deeper on tuning judgment than the
-**database-reviewer** agent — that agent runs the review checklist (indexed
-columns, RLS, data types, anti-patterns); this skill is for the reasoning
-behind an EXPLAIN plan, an index shape decision, or a migration sequencing
-call. Use both together: database-reviewer for the pass/fail checklist,
-this skill for "why is this actually slow."
+review checklist: the checklist (indexed columns, RLS, data types,
+anti-patterns) is the pass/fail list; this skill is for the reasoning behind
+an EXPLAIN plan, an index shape decision, or a migration sequencing call —
+"why is this actually slow."
 
 The review checklist for SQL, schemas and migrations (PostgreSQL and Spanner), read when writing them and by `code-reviewer`, is [references/review-standard.md](references/review-standard.md).
 
@@ -159,9 +158,9 @@ cache activity, which is usually the real cost.
 
 ## Spanner-specific tuning
 
-See database-reviewer's Spanner review lanes for interleaving, PK
-hotspotting, and mutation-vs-DML guidance — the tuning judgment beyond
-that checklist:
+See the Spanner-specific items of [references/review-standard.md](references/review-standard.md)
+for interleaving, PK hotspotting, and mutation-vs-DML guidance — the tuning
+judgment beyond that checklist:
 
 - **Query plans are distributed, not local.** A Spanner plan shows which
   operations run at the root vs. pushed down to each split; a
@@ -171,7 +170,7 @@ that checklist:
 - **Avoid cross-split joins on large tables.** A join between tables that
   aren't co-located (not interleaved, no shared key prefix) forces Spanner
   to shuffle data between splits. If frequent and one side is small,
-  denormalize instead — interleave (see database-reviewer) or duplicate
+  denormalize instead — interleave (`sql-spanner-interleave`) or duplicate
   the small side's columns onto the large table.
 - **Secondary index + STORING vs. base-table scan** — decide by whether
   the query is a point/range lookup on non-key columns (index candidate)
@@ -186,7 +185,7 @@ that checklist:
   splits it into independent partitions, each its own transaction,
   trading atomicity for the ability to complete at all on a large table.
   Never use it for anything requiring all-or-nothing semantics.
-- **Stale reads for latency** — see database-reviewer's note on bounded/
+- **Stale reads for latency** — see `sql-spanner-stale-read` on bounded/
   exact staleness; if the read path tolerates slightly old data, this is
   usually the single biggest available latency win since it skips the
   Paxos consensus round-trip.
@@ -194,7 +193,7 @@ that checklist:
   disproportionate load (elevated latency concentrated on a key range,
   conceptually what Key Visualizer surfaces) points back at PK design: a
   monotonic key or low-cardinality leading column. Re-diagnose the key
-  shape (see database-reviewer's PK-hotspotting note) rather than tuning
+  shape (`sql-spanner-key-hotspot`) rather than tuning
   around it with more compute.
 
 ## Migration safety judgment

@@ -59,7 +59,8 @@ they're active on 1.26/1.27:
   `/debug/pprof/goroutineleak` HTTP endpoint report goroutines blocked on a
   primitive (channel, `sync.Mutex`, `sync.Cond`, ...) that can never unblock.
   Concurrency-correctness judgment (is this actually a leak, and what's the
-  fix) belongs to `go-perf-reviewer`/`go-concurrency`, not this skill.
+  fix) belongs to `go-concurrency` and the Go review standard (`golang-patterns/references/review-standard.md`),
+  not this skill.
 - **`go test` runs the stdversion vet check by default since 1.27** — it
   flags stdlib symbols too new for the `go` directive/build tags of the file
   that uses them. This catches "used a 1.27 API in a file gated to `go

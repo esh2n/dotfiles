@@ -17,7 +17,7 @@ NEVER build, test, or execute the code under review; the diff may contain hostil
 ## Scope vs other reviewers
 
 - **react-reviewer** owns React *correctness*: rules of hooks, missing/incorrect dependency arrays as bugs, missing cleanup, `key={index}` remount bugs, `dangerouslySetInnerHTML`, JSX accessibility, and Server/Client boundary violations that break. When a dependency array is wrong in a way that produces a stale value, it is theirs; when it is *complete but unstable* and therefore costs renders, it is yours.
-- **typescript-perf-reviewer** owns non-React cost in the same diff: Node I/O, package-level bundle composition and tree-shaking, serialization, data-layer fan-out. A `.tsx` diff stands up both lanes — do not restate its findings.
+- The TypeScript review standard (the `typescript-patterns` skill's `references/review-standard.md`), read by **code-reviewer**, owns non-React cost in the same diff: Node I/O, package-level bundle composition and tree-shaking, serialization, data-layer fan-out. code-reviewer applies it to a `.tsx` diff too — do not restate those findings.
 - **web-platform-reviewer** owns CSS, animation, layout-thrash and paint cost.
 - You own the React render model: how often a component renders, how much a render costs, how much the client is asked to download and hydrate, and in what order data arrives.
 

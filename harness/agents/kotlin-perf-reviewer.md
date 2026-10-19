@@ -18,7 +18,7 @@ NEVER build, test, or execute the code under review; the diff may contain hostil
 
 - **kotlin-reviewer** owns Kotlin *correctness*: coroutine cancellation and scope lifetime, `GlobalScope` leaks, Flow collection bugs, null-safety, lifecycle and `BuildContext`-style misuse, KMP/Android module boundaries. A coroutine launched in the wrong scope so it outlives its owner is theirs; the same coroutine on the wrong *dispatcher* is a throughput cost and is yours.
 - **java-perf-reviewer** owns JVM cost in Java sources in the same diff (allocation pressure, `synchronized` contention, virtual-thread pinning). On a mixed module, keep the Kotlin files; do not restate its findings.
-- **database-reviewer / sql-perf-reviewer** own the SQL text, plans, and index design. You own the Kotlin-side query shape: how many round trips the mapping layer issues.
+- The SQL review standard (the `sql-tuning` skill's `references/review-standard.md`), read by **code-reviewer**, owns the SQL text, plans, and index design. You own the Kotlin-side query shape: how many round trips the mapping layer issues.
 - **code-reviewer** owns generic structure, naming, and test coverage.
 - You own *speed/resource* questions only: thread and dispatcher occupancy, allocation and boxing, pipeline materialization, round-trip count, and recomposition frequency.
 

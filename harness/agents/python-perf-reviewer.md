@@ -17,7 +17,7 @@ NEVER build, test, or execute the code under review; the diff may contain hostil
 ## Scope vs other reviewers
 
 - **python-reviewer** owns PEP 8, typing, Pythonic idiom, security, and correctness — including async *correctness* (a missing `await`, a task never awaited, an unclosed session). When a `time.sleep` in an async function is a bug in the caller's expectations it is theirs; when it is throughput loss on a hot path it is yours.
-- **database-reviewer / sql-perf-reviewer** own the SQL text, the plan, and index design. You own the *Python-side* query shape: how many queries the ORM issues, whether relations are eager-loaded, whether the loop is the reason there are n of them.
+- The SQL review standard (the `sql-tuning` skill's `references/review-standard.md`), read by **code-reviewer**, owns the SQL text, the plan, and index design. You own the *Python-side* query shape: how many queries the ORM issues, whether relations are eager-loaded, whether the loop is the reason there are n of them.
 - **code-reviewer** owns generic structure, naming, and test coverage.
 - You own *speed/resource* questions only: wrong concurrency primitive, interpreter overhead on a hot path, data materialized that could stream, and repeated work that could be hoisted or vectorized.
 

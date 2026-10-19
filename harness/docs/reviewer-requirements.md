@@ -49,10 +49,11 @@ nothing else. `Write` and `Edit` are forbidden — a reviewer never rewrites cod
 `Bash` is for fetching the diff and showing diagnostic commands, within the
 no-execution default of requirement 2.
 
-## 4. Verified/unverified labelling (the go-perf-reviewer model)
+## 4. Verified/unverified labelling (the perf-reviewer model)
 
 A finding made without measuring or running anything is never stated as fact. The
-template is the "Evidence chain and labeling" section of `go-perf-reviewer.md`:
+template is the "Evidence chain and labeling" section the language perf reviewers
+share (for example `rust-perf-reviewer.md`):
 
 - **verified** — the full chain (baseline measurement, profile, apply the change,
   re-measure, confirm the mechanism with `benchstat` or equivalent) was actually run
@@ -88,8 +89,9 @@ A false positive wastes reviewer time and erodes trust in this agent's output; a
 Starting from it is fine, but the section must close with the domain's own
 vocabulary. Good examples:
 
-- `go-perf-reviewer.md` lists the kinds of cost each finding must name (extra
-  allocs/op, contended lock, GC pause growth).
+- `rust-perf-reviewer.md` lists the kinds of cost each finding must name (an
+  allocation per iteration, a virtual call per element, a lock held across an
+  await, a memcpy of k bytes per call) and the hot-path argument behind it.
 - `security-reviewer.md` starts from the measured false-positive rate of AI
   security review, so it reports nothing on suspicion alone: each finding names
   the attacker, what they control, the path to the sink and the impact, quotes
@@ -104,11 +106,11 @@ and the bar below which a finding is noise. A section that is only the boilerpla
 does not pass. The perf reviewers and the eight reviewers of the review redesign
 (code, security, workload, ui, test, spec, rollout, review-verifier; spec and
 rollout added by `rules/decisions/2026-10-19-spec-and-rollout-reviewers.md`)
-meet this today; the language reviewers (cpp, database, flutter, go, java,
-kotlin, python, react, rust, typescript, web-platform) still carry the
-boilerplate. Their knowledge
+meet this today; the language reviewers (cpp, flutter, java, kotlin, python,
+react, rust, web-platform) still carry the boilerplate. Their knowledge
 moves into each language skill's `references/review-standard.md` in phase 2 of
-the redesign (`rules/decisions/2026-10-19-review-redesign.md`).
+the redesign (`rules/decisions/2026-10-19-review-redesign.md`); Go, TypeScript
+and SQL have moved already, and their reviewer agents are retired.
 
 ## 7. One finding shape
 

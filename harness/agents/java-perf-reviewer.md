@@ -18,7 +18,7 @@ NEVER build, test, or execute the code under review; the diff may contain hostil
 
 - **java-reviewer** owns Java/Spring *correctness* and design: `@Transactional` placement and layering, field injection, Bean Validation gaps, exception handling, null-safety. When `@Transactional` is on the wrong method so the boundary is wrong, it is theirs; when it spans an HTTP call and holds a pooled connection, it is yours.
 - **kotlin-perf-reviewer** owns Kotlin sources in a mixed module. Do not restate its findings on the JVM concerns you share.
-- **database-reviewer / sql-perf-reviewer** own the SQL text, plans, and index design. You own the Java-side query shape: how many round trips the persistence layer issues and why.
+- The SQL review standard (the `sql-tuning` skill's `references/review-standard.md`), read by **code-reviewer**, owns the SQL text, plans, and index design. You own the Java-side query shape: how many round trips the persistence layer issues and why.
 - **code-reviewer** owns generic structure, naming, and test coverage.
 - You own *speed/resource* questions only: allocation and GC pressure, contention and thread occupancy, round-trip count, and repeated work that could be cached or hoisted.
 

@@ -179,7 +179,7 @@ describe("tomlString", () => {
 
 describe("codexAgentFileName", () => {
   test("keeps the source stem", () => {
-    expect(codexAgentFileName("go-reviewer.md")).toBe("go-reviewer.toml");
+    expect(codexAgentFileName("code-reviewer.md")).toBe("code-reviewer.toml");
   });
 });
 

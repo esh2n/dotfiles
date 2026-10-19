@@ -12,18 +12,20 @@ metadata:
 
 Judgment for concurrent Go: which primitive to reach for, who owns a
 goroutine's lifetime, what the memory model actually guarantees, and which
-review agent a given finding belongs to. Pattern code lives in
+review section a given finding belongs to. Pattern code lives in
 `references/patterns.md`, the bug catalog in `references/pitfalls.md`, every
 source is verified in `references/sources.md`.
 
-## Which Agent Owns What
+## Which Review Section Owns What
 
-| Finding | Owner | Why |
+`code-reviewer` reviews Go concurrency against the Go review standard (`golang-patterns/references/review-standard.md`).
+
+| Finding | Section | Why |
 |---|---|---|
-| Data race, goroutine leak, deadlock, lost wakeup | `go-reviewer` | Correctness — wrong answer or hang, not "slower" |
-| Lock contention (measured), mutex vs atomic choice, `sync.Pool` suitability | `go-perf-reviewer` | Only resolvable by profiling; the code is correct either way |
+| Data race, goroutine leak, deadlock, lost wakeup | 4.3 Concurrency | Correctness — wrong answer or hang, not "slower" |
+| Lock contention (measured), mutex vs atomic choice, `sync.Pool` suitability | 4.4 Performance | Only resolvable by profiling; the code is correct either way |
 
-**Boundary rule:** if dropping the finding produces a wrong result or a hang, it's `go-reviewer`; if it only makes the program slower, it's `go-perf-reviewer`. Example: a `Mutex` held too long during I/O that also causes a downstream deadlock is `go-reviewer`; the same `Mutex` merely serializing hot-path CPU work is `go-perf-reviewer`.
+**Boundary rule:** if dropping the finding produces a wrong result or a hang, it's a 4.3 correctness finding; if it only makes the program slower, it's a 4.4 performance finding. Example: a `Mutex` held too long during I/O that also causes a downstream deadlock is 4.3; the same `Mutex` merely serializing hot-path CPU work is 4.4.
 
 ## Decision Tables
 
@@ -132,7 +134,6 @@ Happens-before edges that actually exist ([go.dev/ref/mem](https://go.dev/ref/me
 
 ## Related
 
-- `go-reviewer` agent — correctness review (race/leak/deadlock)
-- `go-perf-reviewer` agent — performance review (contention, atomic vs mutex, Pool)
+- `golang-patterns/references/review-standard.md` — the Go review standard `code-reviewer` reads: correctness (race/leak/deadlock) in 4.3, performance (contention, atomic vs mutex, Pool) in 4.4
 - `go-modern` skill — idiom-level API replacements (loop vars, `errors.Join`, etc.)
 - `golang-patterns` skill — general Go structure and error conventions

@@ -143,7 +143,7 @@ describe("yamlString", () => {
 
 describe("ompAgentFileName", () => {
   test("keeps the source file name: omp's format is the source's", () => {
-    expect(ompAgentFileName("go-reviewer.md")).toBe("go-reviewer.md");
+    expect(ompAgentFileName("code-reviewer.md")).toBe("code-reviewer.md");
   });
 });
 
