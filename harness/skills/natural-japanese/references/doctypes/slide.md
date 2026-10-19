@@ -1,77 +1,87 @@
-# スライド構成: メッセージラインだけ読んでもストーリーが通る
+# Slide outline (スライド構成): the message lines alone carry the argument
 
-スライドが答える問いは「聞き手を1枚ごとにどう説得するか」ではなく、「メッセージラインだけを上から順に読んだとき、結論に至る筋道が伝わるか」である。文書とは違う。滞在時間は1枚あたり数秒で、聞き手はタイトルと太字の一文しかまともに読まない前提で作る必要がある。だから根拠の箇条書きは補強材料であって、主張そのものはメッセージラインに全部乗せる。ここで扱うのは構成の型と各要素の役割で、文中の言い回しの細部は `readability-principles.md` を参照する。
+The question a slide deck answers is whether, reading only the message lines from top to bottom, the path to the conclusion comes through. Build on the assumption that the audience looks at a slide for a few seconds and properly reads only the title and the one most prominent sentence. So put the whole claim in the message line, and keep the supporting bullets as material that backs it. This file covers the structure and the role of each element. For how to write sentences, follow SKILL.md §2.
 
-## 必須要素
+## Required elements
 
-各スライドは次の3層で構成する。
+Build each slide from these three.
 
-- **タイトル**: そのスライドが扱うテーマ(短い名詞句でよい)
-- **メッセージライン**: そのスライドの結論を言い切る一文(タイトルの直下、いちばん目立つ位置)
-- **根拠**: メッセージラインを支える箇条書き3〜5点(数値・事例を優先し、一般論の言い換えにしない)
+- Title: the theme the slide deals with. A short noun phrase is fine
+- Message line: one sentence that states the slide's conclusion outright (also called the lead sentence). Place it in the most prominent position, right below the title. One sentence, up to about 50 characters. If it grows long from listing what you want to say, narrow it to the one point you most want to make, and move the rest to the supporting bullets or split the slide
+- Support: bullets backing the message line. Prefer numbers and cases; do not restate generalities. Match the count to the slide's weight; if one point is enough, one point is fine
 
-## 構成の型
+## Structure
 
-全体の流れは導入(課題とゴールの共有)→本論(根拠のグループ、3グループ以内)→結論(次のアクション)の三部構成が基本になる。本論を4グループ以上に分けると、聞き手はどれが本筋でどれが付随情報か判断できなくなる。多すぎる論点は伝わらない。根拠が4つ以上ある場合は、上位2〜3個を残りより濃く扱い、残りは1枚にまとめて軽く流す(→第7条)。
+The basic flow has three parts: introduction (share the problem and the goal), body (groups of support, at most 3), conclusion (what you want done next). Split the body into 4 or more groups and the audience cannot tell which is the main line and which is an add-on. When there are 4 or more pieces of support, treat the main 2–3 thickly and touch the rest lightly on one slide (SKILL.md §2 principle 7).
 
-スケルトン通読(→ `SKILL.md` の構造レビュー節)がスライドにもっとも強く効く検査法になる。メッセージラインだけを最初から最後まで順に読み、(1)論旨が通るか (2)各ラインが本当に結論を言っているか (3)同じ文型が続いていないか (4)重要なスライドとそうでないスライドの扱いに差があるか (5)最後のスライドが次のアクションに接続しているか、の5点を確認する。この通読で筋が通らなければ、根拠の中身をどれだけ整えてもストーリーは伝わらない。
+For checking, the most useful thing is reading only the message lines, start to finish, in one go (SKILL.md §5 "Structure check"). Check the following.
 
-スライドはテキストの形で書き起こす場合も、スライド1枚をタイトル・メッセージライン・箇条書きの3行程度に圧縮したまま提示する。段落での説明を挟まないのが他の文書タイプとの最大の違いで、地の文に頼れないぶん、メッセージラインの一文に情報量を凝縮する必要がある。
+- Does the argument hold
+- Does each line state a conclusion
+- Is the same sentence pattern repeating
+- Is there a difference between important slides and the rest
+- Does the last slide lead to what you want done next
 
-## 品質基準
+If the argument does not hold here, no amount of polishing the support will get the talk across.
 
-- **メッセージラインが結論を言い切っているか、それとも体言止めのラベルで終わっていないか。** 「新機能の概要」ではなく「新機能により入力時間が半分になる」まで書けているかを見る
-- **メッセージラインだけを通して読んで、聞き手が結論の流れを追えるか。** 根拠のスライドを飛ばしても、結論に至る道筋が分かる状態が目標
-- **根拠が具体的な数値・事例で書かれているか。** 「効果が見込まれる」のような一般論の箇条書きで埋まっていないか
-- **スライドごとの情報量に差があるか。** 全スライドが同じ行数・同じ箇条書き密度で並んでいたら、重要度の差が失われている疑いがある
-- **最後のスライドが次のアクションを指しているか。** 「以上、ご清聴ありがとうございました」で終わらず、聞き手に何を判断・実行してほしいかまで書けているか
-- **根拠の箇条書きが、そのスライドの重要度に見合った点数になっているか。** 軽いスライドまで無理に3点そろえていないか。1点で十分なら1点でよい
+When writing it out as text too, present each slide kept to a few lines: title, message line, bullets. Not inserting paragraphs of explanation is the big difference from the other document types; since you cannot lean on running prose, concentrate the information in the one message sentence. Do not bold labels like 「タイトル:」「メッセージ:」 or the bullet phrases. When every line is bold, emphasis stops working as emphasis and the screen gets noisy.
 
-## AIがやりがちな失敗
+## Quality criteria
 
-もっとも多いのが、メッセージラインが体言止めのラベルで終わり、結論を言っていない失敗だ。結論が抜けている。「導入のメリット」「今後の展望」のようなタイトルをそのままメッセージラインの位置に置いてしまうと、そのスライドが何を主張しているのかは根拠を全部読むまで分からない。次に多いのが、素材が足りない箇所を「[サービス名]」「[想定コスト]」のようなプレースホルダーで埋めた汎用テンプレをそのまま出す失敗で、これは後で埋める前提の仮置きが本番の構成として提出されてしまう状態にあたる。素材が足りないなら埋めずに先に聞く。もう一つ、全スライドが同じ箇条書き密度(毎回ちょうど3点)で並び、重要なスライドと軽いスライドの区別がつかなくなる失敗もよく起きる。
+- The message line fits in one sentence of about 50 characters. It is not a long sentence that merely lists items, like 「A、B、Cの3点はまだ分かっていない」
+- The message line states the conclusion outright. It does not stop at a label like 「新機能の概要」 but goes as far as 「新機能で入力時間が半分になる」
+- Reading only the message lines in sequence, you can follow the flow to the conclusion. The argument is clear even when support slides are skipped
+- Support is written with concrete numbers and cases. It is not filled with generalities like 「効果が見込まれる」
+- Slides differ in information volume. If every slide has the same line count and the same number of bullets, the difference in importance is gone
+- The last slide shows what you want the audience to decide or do. It does not end with 「ご清聴ありがとうございました」
 
-## 文体憲法の重点条項
+## Typical AI failures
 
-- **第1条(結論から書く)**: メッセージラインはそのスライドの結論そのものであり、前置きや経緯の要約であってはならない
-- **第2条(見出しはメッセージ)**: スライドはこの条がもっとも純粋な形で適用される場面になる。タイトルはラベルでよいが、メッセージラインは必ず一文の結論にする
-- **第7条(濃淡をつける)**: 本論のグループ数を絞り、重要な根拠には数値や事例を厚く添え、軽い根拠は1行で流す
-- **第12条(結びはSo Whatまで)**: 結論スライドは事実の再掲でなく、聞き手に求めるアクションで締める
+The most common is a message line that ends as a label and states no conclusion. Put a title like 「導入のメリット」「今後の展望」 in the message position, and what the slide claims is unclear until all the support has been read.
 
-## 例: 営業支援ツールの提案スライド
+Next most common is shipping places where material is lacking as fill-in blanks like 「[サービス名]」「[想定コスト]」. A placeholder meant to be filled later gets submitted as a finished outline. If material is lacking, ask the user before filling it in.
 
-メッセージラインの悪い例と良い例を並べる。
+Another frequent one is every slide's bullets coming in exactly 3 points every time, so important slides and light slides cannot be told apart.
 
-Before(ラベル止まり、根拠が一般論)
+## Principles that matter most (SKILL.md §2)
 
-> ## タイトル: 新営業支援ツールについて
-> ### メッセージライン: 新ツールの導入メリット
+- Principle 1 (conclusion first): make the message line the slide's conclusion itself. Not a preamble or a summary of the background
+- Principle 2 (conclusions in headings): in slides the title may be a label, but the message line must always be a one-sentence conclusion
+- Principle 7 (density): narrow the body groups, add numbers and cases thickly to important support, and keep light support to one line
+- Principle 12 (the close): end the last slide not by repeating facts but with what you want the audience to do
+
+## Example: a proposal slide for a sales-support tool
+
+Consider writing one slide of a proposal from the following material.
+
+素材:いまは CRM と見積システムに同じ案件情報を別々に入力していて、1案件あたり平均12分の重複作業がある。新しいツールは CRM への入力を見積システムに自動で反映するので、この重複がなくなる。3チームで試験導入したところ、4週間後に営業1人あたり平均で週1.8時間の作業時間が減った。
+
+Example that ends as a label:
+
+> タイトル:新営業支援ツールについて
+> メッセージ:新ツールの導入メリット
 > - 業務効率が向上する
 > - 情報共有がスムーズになる
 > - 顧客満足度の向上が期待できる
 
-このメッセージラインは体言止めのラベルであり、聞き手は根拠を3つ読んでも「結局どれくらい良くなるのか」を受け取れない。根拠も「効率が向上する」という言い換えの繰り返しで、数値も事例もない。
+Example that states the conclusion outright:
 
-After(結論を言い切り、根拠が具体的)
+> タイトル:案件情報の二重入力
+> メッセージ:二重入力をなくした試験導入で、営業1人あたり週1.8時間の作業が減った
+> - いまは CRM と見積システムに同じ情報を別々に入力しており、1案件あたり平均12分の重複作業がある
+> - 新しいツールは CRM への入力を見積システムに自動で反映し、この重複をなくす
+> - 3チームの試験導入で、4週間後に平均で週1.8時間の削減を確かめた
 
-> ## タイトル: 案件情報の二重入力
-> ### メッセージライン: 案件情報の二重入力をなくすだけで、営業1人あたり週2時間が浮く
-> - 現状はCRMと見積システムに同じ情報を別々に入力しており、1案件あたり平均12分の重複作業が発生している
-> - 新ツールはCRM入力を見積システムに自動反映し、重複作業をゼロにする
-> - 試験導入した3チームでは、導入4週間後に平均週1.8時間の作業時間削減を確認した
+With the label example, reading all three pieces of support still does not tell how much things improve, and the support is generalities not in the material. The outright example uses only numbers in the material, and the message line's number is the same 1.8 hours per week as the support. Rounding the number up in the message line contradicts the support. Also, since this is the result of a trial in 3 teams, it is not written as an effect that holds anywhere (「なくすと減る」) but as 「試験導入で減った」.
 
-After は「案件情報の二重入力」という具体的な課題に対して、時間という単位で結論を言い切り、根拠も社内の実測値で裏づけている。メッセージラインだけを読んでも「何が課題で、何がどれだけ改善するか」が伝わる。
+The same difference shows up on the introduction slide. Just listing 「現状の課題」「新ツールの提案」「導入スケジュール」 under the label 「本日のアジェンダ」 leaves the audience guessing at the content. Writing the agenda itself as a preview of the conclusion, like 「二重入力をなくした試験導入で、営業1人あたり週1.8時間の作業が減った。全体への導入と、その時期を提案する」, tells the audience on the first slide what to listen for.
 
-タイトル自体が結論の一文になっている例として、「AIエージェントは、頼んだ仕事をこなせる。次の仕事を見つけるのは、まだ人間だ。」という書き出しがある。表紙スライドにこの発想を当てはめると、聞き手はめくる前から結論の輪郭を掴める。
+## When material is lacking, ask instead of filling in
 
-導入スライドでも同じ差が出る。Before は「本日のアジェンダ」というラベルの下に「現状の課題」「新ツールの提案」「導入スケジュール」と並べるだけで、聞き手は各項目の中身を推測できない。After は「営業の重複入力が週2時間を奪っている。解決策と導入時期を提案する」のように、アジェンダ自体を結論の予告として書く。同じ3項目を扱うにしても、後者は開始1枚目で聞き手の期待値を具体的に設定できる。
+In slide requests, numbers such as company names, costs and rollout dates are often not all there at the start. Producing a provisional outline with fill-in blanks like 「[サービス名]」「約[金額]円」 looks finished but has no content, and leads to large rework later. When you notice a place lacking numbers or proper nouns, confirm with the user which numbers to use before filling it in. If there is a reason it cannot be confirmed, write 【要確認】 there and say it is meant to be replaced later.
 
-## 素材が足りないときは埋めずに聞く
+Even when the request is a single sentence like 「〇〇についてのプレゼン資料を作って」, there is less rework if you first show the conclusion (candidate message lines) and the number of body groups and get agreement, then fill in the support. If the structure is wrong, fixing it at the structure stage is far lighter than fixing it after building out the slides.
 
-スライド構成の依頼では、社名・コスト・導入時期などの数値が最初から揃っていないことが多い。ここで安易に「[サービス名]」「約[金額]円」のようなプレースホルダーで埋めた構成を出すと、見た目は完成しているのに中身がなく、後で全滅的な手戻りを生む。数値や固有名詞が欠けている箇所に気づいたら、その場で埋めずに「この数値は何を使うか」を先に確認する。確認できない事情があるなら、該当箇所に「未確定・要確認」と明示し、確定後に差し替える前提であることを伝えておく。
+## Decide the slide count from the number of conclusions
 
-同じ理由で、依頼が「〇〇についてのプレゼン資料を作って」という素っ気ない一文だけの場合も、まず結論(メッセージラインの候補)と本論のグループ数を提示して合意を取り、そのあとで根拠の肉付けに進むほうが手戻りが少ない。骨格が違っていた場合、枚数を埋めたあとに直すより、骨格の段階で直すほうがはるかに軽い。
-
-## 枚数は結論の数で決まる
-
-スライドの枚数を先に決めてから中身を割り振ると、無理に間を持たせる枚や、逆に1枚に主張を詰め込みすぎる枚が生まれる。順序は逆にする。まず本論の根拠グループがいくつあるかを数え、そのグループ数に導入と結論を足した枚数を採用する。グループが2つしかないのに3グループ分の型で構成しようとすると、片方が水増しになる。枚数は結果でしかない。グループの数がそのまま枚数を決める、という向きで考えたほうが破綻しない。
+Fixing the slide count first and then allocating content produces slides that only fill time, or slides crammed with too many claims. First count how many groups the body's support forms, then add the introduction and conclusion to get the slide count. Building a three-group structure when there are only two groups pads one of them.
