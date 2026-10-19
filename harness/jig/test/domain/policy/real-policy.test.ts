@@ -1202,8 +1202,16 @@ const PRECEDENCE_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
   ]),
   ...shellRows("ask-gh-shared-write", [
     ["gh pr edit --base asks", "gh pr edit 3 --base main", "ask"],
-    ["resolving a review thread asks", "gh api graphql -f query=mutation{resolveReviewThread(input:{threadId:1}){thread{id}}}", "ask"],
-    ["arming auto-merge asks", "gh api graphql -f query=mutation{enablePullRequestAutoMerge(input:{}){clientMutationId}}", "ask"],
+    [
+      "resolving a review thread asks",
+      "gh api graphql -f query=mutation{resolveReviewThread(input:{threadId:1}){thread{id}}}",
+      "ask",
+    ],
+    [
+      "arming auto-merge asks",
+      "gh api graphql -f query=mutation{enablePullRequestAutoMerge(input:{}){clientMutationId}}",
+      "ask",
+    ],
     ["gh pr view is allowed", "gh pr view 3", "allow"],
     ["a draft PR is allowed", "gh pr create --draft", "allow"],
     ["reading a PR through the API is allowed", "gh api repos/o/r/pulls/3", "allow"],
