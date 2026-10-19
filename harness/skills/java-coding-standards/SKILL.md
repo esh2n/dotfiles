@@ -11,6 +11,8 @@ metadata:
 
 Standards for readable, maintainable Java (17+) code in Spring Boot services.
 
+Writing or reviewing Java or Spring Boot: read `references/review-standard.md` first — the single Java review standard (items with sources, version gates, concurrency model, linter mapping) shared by the writer and `code-reviewer`.
+
 ## When to Activate
 
 - Writing or reviewing Java code in Spring Boot projects
