@@ -32,7 +32,9 @@ target() {
 		check .pi/agent/models.json "${C}/pi/models.json"
 		for ext in "${C}"/pi/extensions/*.ts; do check ".pi/agent/extensions/$(basename "$ext")" "$ext"; done
 		check .pi/agent/themes/unkai.json "${C}/pi/themes/unkai.json"
-		for f in config.yml models.yml lsp.yml; do check ".omp/agent/${f}" "${C}/omp/${f}"; done
+		for f in models.yml lsp.yml; do check ".omp/agent/${f}" "${C}/omp/${f}"; done
+		# jig writes the keys it owns into omp's config.yml; the file is not linked
+		[ "$(target "$json" ".omp/agent/config.yml")" = "<missing>" ]
 		check .dsh/settings.yaml "${C}/dsh/settings.yaml"
 		[ "$(target "$json" ".pi/agent/extensions/__tests__")" = "<missing>" ]
 	done
