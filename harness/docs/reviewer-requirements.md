@@ -1,7 +1,7 @@
 # Reviewer agent requirements
 
 The minimum every reviewer agent in `harness/agents/*-reviewer.md` (including
-`security-reviewer` and the `*-perf-reviewer` agents) and `review-verifier` must
+`security-reviewer` and the remaining flutter reviewers) and `review-verifier` must
 meet. Check a reviewer against this list before writing a new one or editing an
 existing one. The procedure that spawns them is the `change-review` skill
 (`harness/skills/change-review/`); its judgment rules are `code-review-discipline`
@@ -49,11 +49,12 @@ nothing else. `Write` and `Edit` are forbidden — a reviewer never rewrites cod
 `Bash` is for fetching the diff and showing diagnostic commands, within the
 no-execution default of requirement 2.
 
-## 4. Verified/unverified labelling (the perf-reviewer model)
+## 4. Verified/unverified labelling
 
 A finding made without measuring or running anything is never stated as fact. The
-template is the "Evidence chain and labeling" section the language perf reviewers
-share (for example `rust-perf-reviewer.md`):
+template is the evidence chain in `skills/go-performance/SKILL.md`, which the
+performance sections of the language review standards
+(`skills/<lang skill>/references/review-standard.md`) follow:
 
 - **verified** — the full chain (baseline measurement, profile, apply the change,
   re-measure, confirm the mechanism with `benchstat` or equivalent) was actually run
@@ -89,28 +90,28 @@ A false positive wastes reviewer time and erodes trust in this agent's output; a
 Starting from it is fine, but the section must close with the domain's own
 vocabulary. Good examples:
 
-- `rust-perf-reviewer.md` lists the kinds of cost each finding must name (an
-  allocation per iteration, a virtual call per element, a lock held across an
-  await, a memcpy of k bytes per call) and the hot-path argument behind it.
+- `workload-reviewer.md` reports a finding only with the mechanism and the input
+  that triggers it ("50 items, 51 queries"), quoting the line; a load claim it
+  cannot size goes under missing context with what would size it.
 - `security-reviewer.md` starts from the measured false-positive rate of AI
   security review, so it reports nothing on suspicion alone: each finding names
   the attacker, what they control, the path to the sink and the impact, quotes
   the sink line, and a weaker one is reported only as an `[unverified]` blocker.
-- `web-platform-reviewer.md` lists what is reported (a visible rendering break, an
-  accessibility barrier, a maintainability trap with a specific mechanism, a
-  measured or measurable performance cost) and what is not (taste).
+- `ui-reviewer.md` reports measurable breakage (overflow or clipping, overlap, a
+  missing loading, empty, error or focus state, contrast below the threshold with
+  the measured ratio, an unlabelled control) and sends taste (spacing scale,
+  hierarchy, eye flow) to the owner as a sourced question.
 
 A new reviewer meets the level of one of these three, writing whichever applies
 of: the nameable costs in its domain, the false-positive/false-negative asymmetry,
 and the bar below which a finding is noise. A section that is only the boilerplate
-does not pass. The perf reviewers and the eight reviewers of the review redesign
-(code, security, workload, ui, test, spec, rollout, review-verifier; spec and
-rollout added by `rules/decisions/2026-10-19-spec-and-rollout-reviewers.md`)
-meet this today; the language reviewers (cpp, flutter, java, kotlin, python,
-react, rust, web-platform) still carry the boilerplate. Their knowledge
-moves into each language skill's `references/review-standard.md` in phase 2 of
-the redesign (`rules/decisions/2026-10-19-review-redesign.md`); Go, TypeScript
-and SQL have moved already, and their reviewer agents are retired.
+does not pass. The eight reviewers of the review redesign (code, security,
+workload, ui, test, spec, rollout, review-verifier; spec and rollout added by
+`rules/decisions/2026-10-19-spec-and-rollout-reviewers.md`) meet this today; the
+flutter reviewers still carry the boilerplate. Language knowledge lives in each
+language skill's `references/review-standard.md` (phase 2 of
+`rules/decisions/2026-10-19-review-redesign.md`), and the language reviewer
+agents are retired as their standard lands.
 
 ## 7. One finding shape
 
@@ -129,7 +130,7 @@ The eight reviewers of the review redesign return findings in one shape, so the
 - three sections: Findings, Questions for the owner (trade-offs, taste, design
   calls), Missing context (inputs that were absent and what each would decide).
 
-The language and perf reviewers still use the `[C:x/I:x]` threshold until phase 2.
+The flutter reviewers still use the `[C:x/I:x]` threshold until their standard lands.
 
 ## Known deviation
 

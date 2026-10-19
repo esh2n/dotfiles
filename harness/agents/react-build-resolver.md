@@ -209,7 +209,7 @@ Final: `Build Status: SUCCESS | Errors Fixed: N | Files Modified: <list>` or `Bu
 
 ## Related
 
-- Agent: `react-reviewer` for code review after build is green
+- Review: once the build is green, the `change-review` skill reviews the diff (`code-reviewer` reads `react-patterns/references/review-standard.md`)
 - Rules: `rules/react/coding-style.md`, `rules/react/patterns.md`
 - Skills: `skills/react-patterns/`, `skills/frontend-patterns/`
 - Commands: `/react-build`, `/react-review`

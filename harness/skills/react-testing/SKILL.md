@@ -341,7 +341,7 @@ CI=true vitest run --coverage
 ## Related
 
 - Skills: [react-patterns](../react-patterns/SKILL.md)
-- Agents: `react-reviewer` (reviews test quality during code review)
+- Review: `code-reviewer` checks test quality against section 4.7 of `react-patterns/references/review-standard.md`; `test-reviewer` checks whether the tests would fail when the behaviour breaks
 
 ## Examples
 
