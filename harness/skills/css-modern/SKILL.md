@@ -8,6 +8,8 @@ metadata:
 
 # Modern CSS
 
+Writing or reviewing CSS: read `references/review-standard.md` first — the single CSS review standard (cascade, flow, units, modern CSS, defensive CSS, rendering performance; items with sources, Baseline gates, pipeline model, linter mapping) shared by the writer and `code-reviewer`; markup and accessibility are in `semantic-html`.
+
 ## Overview
 
 Models reach for pre-2022 CSS by default: viewport media queries, `!important`,
