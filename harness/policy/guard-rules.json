@@ -875,6 +875,119 @@
         "standard",
         "strict"
       ]
+    },
+    {
+      "id": "git-discard-worktree",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*(?:checkout|restore)(?:\\s+(?:--worktree|-W|--source[=\\s]\\S+|-s\\s*\\S+))*\\s+(?:--\\s+)?(?:\\.|:/)(?:\\s|$)"
+      },
+      "why": "2026-10-19-pstack-house-wins-on-conflict: `git checkout .` and `git restore .` discard every uncommitted change, the same as `git checkout -- .`",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-git-restore",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*restore\\b(?!.*(?:^|\\s)(?:--staged|-S)(?:\\s|$)(?!.*(?:^|\\s)(?:--worktree|-W)(?:\\s|$)))"
+      },
+      "why": "2026-10-19-pstack-house-wins-on-conflict: restoring working-tree files discards their uncommitted edits; pstack's loops revert changes that did not help",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-git-stash-drop",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*stash\\s+(?:drop|clear)\\b"
+      },
+      "why": "2026-10-19-pstack-house-wins-on-conflict: a dropped stash is uncommitted work gone",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-git-branch-force-delete",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*branch\\b.*(?:^|\\s)(?:-D|-[a-zA-Z]*D[a-zA-Z]*|--delete\\s+--force|--force\\s+--delete)(?:\\s|$)"
+      },
+      "why": "2026-10-19-pstack-house-wins-on-conflict: `branch -D` deletes unmerged commits",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-rm-recursive",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "rm",
+        "argv": "(?:^|\\s)(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(?:\\s|$)"
+      },
+      "why": "2026-10-19-pstack-house-wins-on-conflict: a recursive delete without -f still removes whole trees; rm-recursive-force covers only -rf",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-cache-and-simulator-delete",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "xcrun|brew|pnpm|uv|yarn|npm",
+        "argv": "^(?:simctl\\b.*\\b(?:delete|erase)\\b|cleanup\\b|autoremove\\b|store\\s+prune\\b|cache\\s+(?:clean|prune|clear)\\b)"
+      },
+      "why": "2026-10-19-pstack-house-wins-on-conflict: pstack's worktree-cleanup deletes simulators and package caches; the owner decides what to free",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-gh-shared-write",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "gh",
+        "argv": "^(?:pr(?:\\s+-{1,2}[A-Za-z][\\w-]*(?:=\\S*)?(?:\\s+(?!-)\\S+)?)*\\s+(?:edit|close|reopen)\\b|issue(?:\\s+-{1,2}[A-Za-z][\\w-]*(?:=\\S*)?(?:\\s+(?!-)\\S+)?)*\\s+(?:create|edit|close|reopen)\\b|api\\b.*\\b(?:resolveReviewThread|unresolveReviewThread|enablePullRequestAutoMerge|updatePullRequestBranch|closePullRequest|createIssue|updateIssue)\\b)"
+      },
+      "why": "2026-10-19-pstack-house-wins-on-conflict: writes other people see — editing or closing a PR, filing an issue, resolving a review thread, arming auto-merge — wait for the owner",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-tailscale-expose",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "tailscale",
+        "argv": "^(?:serve|funnel)\\b"
+      },
+      "why": "2026-10-19-pstack-house-wins-on-conflict: exposing a local port on the tailnet or the internet is an outward change (pstack's make-bot-ui)",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
     }
   ]
 }

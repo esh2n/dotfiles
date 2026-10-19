@@ -321,10 +321,10 @@ const CASES: readonly Case[] = [
     expected: "ask",
   },
   {
-    label: "near-miss: rm -r without force is allowed",
+    label: "rm -r without force asks too (ask-rm-recursive)",
     call: shellCall("rm -r /tmp/x"),
     profile: "standard",
-    expected: "allow",
+    expected: "ask",
   },
 
   // --- kill-force ---
@@ -1096,11 +1096,11 @@ const PRECEDENCE_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
     ["gh pr close --comment asks", "gh pr close 12 --comment superseded", "ask"],
     ["gh pr close -dc (bundled) asks", "gh pr close 12 -dc superseded", "ask"],
     ["gh issue close --comment= asks", "gh issue close 3 --comment=done", "ask"],
-    ["gh pr close without a comment is not a comment", "gh pr close 12", "allow"],
+    ["gh pr close without a comment asks as a shared write", "gh pr close 12", "ask"],
     [
-      "gh issue close -r without a comment is not a comment",
+      "gh issue close -r without a comment asks as a shared write",
       "gh issue close 3 -r completed",
-      "allow",
+      "ask",
     ],
     [
       "POST to pulls/N/comments asks",
@@ -1163,7 +1163,55 @@ const PRECEDENCE_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
       "allow",
     ],
     ["gh pr view --comments is allowed", "gh pr view 12 --comments", "allow"],
-    ["gh issue create is out of scope", "gh issue create -t x -b y", "allow"],
+    ["gh issue create asks as a shared write", "gh issue create -t x -b y", "ask"],
+  ]),
+  ...shellRows("git-discard-worktree", [
+    ["git checkout . is forbidden", "git checkout .", "deny"],
+    ["git restore . is forbidden", "git restore .", "deny"],
+    ["git restore --worktree . is forbidden", "git restore --worktree .", "deny"],
+    ["git checkout of a branch is allowed", "git checkout main", "allow"],
+    ["git checkout -b is allowed", "git checkout -b feat/x", "allow"],
+  ]),
+  ...shellRows("ask-git-restore", [
+    ["git restore of one file asks", "git restore src/a.ts", "ask"],
+    ["git restore --staged is allowed", "git restore --staged src/a.ts", "allow"],
+  ]),
+  ...shellRows("ask-git-stash-drop", [
+    ["git stash drop asks", "git stash drop", "ask"],
+    ["git stash clear asks", "git stash clear", "ask"],
+    ["git stash pop is allowed", "git stash pop", "allow"],
+  ]),
+  ...shellRows("ask-git-branch-force-delete", [
+    ["git branch -D asks", "git branch -D old", "ask"],
+    ["git branch --delete --force asks", "git branch --delete --force old", "ask"],
+    ["git branch -d is allowed", "git branch -d old", "allow"],
+  ]),
+  ...shellRows("ask-rm-recursive", [
+    ["rm -r asks", "rm -r build", "ask"],
+    ["rm of one file is allowed", "rm file.txt", "allow"],
+  ]),
+  ...shellRows("ask-cache-and-simulator-delete", [
+    ["xcrun simctl delete asks", "xcrun simctl delete unavailable", "ask"],
+    ["brew cleanup asks", "brew cleanup", "ask"],
+    ["pnpm store prune asks", "pnpm store prune", "ask"],
+    ["uv cache clean asks", "uv cache clean", "ask"],
+    ["npm cache clean asks", "npm cache clean --force", "ask"],
+    ["xcrun simctl list is allowed", "xcrun simctl list", "allow"],
+    ["brew install is allowed", "brew install jq", "allow"],
+    ["pnpm install is allowed", "pnpm install", "allow"],
+  ]),
+  ...shellRows("ask-gh-shared-write", [
+    ["gh pr edit --base asks", "gh pr edit 3 --base main", "ask"],
+    ["resolving a review thread asks", "gh api graphql -f query=mutation{resolveReviewThread(input:{threadId:1}){thread{id}}}", "ask"],
+    ["arming auto-merge asks", "gh api graphql -f query=mutation{enablePullRequestAutoMerge(input:{}){clientMutationId}}", "ask"],
+    ["gh pr view is allowed", "gh pr view 3", "allow"],
+    ["a draft PR is allowed", "gh pr create --draft", "allow"],
+    ["reading a PR through the API is allowed", "gh api repos/o/r/pulls/3", "allow"],
+  ]),
+  ...shellRows("ask-tailscale-expose", [
+    ["tailscale serve asks", "tailscale serve --bg 8080", "ask"],
+    ["tailscale funnel asks", "tailscale funnel 443", "ask"],
+    ["tailscale status is allowed", "tailscale status", "allow"],
   ]),
   ...shellRows("ask-git-worktree-remove-force", [
     ["git worktree remove --force asks", "git worktree remove --force .claude/worktrees/a", "ask"],
