@@ -25,8 +25,8 @@ test/       mirrors src/. Domain/app tested with in-memory fakes of the ports.
 
 Not yet ported (placeholders will land as the migration proceeds):
 `domain/graph` + `app/graph`, `app/loop`, `infra/secrets`, `infra/model`,
-`infra/state`. The config generator that replaces yoki-switch is partly
-landed — see [The generator](#the-generator-jig-apply--retiring-yoki-switch).
+`infra/state`. The config generator that replaced yoki-switch is complete —
+see [The generator](#the-generator-jig-apply--retiring-yoki-switch).
 
 ## Develop
 
@@ -38,20 +38,43 @@ bun run lint      # biome
 bun run src/cli/jig.ts version
 ```
 
+## Commands
+
+`bun run src/cli/jig.ts` with no arguments prints the usage; on a terminal it
+opens the interactive entry point (which harness, then host or box). The
+subcommands (`src/cli/jig.ts`):
+
+| command | what it does |
+|---|---|
+| `version` | prints the version |
+| `hooks <pre-tool-use\|session-start\|user-prompt-submit\|post-tool-use-format\|stop-gate>` | the five hook entrypoints (stdin JSON → stdout JSON) |
+| `decide`, `tier` | one-shot judgments: a request on stdin, the answer on stdout (`src/cli/decide.ts`, `src/cli/tier.ts`) |
+| `serve` | the judgment service over HTTP, with `/metrics` |
+| `report skills [--days N] [--json] [--opened-via read\|skill\|any]` | what the skill router injected against what the model opened, from session transcripts |
+| `report guard-coverage [--days N] [--json]` | reconciles the tool calls Claude Code and Codex recorded in their transcripts against jig's audit log, and names the harnesses it cannot reconcile (`src/app/coverage/`) |
+| `apply [--target claude\|codex\|omp\|pi\|dsh\|litellm\|all] [--write [--take-over]]` | the generator below. Dry-run by default. `--target all` (the default) runs the tiers half only — `pi`, `dsh`, `omp` and `litellm` (`home/shared/litellm/config/config.yaml`'s tiers block) from `policy/tiers.json` and `policy/models.json`. `--take-over` (claude, codex or pi, with `--write`): when jig's own earlier writes no longer match its record, copies the files aside (`<file>.pre-dotfiles`), forgets that record and writes jig's part again |
+| `tiers [list]`, `tiers use <tier> <model>...` | lists the tiers and the model catalog, or points a tier at catalog models in LiteLLM order (rewrites `policy/tiers.json`; run `apply --write` after) |
+| `setup [--target claude\|codex\|pi\|omp\|dsh]` | what home-manager activation runs once the links are written (`app/setup/setup-harness.ts`): builds the DSH plugin, installs DSH's expanded copies and links the plugin into each scaffolded profile, seeds codex's `config.toml` once, then `apply --target <h> --write` per harness and `codex register --write` when codex is installed. A failed step warns; it exits 0 |
+| `codex register [--write]` | registers jig's hooks with Codex (`hooks.json` and the trust entry) |
+| `retire yoki [--write]` | [Milestone 4](#milestone-4-jig-retire-yoki) |
+| `skills <hide\|show> [--write]` | sets or clears `disable-model-invocation` on every skill under the root |
+| `box <new\|list\|resume\|fetch\|rm>` | runs an agent in a Docker Sandboxes microVM around a clone of this repository (`src/cli/box.ts`, `rules/decisions/2026-09-22-box-shape.md`) |
+
 ## Placement
 
 Lives at `harness/jig/` in the dotfiles monorepo, replacing the
-old `claude-profiles/runtime/yoki`. The composed content (skills/rules/packs/
-personal) stays alongside under `llm/harness/` and jig composes it — it is not
-vendored inside jig.
+old `claude-profiles/runtime/yoki`. The composed content (skills, rules,
+agents, MCP, policy) stays alongside under `harness/` and jig composes it — it
+is not vendored inside jig.
 
 ## The generator (`jig apply`) — retiring `yoki-switch`
 
-`domains/dev/bin/yoki-switch` (1039 lines of bash) writes five harnesses'
-configuration today. `jig apply` replaces it target by target. The sources are
-the flat tree named by
-[`rules/decisions/2026-09-22-config-layout-no-personal-layer.md`](../rules/decisions/2026-09-22-config-layout-no-personal-layer.md)
-— `rules/ skills/ agents/ hooks/ mcp/ policy/` under `llm/harness/`, with no
+`domains/dev/bin/yoki-switch` (1039 lines of bash) wrote five harnesses'
+configuration. `jig apply` replaced it target by target, and yoki-switch was
+deleted (834c0d71); every milestone below is done. The sources are the flat
+tree named by
+[`rules/decisions/2026-09-24-harness-top-level-dir.md`](../rules/decisions/2026-09-24-harness-top-level-dir.md)
+— `rules/ skills/ agents/ hooks/ mcp/ policy/` under `harness/`, with no
 `core`/`packs`/`personal` layers and no pack switch.
 
 ### The invariant
@@ -66,19 +89,20 @@ source no longer has, say) is a one-time manual migration step, not a generator
 feature; the decision above records the day that dependency nearly got
 inverted.
 
-`~/.claude.json` is never touched at all.
+`~/.claude.json` is Claude Code's own state file. jig changes one key of it,
+`mcpServers`, and only the servers it recorded writing ([MCP servers](#mcp-servers)).
 
 ### Milestones
 
 | # | Scope | Status |
 |---|---|---|
-| 1 | Claude Code's `~/.claude/settings.json`: `hooks`, `permissions.{allow,deny,defaultMode}`, `sandbox`, and the removal of `YOKI_*` from `env`; MCP servers as printed `claude mcp add` lines | **done** |
-| 2 | The sources move: `skills/`, `rules/` and `agents/` into `llm/harness/`, and jig delivers `~/.claude/{skills,rules,agents}` and the generated `AGENTS.md` (with `CLAUDE.md` → `AGENTS.md`), and retires `~/.claude/commands` | **done** |
+| 1 | Claude Code's `~/.claude/settings.json`: `hooks`, `permissions.{allow,deny,defaultMode}`, `sandbox`, and the removal of `YOKI_*` from `env`; MCP servers in `~/.claude.json`'s `mcpServers` | **done** |
+| 2 | The sources move: `skills/`, `rules/` and `agents/` into `harness/`, and jig delivers `~/.claude/{skills,rules,agents}` and the generated `AGENTS.md` (with `CLAUDE.md` → `AGENTS.md`), and retires `~/.claude/commands` | **done** |
 | 3a | Codex: `~/.agents/skills` as a managed link directory (`~/.codex/skills` reported, not managed), `~/.codex/AGENTS.md`, `~/.codex/agents/*.toml` with the model from `agents/models.json`, jig's MCP block in `~/.codex/config.toml` | **done** |
-| 3b | omp: the same `~/.agents/skills` mount (one plan shared with 3a), `~/.omp/agent/agents/*.md`, jig's entries in `~/.omp/agent/mcp.json`, `~/.omp/agent/extensions/jig.ts` → jig's omp extension; `config.yml` reported, not owned | **done** |
+| 3b | omp: the same `~/.agents/skills` mount (one plan shared with 3a), `~/.omp/agent/agents/*.md`, jig's entries in `~/.omp/agent/mcp.json`, `~/.omp/agent/extensions/jig.ts` → jig's omp extension; jig's keys of `config.yml` | **done** |
 | 3c-pi | pi: the same `~/.agents/skills` mount (one plan shared with 3a/3b), `~/.pi/agent/AGENTS.md` as the same generated file (replacing today's symlink into the repo), jig's entries in pi-mcp-adapter's `~/.config/mcp/mcp.json`; `packages` and `extensions/` reported, not owned | **done** |
 | 3c-dsh | DSH: jig's `@deepseek-ai/dsh-mcp-client` rows (serena, codebase-memory, context7 — the `targets.dsh` set) in each scaffolded-and-repo-owned profile's `$DSH_HOME/profiles/<name>/cordis.patch.yml`, every other row carried through; `$DSH_HOME/AGENTS.md` as the same generated file; skills, the home-level patch, `settings.yaml`, `hooks.claude.json` and the guard plugin reported, not owned | **done** |
-| 4 | `~/.claude/{scripts,workflows}` as two more managed directories of the Claude target, and `jig retire yoki [--write]`: the yoki / yoki-switch artifacts on the machine, listed with evidence and removed on `--write` — the staging directories, state, links, Codex's block and hook groups, omp's files, Cursor's links | **done** (2026-09-23: sources moved, `retire yoki --write` run, `claude-profiles/` and `yoki-switch` deleted — see [Milestone 4](#milestone-4-jig-retire-yoki)). `core/config/manager.sh`'s `link_*` functions for pi and DSH stay, now calling `jig apply` |
+| 4 | `~/.claude/{scripts,workflows}` as two more managed directories of the Claude target, and `jig retire yoki [--write]`: the yoki / yoki-switch artifacts on the machine, listed with evidence and removed on `--write` — the staging directories, state, links, Codex's block and hook groups, omp's files, Cursor's links | **done** (2026-09-23: sources moved, `retire yoki --write` run, `claude-profiles/` and `yoki-switch` deleted — see [Milestone 4](#milestone-4-jig-retire-yoki)). `core/config/manager.sh` was deleted later (52411843): home-manager (`home/shared/harness/default.nix`) links pi's and DSH's files, and `jig setup` does DSH's copies and plugin |
 
 ### What each milestone replaces in `yoki-switch`
 
@@ -89,21 +113,21 @@ Rows cite the destination table in the yoki-switch migration map, §1a.
 | `merge_settings()` (yoki-switch:200-327) — `jq -s` over `core/settings.layer.json` × packs × `personal/settings.personal.json` | `app/apply/apply-claude.ts` + `domain/claude/settings.ts`: no layers, five managed keys, everything else preserved | 1 |
 | the `hooks` array concatenation of §1e (personal → packs → core, 33 entries over 7 events) | `domain/claude/hooks.ts`: five events, one hook each, generated from jig's own subcommands | 1 |
 | `permissions.yaml` layers → `lib/permissions/to-claude.js` (§1c) | `domain/policy/to-claude-permissions.ts` over `policy/guard-rules.json`, plus `domain/claude/permits.ts` | 1 |
-| `mcp.json` layers → `lib/mcp-inventory/writers/claude.js` (§1d), which wrote `mcpServers` into settings.json — a key Claude Code never reads | `mcp/servers.json` → `domain/mcp/to-claude.ts` → `domain/mcp/claude-mcp-add.ts`: one printed `claude mcp add --scope user` line per server, run by hand (see "MCP servers" below) | 1 |
+| `mcp.json` layers → `lib/mcp-inventory/writers/claude.js` (§1d), which wrote `mcpServers` into settings.json — a key Claude Code never reads | `mcp/servers.json` → `domain/mcp/to-claude.ts` → `domain/claude/claude-json.ts`: the `mcpServers` key of `~/.claude.json` (see "MCP servers" below) | 1 |
 | `.autoMode` carry-over (yoki-switch:317-326) | generalized: every unmanaged key is preserved, not just the one | 1 |
 | `~/.claude/.yoki/permissions.json` (hook-enforced deny set) | nothing — the guard reads `policy/guard-rules.json` directly | 1 |
 | `merge_claude_md()` (yoki-switch:332-346) — `CLAUDE.layer.md` + `CLAUDE.personal.md` | generated `AGENTS.md` from `rules/common/` + `rules/decisions/` (`domain/claude/agents-md.ts`), `CLAUDE.md` → `AGENTS.md` | 2 |
 | `merge_dir()` (yoki-switch:352-390) — the `.{dir}-merged` staging dirs behind `skills`/`hooks`/`commands`/`agents`/`rules`/`workflows`/`scripts` | one flat source tree, delivered by symlink; no `commands/` at all ([commands are skills](../rules/decisions/2026-09-22-commands-are-skills.md)); `scripts` and `workflows` as managed directories, and the staging dirs themselves, `~/.claude/hooks`, `.yoki/` and `.claude-packs` removed by `jig retire yoki` | 2, 4 |
 | `link_external_resources()` (yoki-switch:411-452) and `external-links.yaml` | folded into the flat tree | 2 |
-| `.claude-packs` / `packs.default` / `pack enable\|disable` | gone — rules are selected by `paths:` frontmatter, skills by the judgment service | 2 |
+| `.claude-packs` / `packs.default` / `pack enable\|disable` | gone — language guidance lives in the language skills (`skills/<lang>-*`), and skills are selected by the judgment service | 2 |
 | `apply_target_generator()` (yoki-switch:670-706) → `targets/gen.js` for codex: `codex-agents.js`, `codex-skills.js`, the `# yoki:begin` block of `config.toml`, the `~/.agents/skills` links | `app/apply/apply-codex.ts` + `domain/codex/{agents,config}.ts` and `domain/claude/agent-models.ts`, with the milestone-2 delivery verbs shared through `app/apply/delivery.ts`; `codex-skills.js` has no successor (no Codex-specific skills) — its `cmd-*` directories, the two port links, the block, `[permissions.yoki]`, `rules/yoki.rules`, `.yoki/` and the hook groups in `hooks.json` are removed by `jig retire yoki` | 3a, 4 |
-| `targets/gen.js` for omp: `omp-agents.js` + `omp-tool-names.js`, `omp-mcp.js`, the `~/.agents/skills` links, `link_omp_resources` in `core/config/manager.sh` | `app/apply/apply-omp.ts` + `domain/omp/{agents,mcp,agent-dir}.ts`, the mount through `app/apply/delivery.ts`'s `planAgentsSkillsMount` (shared with 3a) | 3b |
-| `targets/gen.js` for omp: `omp-config-yml.js`, `omp-rules-md.js`, `omp-hooks.js` (`config.yml`, `RULES.md`, `yoki-hooks.json`, the `yoki-*.ts` extension links) | `RULES.md`, `yoki-hooks.json`, `.yoki/` and the two `yoki-*.ts` links removed by `jig retire yoki`; `config.yml` left, its ownership a ruling not made | 4 |
+| `targets/gen.js` for omp: `omp-agents.js` + `omp-tool-names.js`, `omp-mcp.js`, the `~/.agents/skills` links, `link_omp_resources` in `core/config/manager.sh` (deleted) | `app/apply/apply-omp.ts` + `domain/omp/{agents,mcp,agent-dir}.ts`, the mount through `app/apply/delivery.ts`'s `planAgentsSkillsMount` (shared with 3a) | 3b |
+| `targets/gen.js` for omp: `omp-config-yml.js`, `omp-rules-md.js`, `omp-hooks.js` (`config.yml`, `RULES.md`, `yoki-hooks.json`, the `yoki-*.ts` extension links) | `RULES.md`, `yoki-hooks.json`, `.yoki/` and the two `yoki-*.ts` links removed by `jig retire yoki`; `config.yml`: jig's keys written by `apply --target omp` (`domain/omp/config.ts`, since fb2503ac) | 4 |
 | `link_cursor_rules` — `~/.cursor/rules/*` → `claude-profiles/runtime/yoki/.cursor/rules/` | nothing delivered (Cursor is not a jig target); the links removed by `jig retire yoki` | 4 |
-| `link_pi_resources` in `core/config/manager.sh`: the `AGENTS.md` link | `app/apply/apply-pi.ts`: the generated file over the link, `domain/pi/{mcp,packages,agent-dir}.ts` for the rest; the mount through `planAgentsSkillsMount` (shared with 3a/3b) | 3c-pi |
-| `link_pi_resources`: the `settings.json`/`models.json` links, the `extensions/*.ts` and `themes/*.json` file links | nothing yet — reported by 3c-pi (`extensions/`) or untouched (`settings.json` is read as the `packages` source; `models.json` is the tiers target's file) | 4 |
-| `link_dsh_resources` in `core/config/manager.sh`: the profile discovery rule (scaffolded AND in the repo) | `app/apply/apply-dsh.ts`, the same rule, plus what manager.sh never did — the MCP rows (`domain/dsh/{mcp,cordis-patch}.ts`) and `AGENTS.md` | 3c-dsh |
-| `link_dsh_resources`: the `settings.yaml` link, the `hooks.claude.json` expanded copy, the per-profile `cordis.patch.yml` expanded copy, the plugin build + `pnpm add link:` | nothing yet — reported by 3c-dsh; the expanded copy still overwrites jig's block on each run, which reads as "write again" | 4 |
+| `link_pi_resources` in `core/config/manager.sh` (deleted): the `AGENTS.md` link | `app/apply/apply-pi.ts`: the generated file over the link, `domain/pi/{mcp,packages,agent-dir}.ts` for the rest; the mount through `planAgentsSkillsMount` (shared with 3a/3b) | 3c-pi |
+| `link_pi_resources`: the `settings.json`/`models.json` links, the `extensions/*.ts` and `themes/*.json` file links | home-manager (`home/shared/harness/default.nix`); 3c-pi reports `extensions/` and reads `settings.json` as the `packages` source; `models.json` is the tiers target's file | — |
+| `link_dsh_resources` in `core/config/manager.sh` (deleted): the profile discovery rule (scaffolded AND in the repo) | `app/apply/apply-dsh.ts`, the same rule, plus what manager.sh never did — the MCP rows (`domain/dsh/{mcp,cordis-patch}.ts`) and `AGENTS.md` | 3c-dsh |
+| `link_dsh_resources`: the `settings.yaml` link, the `hooks.claude.json` expanded copy, the per-profile `cordis.patch.yml` expanded copy, the plugin build + `pnpm add link:` | home-manager (the `settings.yaml` link) and `jig setup` (`app/setup/setup-harness.ts`: the copies, the build, the link), both reported by 3c-dsh; `jig setup` installs the copies before it runs `apply --target dsh --write`, so the block lands after them | — |
 
 ### Milestone 1: what `jig apply --target claude` does
 
@@ -158,12 +182,12 @@ Owned, from sources:
   Rules with no native form are listed as `hookOnly` in the dry-run — the hook
   is their enforcement, and a `PreToolUse` deny holds in every permission mode.
 - `permissions.defaultMode` — `auto`.
-- `sandbox` — host mode, per
-  [`2026-09-22-box-shape.md`](../rules/decisions/2026-09-22-box-shape.md): the
-  same block `app/box/kit.ts` writes inside a box, minus the box's network
-  allowlist. `enabled`, `failIfUnavailable` and `allowUnsandboxedCommands` are
-  fixed in code; `excludedCommands` is copied verbatim from
-  `policy/sandbox.json`, which the owner maintains and no agent may write.
+- `sandbox` — `{ "enabled": false }` on the host, per
+  [`2026-09-30-host-claude-without-os-sandbox.md`](../rules/decisions/2026-09-30-host-claude-without-os-sandbox.md)
+  (`domain/claude/sandbox.ts`): jig's guard and auto mode's classifier check
+  every tool call. The key is written rather than left out, so a sandbox
+  turned on by hand is visibly jig's to turn off. A box keeps Claude Code's
+  own sandbox (`app/box/kit.ts`).
 
 Preserved: everything else in the live file, byte-for-byte in value —
 `autoMode`, `enabledPlugins`, `model`, `effortLevel`, `theme`,
@@ -182,44 +206,45 @@ reason.
 Claude Code does not read MCP servers from `~/.claude/settings.json`
 ([mcp.md](https://code.claude.com/docs/en/mcp.md),
 [settings.md](https://code.claude.com/docs/en/settings.md): "MCP servers are
-NOT stored in settings.json"). Its sources are `~/.claude.json` (user scope,
-written by `claude mcp add --scope user …`), the project's `.mcp.json`,
-plugins, claude.ai connectors and managed-mcp.json. There is no JSON bulk-add
-command: `claude mcp add` and `claude mcp remove` are the only documented
-writers of `~/.claude.json`, and `claude mcp list` shows every source with its
-scope. `~/.claude.json` is also a file jig may neither read nor write (the
-invariant above), so the delivery is the same as the default permits': the
-dry-run prints, under `mcp servers (claude mcp, user scope)`, one paste-able
-line per `targets.claude` server in `mcp/servers.json` —
-`targetOverrides.claude` applied, `{{HOME}}` substituted, `env` as `-e`,
-`headers` as `-H`, `transport` as `--transport stdio|http|sse`, every word
-shell-quoted (`domain/mcp/shell-quote.ts`; a `${VAR}` reference is
-single-quoted so it reaches `~/.claude.json` intact, where Claude Code expands
-it at runtime). The owner runs the block once, and again after editing
-`mcp/servers.json`. A server registered in `~/.claude.json` but no longer in
-the source is removed by hand with `claude mcp remove --scope user <name>`;
-jig cannot list those, because it does not read `~/.claude.json`.
+NOT stored in settings.json"). Its user-scope servers live in the
+`mcpServers` key of `~/.claude.json` (`$CLAUDE_CONFIG_DIR/.claude.json` when
+that is set), so the same `apply --target claude` writes them there, per
+[`2026-09-25-jig-writes-claude-json-mcp.md`](../rules/decisions/2026-09-25-jig-writes-claude-json-mcp.md)
+(`domain/claude/claude-json.ts`, planned in `app/apply/apply-claude.ts`).
 
-`--write` does not run the lines. Whether jig may invoke the `claude` CLI is a
-ruling the owner has not made; until then `--write` performs the settings.json
-change only, and the dry-run says so under the block.
+- One entry per `targets.claude` server in `mcp/servers.json`, in Claude
+  Code's own shape: `targetOverrides.claude` applied, `{{HOME}}` substituted;
+  stdio as `type`, `command`, `args`, `env`; http/sse as `type`, `url`,
+  `headers` (`domain/mcp/to-claude.ts`). A `${VAR}` reference is written as
+  is, and Claude Code expands it at runtime.
+- Only that key changes. Every other key of the file, and every server jig
+  did not write, comes back exactly as read.
+- The manifest records the server names jig wrote. A recorded server that
+  `mcp/servers.json` no longer has is removed; a server jig never wrote is
+  left alone and listed.
+- A server of the same name that jig did not write stops the write as a
+  conflict, unless it is already identical to jig's entry. The fix is
+  `claude mcp remove --scope user <name>`, a rename in `mcp/servers.json`, or
+  `--write --take-over`, which makes the servers of jig's names jig's.
+- A file that is not a JSON object, or an `mcpServers` that is not an
+  object, is a conflict too: nothing is written.
 
-### Two things the generator prints instead of writing
+`--write` writes the file atomically together with `settings.json` and the
+rest of the Claude target. jig does not run the `claude` CLI for this.
+
+### What the generator prints instead of writing
 
 `policy/` is not agent-writable — its own floor rules (`floor-policy-write`,
 `floor-policy-edit`) forbid it, and the guard blocks even a deliberate attempt.
 Where a decision's source belongs there, the dry-run prints what to paste:
-
-- **the default permits.** `src/domain/claude/permits.ts` is a *fallback* that
-  keeps the six rules in the output until they exist in
-  `policy/guard-rules.json`. The dry-run prints them as a ready `rules[]`
-  fragment; once pasted, the projection produces the identical strings and the
-  fallback collapses into them, so pasting changes nothing in the output.
-  `test/domain/claude/permits.test.ts` pins that equivalence through the real
-  parser and the real projection.
-- **`policy/sandbox.json`.** Absent, `excludedCommands` falls back to `[]` —
-  the tightest possible answer, so a missing source can only over-restrict —
-  and the dry-run states which of the two it used.
+**the default permits.** `src/domain/claude/permits.ts` (`DEFAULT_PERMITS`) is
+a *fallback* that keeps those rules in the output until they exist in
+`policy/guard-rules.json`; the list there is the authority on which rules they
+are. The dry-run prints them as a ready `rules[]` fragment; once pasted, the
+projection produces the identical strings and the fallback collapses into
+them, so pasting changes nothing in the output.
+`test/domain/claude/permits.test.ts` pins that equivalence through the real
+parser and the real projection.
 
 ### Waiver lists: a rule switched off per repository, by the owner, outside git
 
@@ -254,7 +279,7 @@ conflict anywhere (either generated file hand-edited, or a `commands`
 directory holding real files) stops the whole write — the parts are one
 delivery.
 
-Sources, all under `llm/harness/`: `skills/<name>/SKILL.md` (one flat tree;
+Sources, all under `harness/`: `skills/<name>/SKILL.md` (one flat tree;
 language guidance lives here, in `skills/<lang>-*`), `rules/common/*.md`
 (always-on), `rules/decisions/*.md`, `agents/*.md`. There is no
 `rules/<lang>/` and no `paths:`-scoped rule
@@ -266,30 +291,39 @@ Destinations:
   detection as `settings.json` (`domain/tiers/plan.ts` + the manifest). In
   order: one HTML comment naming the sources; the bodies of `rules/common/*.md`
   in file-name order, frontmatter stripped, otherwise verbatim (`README.md`
-  skipped); then the research-index line and `## Decisions`. Every link is
+  skipped); then one line pointing at the two indexes,
+  `rules/knowledge/INDEX.md` (settled facts) and `rules/research/INDEX.md`
+  (research of the last 14 days), and `## Decisions`. Every link is
   absolute under the harness root — the file lives in `~/.claude`, where a
   relative link resolves nowhere. The dry-run prints the byte size and warns
   past 32 KiB, where Codex truncates
   ([`2026-09-22-decision-records.md`](../rules/decisions/2026-09-22-decision-records.md));
   a warning, not a refusal. A file at that path jig has no record of writing
   is kept as `AGENTS.md.pre-jig.<stamp>` before the first generated one lands.
-  The bold line per decision is the note's `rule:` line, copied verbatim, per
-  [`2026-09-23-model-facing-english.md`](../rules/decisions/2026-09-23-model-facing-english.md);
+  Each decision is one plain line: the note's `rule:` line, copied verbatim
+  per [`2026-09-23-model-facing-english.md`](../rules/decisions/2026-09-23-model-facing-english.md),
+  ending with the note's file name; the notes' directory is named once
+  ([`2026-10-18-decision-scope.md`](../rules/decisions/2026-10-18-decision-scope.md));
   an accepted note with no `rule:` line does not bind and is reported as a
-  gap — the generator never translates a title into one.
+  gap — the generator never translates a title into one. A note marked
+  `scope: repo` under its `rule:` line goes to the repository's own file
+  instead (next item).
+- **the checkout's `AGENTS.md`** (with `CLAUDE.md` → `AGENTS.md` beside it) —
+  generated by the same run into the dotfiles checkout's root, untracked
+  (`renderRepoAgentsMd` in `domain/claude/agents-md.ts`). It holds only the
+  `scope: repo` decisions, under `## Decisions for this repository`, so every
+  harness reads them when it works in this repository and nowhere else.
 - **`CLAUDE.md`** → symlink, relative target `AGENTS.md`.
-- **`skills/`**, **`agents/`**, **`rules/`** → three real directories jig
-  manages, each holding one symlink per entry
-  (`domain/claude/managed-dir.ts`, one reconciliation shared by all three):
-  - `skills/<name>` → `llm/harness/skills/<name>`, for every directory
+- **`skills/`**, **`rules/`** → two real directories jig manages, each
+  holding one symlink per entry (`domain/claude/managed-dir.ts`, one
+  reconciliation shared by both):
+  - `skills/<name>` → `harness/skills/<name>`, for every directory
     there that holds a `SKILL.md` (`domain/claude/skills-dir.ts`; the
     tree's `README.md` and a directory without one get no link).
-  - `agents/<name>.md` → `llm/harness/agents/<name>.md`, for every regular
-    `*.md` file there (`domain/claude/agents-dir.ts`).
-  - `rules/<name>` → `llm/harness/rules/<name>`, for every subdirectory of
-    `rules/` except `common`, `decisions` and `research`
+  - `rules/<name>` → `harness/rules/<name>`, for every subdirectory of
+    `rules/` except `common`, `decisions`, `knowledge` and `research`
     (`domain/claude/rules-dir.ts`, `NOT_RULE_DIRS`, with the why): `common`
-    is in AGENTS.md and a link would load it twice; the other two are
+    is in AGENTS.md and a link would load it twice; the other three are
     Markdown for humans and would load as always-on rules. Since the
     language rules were folded into skills (2026-09-23) no such
     subdirectory exists, so the directory holds no links; the reconciliation
@@ -300,34 +334,45 @@ Destinations:
   (skills synced from the claude.ai account) with a `.bucket-<id>` marker
   beside it, and updates that tree on its own. One symlink from
   `~/.claude/skills` into the harness would land those writes in git
-  sources. `agents/` takes the same shape for the same reason and for
-  symmetry. On write, for each of the three: the directory is created if
+  sources. On write, for each managed directory: the directory is created if
   missing (a symlink standing there — today yoki-switch's `.<x>-merged` — is
   replaced, its target left alone), missing links added, links pointing
   elsewhere replaced, links into the source tree that are no longer planned
   removed as stale, and anything else left alone and reported as "not
   jig's" — `synced/` and its marker are the expected case, named in the
   dry-run.
+- **`agents/`** — a real directory of generated files, one per house or
+  pack agent (`app/apply/claude-agents.ts`, since 0a0fe4d7). The sources name
+  a house tier (`main`, `complex`, `executor`) that Claude Code does not know,
+  so each file is the source with `model:` replaced by the alias the `claude`
+  table of [`agents/models.json`](../agents/models.json) maps it to
+  (`domain/claude/claude-agent.ts`), per
+  [`2026-10-19-model-assignment.md`](../rules/decisions/2026-10-19-model-assignment.md).
+  The links jig kept here before are replaced in place. A file jig wrote whose
+  source is gone is removed; one edited since stays, named. A house agent
+  outside the tier and effort vocabulary stops the apply; a pack agent that
+  does not parse is left out with its reason.
 - **`commands`** — retired
   ([commands are skills](../rules/decisions/2026-09-22-commands-are-skills.md)).
   A symlink, or a directory whose entries are all symlinks, is removed on
   write; a directory holding any regular file is a conflict and is not
   touched.
 
-Each symlink destination — `CLAUDE.md` and every entry of the three managed
+Each symlink destination — `CLAUDE.md` and every entry of the managed
 directories — is planned by `domain/claude/links.ts` from what `lstat` finds
 there and printed one line per destination: `ok` (already the planned link),
 `create`, `replace` (a symlink elsewhere — the old target is shown; what it
 pointed at is untouched), or `backup-then-create` (a regular file or a real
 directory: renamed to `<path>.pre-jig.<YYYYMMDD-HHMMSS>`, UTC, then linked —
 user content is never deleted). The dry-run prints a `links` section for
-`CLAUDE.md`, then a `skills directory:`, `agents directory:` and `rules
-directory:` section of the same shape: the directory's own state, the count
+`CLAUDE.md`, then a `skills directory:` and `rules directory:` section of
+the same shape: the directory's own state, the count
 of entries to link, one line per entry (planned, stale, or not jig's), and
 the source entries that get no link with why. On the machine yoki-switch
-left, that reads: `CLAUDE.md` backup-then-create; `skills`, `agents` and
+left, that read: `CLAUDE.md` backup-then-create; `skills`, `agents` and
 `rules` directories replace (currently → `.<x>-merged`) with every entry
-`create`; `commands` remove.
+`create`; `commands` remove. (`agents/` has since become the directory of
+generated files above.)
 
 The skill router (`hooks user-prompt-submit`, `serve`, `skills hide|show`)
 reads its default root from `<config dir>/skills`, the directory Claude Code
@@ -338,8 +383,9 @@ of the prompt.
 
 External skill packs (`../plugins/<name>/source.json`,
 `src/domain/plugins/`, `src/app/apply/plugins.ts`) join the skills and agents
-directories: `~/.claude/skills`, `~/.agents/skills`, `~/.claude/agents` and
-omp's agents directory link the pack's entries from its checkout under
+directories: `~/.claude/skills` and `~/.agents/skills` link the pack's
+skills, and `~/.claude/agents` and omp's agents directory get a generated file
+per pack agent, from its checkout under
 `resolvePluginsDir` (`JIG_PLUGINS_DIR`, else `$XDG_DATA_HOME/jig/plugins`,
 else `~/.local/share/jig/plugins`) beside the house's own. A house entry of
 the same name wins and the pack's shows under "not linked"; a pack not
@@ -351,8 +397,7 @@ missing from `translated`.
 Not touched in milestone 2: `~/.claude/{hooks,scripts,workflows}` and every
 `.<x>-merged` staging directory stayed with `yoki-switch` until milestone 4
 (below: `scripts` and `workflows` join the managed directories, `hooks` and
-the staging directories go through `jig retire yoki`), and `~/.claude.json` is
-never touched in any milestone.
+the staging directories go through `jig retire yoki`).
 
 ### Milestone 3a: codex
 
@@ -408,22 +453,25 @@ Destinations, one source tree:
   (`domain/codex/agents.ts`): `name` and `description` verbatim, the body as
   `developer_instructions`, and `tools:` as one trailing sentence of the
   instructions, because Codex's custom agent has no per-agent tool list and a
-  dropped field should be visible. `model:` is a Claude tier name
-  (`sonnet`/`opus`/`haiku`) and Codex wants one of its own ids, so the tier
-  is looked up in the `codex` table of
+  dropped field should be visible. `model:` is a house tier (`main`,
+  `complex`, `executor`) and Codex wants one of its own ids, so the tier is
+  looked up in the `codex` table of
   [`agents/models.json`](../agents/models.json)
   (`domain/claude/agent-models.ts`; documented in
-  [`agents/README.md`](../agents/README.md)), ruled on 2026-09-23 from
-  Codex's model and pricing pages: `sonnet` → `gpt-6-luna` at
-  `model_reasoning_effort = "high"`, `haiku` → `gpt-6-luna` at `medium`,
-  `opus` → `gpt-6-sol` at `medium`; the file's `_comment` carries the
-  prices and the sources. An agent may override its entry with a
-  `models: { codex: { model, reasoningEffort } }` block in its frontmatter,
-  which wins over the tier. A tier the table does not know leaves `model`
-  out (Codex applies its default; an absent `model:` inherits, which is not
-  a gap) and the dry-run counts it; a `reasoningEffort` outside the config
-  reference's `low | medium | high | xhigh | max | ultra` is refused before
-  anything is written. The table reaches the use-case as
+  [`agents/README.md`](../agents/README.md)), per
+  [`2026-10-19-model-assignment.md`](../rules/decisions/2026-10-19-model-assignment.md):
+  `complex` → `gpt-6-sol`, `main` and `executor` → `gpt-6-luna`; the file's
+  `_comment` carries the sources. `model_reasoning_effort` is the agent's
+  own `effort:` (`agent-definition.ts`) when it has one, else the override's
+  `reasoningEffort` below; the table carries none. An agent may
+  override its entry with a `models: { codex: { model, reasoningEffort } }`
+  block in its frontmatter, which wins over the tier. A house agent whose
+  `model:` or `effort:` is outside the vocabulary stops the apply
+  (`checkAgentVocabulary`); a pack agent's model name the table does not know
+  leaves `model` out (Codex applies its default; an absent `model:` inherits,
+  which is not a gap) and the dry-run counts it; a `reasoningEffort` outside
+  the config reference's `low | medium | high | xhigh | max | ultra` is
+  refused before anything is written. The table reaches the use-case as
   `CodexApplyOptions.codexModels`, read once at the composition root, so the
   tests inject a map and the CLI reads the file. Files there that no source
   produces are not jig's.
@@ -503,14 +551,15 @@ Destinations, one source tree:
   tools and restrict the agent to nothing; `WebFetch` maps to `read`, which
   is omp's URL reader; a name with no omp tool is left out and counted
   (`NotebookEdit`, `Skill`), which only narrows the agent; an empty result
-  omits the key and omp grants its default set. `model:` is a Claude tier
-  and omp wants a provider-qualified selector or a `modelRoles` alias; the
-  `omp` table of `agents/models.json` is empty until a ruling names one, so
-  `model` is left out and the dry-run counts the gap per tier, exactly as
-  the Codex target does (`OmpApplyOptions.ompModels`, the same file's `omp`
-  object, read at the composition root; filling it is the whole change — a
-  mapping's `reasoningEffort` is ignored here, the selector carries the
-  effort). A `models: { omp: { model } }` block in an agent's frontmatter
+  omits the key and omp grants its default set. `model:` is a house tier
+  and omp wants a provider-qualified selector or a `modelRoles` alias, so
+  the tier is looked up in the `omp` table of `agents/models.json`
+  (`OmpApplyOptions.ompModels`, read at the composition root), which maps
+  each tier to `proxy/<tier>`: the LiteLLM proxy's tier of the same name.
+  The agent's own `effort:` becomes omp's `thinking` key; a mapping's
+  `reasoningEffort` is ignored here. A house agent outside the vocabulary
+  stops the apply, as for Codex; a pack agent's unknown model is left out
+  and counted. A `models: { omp: { model } }` block in an agent's frontmatter
   overrides its entry. The generated frontmatter is validated as YAML before
   writing.
 - **`~/.omp/agent/mcp.json`** — jig's entries of `mcpServers` for every
@@ -544,11 +593,21 @@ Destinations, one source tree:
   jig's. To switch the extension off, `disabledExtensions:
   [extension-module:jig]` in `config.yml` — omp derives that id from the
   link's name.
-- **Report only.** `yoki-hooks.json`, `RULES.md`, `.yoki/` and `config.yml`
-  under the agent directory are yoki's, listed with what each is and left
-  for milestone 4. jig does not own `config.yml` in this milestone: omp's
-  approval policy, tool settings and model roles live there, and what jig
-  should write is a ruling not yet made. Skills and the instructions file
+- **`~/.omp/agent/config.yml`** — jig's keys only, every other key carried
+  through as omp wrote it (`domain/omp/config.ts`, since fb2503ac; ruled by
+  the owner on 2026-09-27). omp rewrites this file itself, so ownership is
+  by key, and hand-edit detection looks at jig's keys alone. jig owns:
+  `modelRoles` (the thinking roles `slow`, `plan`, `advisor`, `designer` on
+  `complex`, every other role on `main`, per
+  [`2026-10-19-model-assignment.md`](../rules/decisions/2026-10-19-model-assignment.md));
+  `tools.approvalMode` (`yolo`) and `tools.approval.eval` (`prompt`, per
+  [`2026-09-27-eval-stays-prompt-under-yolo.md`](../rules/decisions/2026-09-27-eval-stays-prompt-under-yolo.md));
+  `retry.modelFallback` off and `retry.maxRetries` 0, since LiteLLM is the
+  one retry layer; and `statusLine`. `symbolPreset`, `composer`, `theme` and
+  `setupVersion` are written only when the file does not exist yet.
+- **Report only.** `yoki-hooks.json`, `RULES.md` and `.yoki/` under the
+  agent directory are yoki's, listed with what each is and removed by
+  `jig retire yoki`. Skills and the instructions file
   reach omp natively — `~/.agents/skills` above, and `~/.claude/CLAUDE.md`
   (→ `AGENTS.md`) through omp's `claude` provider; jig writes no
   `~/.omp/agent/AGENTS.md`, which would shadow it. Language guidance reaches
@@ -557,7 +616,8 @@ Destinations, one source tree:
   ([`2026-09-23-language-rules-fold-into-skills.md`](../rules/decisions/2026-09-23-language-rules-fold-into-skills.md)).
 
 `--write` writes all of it in one run — the generated files, `mcp.json`,
-the manifest and provenance, then the skills mount and the extension link —
+`config.yml`'s keys, the manifest and provenance, then the skills mount and
+the extension link —
 and any conflict anywhere (a hand-edited generated file, a changed jig entry
 in `mcp.json`, an unreadable `mcp.json`, a regular file where the
 `extensions` directory should be) returns `wrote: false` with nothing
@@ -585,9 +645,9 @@ fixed in code. The facts about pi that the delivery rests on are in the
 (no MCP client; pi-mcp-adapter is the de facto adapter), the
 [commands-are-skills decision](../rules/decisions/2026-09-22-commands-are-skills.md)
 (skill discovery paths, `/skill:name`), and the yoki-switch migration map
-§2 and §6.3 (what `core/config/manager.sh link_pi_resources` links today, file
-by file, never a directory, because pi writes its own files into
-`~/.pi/agent`).
+§2 and §6.3 (what `core/config/manager.sh link_pi_resources` linked, file by
+file, never a directory, because pi writes its own files into `~/.pi/agent`;
+home-manager does that now, `home/shared/harness/default.nix`).
 
 Destinations, one source tree:
 
@@ -604,15 +664,16 @@ Destinations, one source tree:
   ([configuration](https://pi.dev/docs/latest/configuration): "User
   instructions applied across working directories"). Per the
   [config-layout decision](../rules/decisions/2026-09-22-config-layout-no-personal-layer.md)
-  (Consequences, 2026-09-24) the generated file is identical for all five
-  harnesses and pi's short `home/shared/harness/pi/AGENTS.md` retires. On
-  the machine manager.sh left, the path is a symlink to that repo file: on
-  `--write` the link is removed and the generated regular file written in
-  its place — a symlink is `replace`, not a backup, and what it pointed at
-  is untouched. The dry-run then names the repo file as a source-side
-  cleanup for the owner (jig does not delete repository files) and says to
-  drop `AGENTS.md` from `link_pi_resources`, which would otherwise put the
-  link back on its next run. A regular file jig has no record of writing is
+  (Consequences, 2026-09-24; its location part is superseded by
+  [`2026-09-24-harness-top-level-dir.md`](../rules/decisions/2026-09-24-harness-top-level-dir.md))
+  the generated file is identical for all five harnesses and pi's short
+  `home/shared/harness/pi/AGENTS.md` retires. Where the path is still a
+  symlink to that repo file, `--write` removes the link and writes the
+  generated regular file in its place — a symlink is `replace`, not a
+  backup, and what it pointed at is untouched. The dry-run then names the
+  repo file as a source-side cleanup for the owner (jig does not delete
+  repository files); home-manager no longer links it, so the link does not
+  come back. A regular file jig has no record of writing is
   kept as `AGENTS.md.pre-jig.<stamp>`, and a hand edit after jig wrote is a
   conflict, as everywhere.
 - **`~/.config/mcp/mcp.json`** — jig's entries of `mcpServers` for every
@@ -638,8 +699,7 @@ Destinations, one source tree:
   rewritten"), so a `disabled` inside a jig entry here is a hand edit and a
   conflict. `~/.pi/agent/mcp.json` is the adapter's own override file, with
   higher precedence ("later entries win"): it is reported as found and
-  never written. On the machine manager.sh left, neither file exists: one
-  write, then noop.
+  never written. Where neither file exists: one write, then noop.
 - **Report only: `packages`.** The delivery relies on two extensions, and
   jig does not edit pi's settings in this milestone. The dry-run reads the
   REPO `home/shared/harness/pi/settings.json` — a source; `~/.pi/agent/settings.json`
@@ -647,24 +707,22 @@ Destinations, one source tree:
   (by pi's identity rule, package name at any version;
   [packages](https://pi.dev/docs/latest/packages), "Understand scope and
   identity"): `pi-mcp-adapter`, without which the entries above reach
-  nothing, and `@tintinweb/pi-subagents`, the runner of the subagents
-  decision. For each that is missing it prints the `pi install npm:<name>`
-  line ("Personal installs are written to `~/.pi/agent/settings.json`") and
-  the `"npm:<name>"` entry to add by hand. On the machine manager.sh left,
-  both are missing.
+  nothing, and `@tintinweb/pi-subagents` (`domain/pi/packages.ts`). For each
+  that is missing it prints the `pi install npm:<name>` line ("Personal
+  installs are written to `~/.pi/agent/settings.json`") and the
+  `"npm:<name>"` entry to add by hand. **Not implemented yet:** the accepted
+  [`2026-10-19-swarm-on-native-subagents.md`](../rules/decisions/2026-10-19-swarm-on-native-subagents.md)
+  replaces tintinweb's package with `nicobailon/pi-subagents` and has jig
+  write the house agents into `~/.pi/agent/agents/` (and a Cordis preset for
+  DSH). The code still checks for tintinweb's package and delivers no agents
+  to pi or DSH.
 - **Report only: `~/.pi/agent/extensions/`.** Every symlink into
-  `home/shared/harness/pi/extensions/` is named as delivered by
-  `core/config/manager.sh link_pi_resources` until milestone 4; everything
-  else (orca's own `*.ts` files today) as not jig's. Nothing is linked or
-  unlinked.
-- **Two gaps, one line each.** Subagents: pi has none natively
-  (per the [subagents decision](../rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md):
-  "Pi itself remains fundamentally single-agent"); the
-  [subagents decision](../rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md)'s
-  answer is a workflow script written once in Claude Code's syntax, which
-  pi runs through tintinweb/pi-subagents when that package is installed —
-  the `packages` check above. Language guidance: inside the language skills,
-  as for omp.
+  `home/shared/harness/pi/extensions/` is named as delivered by home-manager
+  (`home/shared/harness/default.nix`); everything else (orca's own `*.ts`
+  files today) as not jig's. Nothing is linked or unlinked by jig.
+- **Two gaps, one line each.** Subagents: jig delivers no agent definitions
+  to pi yet (the `packages` item above says what the accepted decision
+  requires). Language guidance: inside the language skills, as for omp.
 
 `--write` writes both halves in one run — `models.json`, then AGENTS.md
 (the link removed first), the adapter config, the manifest and provenance,
@@ -720,7 +778,7 @@ Destinations, one source tree:
 - **`$DSH_HOME/profiles/<name>/cordis.patch.yml`** — for every profile that
   DSH has scaffolded there AND the repo owns
   (`home/shared/harness/dsh/profiles/<name>/cordis.patch.yml` exists), the
-  rule `link_dsh_resources` applies. Profiles are pnpm workspaces DSH
+  rule `jig setup` applies too. Profiles are pnpm workspaces DSH
   scaffolds itself; jig never creates one, and a repo profile DSH has not
   scaffolded is named and gets nothing. `node_modules` under `profiles/` is
   DSH's shared module fallback, not a profile. When no profile matches, DSH
@@ -744,7 +802,7 @@ Destinations, one source tree:
   expand — is rendered as the documented `!!js` expression (`!!js
   process.env.VAR`, or the template form `!!js '`Bearer
   ${process.env.TOKEN}`'`). Every other row — the repo's
-  `agent-default-model` override and `jig-guard` insert that manager.sh
+  `agent-default-model` override and `jig-guard` insert that `jig setup`
   installs, anything hand-added, every comment — is carried through byte
   for byte: the file is spliced as text and never re-serialised. The
   scaffold's lone `[]` (DSH: "an empty or comments-only file fails boot —
@@ -756,10 +814,10 @@ Destinations, one source tree:
   layer) is a conflict naming the line, because a duplicate id fails boot
   ("duplicate loader entry id") and a duplicate server name drops the later
   row — the one-time manual reconciliation the config-layout decision keeps
-  out of the generator; an unterminated block is one too. Until milestone 4,
-  `link_dsh_resources` overwrites the file with the repo copy on each run
-  and drops the block; that reads as "write again", never as a conflict,
-  and the dry-run says to re-apply after it. On this machine both
+  out of the generator; an unterminated block is one too. `jig setup
+  --target dsh` overwrites the file with the expanded repo copy and drops
+  the block, then runs `apply --target dsh --write` itself; the dropped
+  block reads as "write again", never as a conflict. On this machine both
   `headless` and `proxy` are scaffolded with the repo's rows and the plugin
   linked: two writes, then noop.
 - **`$DSH_HOME/AGENTS.md`** — the same generated content as
@@ -779,12 +837,13 @@ Destinations, one source tree:
   delivery, one plan (`planAgentsSkillsMount`); this target reports its
   state and plans nothing there. Promoting `dsh` into
   `AGENTS_SKILLS_MOUNT_TARGETS` would be a one-line change if wanted.
-- **Report only: manager.sh's.** `settings.yaml` (the link to the repo file
-  the tiers half writes), `hooks.claude.json` (the expanded copy for the
-  `dsh-hooks-claude-code` bridge, which the profiles no longer compose), and
-  the jig-guard plugin (`bun run build` in `adapters/dsh`, then `pnpm add
-  link:` into each profile — reported per profile as linked or not) stay
-  with `link_dsh_resources` until milestone 4. The home-level
+- **Report only: home-manager's and `jig setup`'s.** `settings.yaml` (the
+  link to the repo file the tiers half writes, made by home-manager),
+  `hooks.claude.json` (the expanded copy for the `dsh-hooks-claude-code`
+  bridge, which the profiles no longer compose), and the jig-guard plugin
+  (`bun run build` in `adapters/dsh`, then `pnpm add link:` into each
+  profile — reported per profile as linked or not); the last two are
+  `jig setup`'s (`app/setup/setup-harness.ts`). The home-level
   `$DSH_HOME/cordis.patch.yml` is reported as found, scanned for a jig
   duplicate, and never written. Language guidance: inside the language
   skills, as for omp and pi.
@@ -815,7 +874,7 @@ dry-run and marked in the code:
   file.
 - Whether one row in the home-level `$DSH_HOME/cordis.patch.yml` could
   replace the per-profile rows for every profile at once — a ruling, not a
-  guess; the delivery is per profile as manager.sh's is.
+  guess; the delivery is per profile, as `jig setup`'s copies are.
 
 ### Milestone 4: `jig retire yoki`
 
@@ -905,7 +964,8 @@ with no end marker, a `config.toml` that would not parse afterwards — is
 - **omp**: `yoki-hooks.json`, `RULES.md` (by its `<!-- yoki:begin -->`
   header), `.yoki/`, and `extensions/{yoki-bridge,yoki-guard}.ts` when they
   are symlinks into `home/shared/harness/omp/extensions/` or
-  `claude-profiles/`. `config.yml` stays: a ruling not made.
+  `claude-profiles/`. `config.yml` stays: `apply --target omp` owns jig's
+  keys of it.
 - **Cursor**: every `~/.cursor/rules/*` symlink into
   `claude-profiles/runtime/yoki/.cursor/rules/` (39 today); the count of
   other entries is reported and they stay, as does the directory.
@@ -919,15 +979,14 @@ refuse any other kind of path than the one they are named for, and
 `removeTree` refuses a tree holding a regular file anywhere outside
 `.yoki/`; a refusal is recorded per item (exit 1) and the run continues.
 
-Never touched: `~/.claude.json`; `~/.claude/settings.json` (the Claude
-target's, and its `statusLine.command` keeps working through the `scripts`
-link); `~/.claude/{scripts,workflows}` (that target's too); Codex's
-`.system/`; omp's `config.yml`; and the repository trees the removed links
-point into — jig deletes no repository file. Not in this verb:
-`core/config/manager.sh`'s `link_pi_resources` and `link_dsh_resources`
-(pi's `extensions/` and settings links, DSH's `settings.yaml`,
-`hooks.claude.json` and the guard plugin), which the pi and DSH targets
-still report.
+Never touched by this verb: `~/.claude.json` and `~/.claude/settings.json`
+(the Claude target's, and the latter's `statusLine.command` keeps working
+through the `scripts` link); `~/.claude/{scripts,workflows}` (that target's
+too); Codex's `.system/`; omp's `config.yml` (the omp target's); and the
+repository trees the removed links point into — jig deletes no repository
+file. Not in this verb: pi's `extensions/` and settings links and DSH's
+`settings.yaml` (home-manager's), and DSH's `hooks.claude.json` and guard
+plugin (`jig setup`'s), which the pi and DSH targets report.
 
 The order that leaves nothing dangling: the owner's two moves; `jig apply
 --target claude --write` (replaces the `scripts`/`workflows` links); `jig

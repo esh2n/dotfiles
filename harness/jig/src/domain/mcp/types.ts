@@ -3,7 +3,7 @@
  * compiled into each harness's own shape instead of being read from that
  * harness's settings file.
  *
- * The source is now a single file, `llm/harness/mcp/servers.json`
+ * The source is now a single file, `harness/mcp/servers.json`
  * (`rules/decisions/2026-09-22-config-layout-no-personal-layer.md` — no
  * core/pack/personal layers). The layer merge below still exists because the
  * merge order is what a later layer *would* mean, and the parser is shared

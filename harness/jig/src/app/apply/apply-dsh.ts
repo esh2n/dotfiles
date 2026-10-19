@@ -1,9 +1,9 @@
 /**
  * `jig apply --target dsh`, the harness-home half — deliver the DSH
- * configuration from the sources under `llm/harness/`, and either show what
+ * configuration from the sources under `harness/`, and either show what
  * would change (default) or do it (`--write`). Milestone 3c-dsh of the
- * generator that retires `yoki-switch` and `core/config/manager.sh`'s
- * `link_dsh_resources`; the same shape as `./apply-pi.ts`, over DSH's
+ * generator that retired `yoki-switch` and `core/config/manager.sh`'s
+ * `link_dsh_resources` (both deleted); the same shape as `./apply-pi.ts`, over DSH's
  * harness home (`~/.dsh`, or `DSH_HOME` — `domain/dsh/home.ts`). The tiers
  * half (`home/shared/harness/dsh/settings.yaml` from `policy/tiers.json`,
  * `./apply-tiers.ts`) runs first under the same target name, as pi's does.
@@ -11,7 +11,7 @@
  * - `<dshHome>/profiles/<name>/cordis.patch.yml` — for every profile DSH
  *   has scaffolded there that ALSO has a source
  *   `home/shared/harness/dsh/profiles/<name>/cordis.patch.yml` (the rule
- *   `link_dsh_resources` applies, so the two agree on which profiles are
+ *   `jig setup` applies, so the two agree on which profiles are
  *   ours): jig's `- insert:` row of `@deepseek-ai/dsh-mcp-client` entries,
  *   one per server with `targets.dsh` (`domain/dsh/mcp.ts`), inside its
  *   own marked block (`domain/dsh/cordis-patch.ts`); every other row is
@@ -37,8 +37,8 @@
  *   `~/.agents`", rank 500, beside `<dshHome>/skills` at rank 400); the
  *   mount itself is the Codex/omp/pi targets' delivery and is not planned
  *   here. `settings.yaml`, `hooks.claude.json`, the jig-guard plugin build
- *   and its `pnpm add link:` per profile — `link_dsh_resources`'s until
- *   milestone 4. The home-level `<dshHome>/cordis.patch.yml` (applied after
+ *   and its `pnpm add link:` per profile — home-manager's (`settings.yaml`)
+ *   and `jig setup`'s (the rest). The home-level `<dshHome>/cordis.patch.yml` (applied after
  *   every profile's, dsh README "Profiles") — not jig's, never written, but
  *   scanned for a jig id, which would fail boot just the same.
  *
@@ -74,11 +74,11 @@ import type { DshApplyPorts } from "./ports";
 export const DSH_INSTRUCTIONS_BUDGET_BYTES = 65_536;
 
 export interface DshApplyPaths {
-  /** `llm/harness/`, absolute. */
+  /** `harness/`, absolute. */
   readonly harnessRoot: string;
-  /** `llm/harness/mcp/servers.json`. */
+  /** `harness/mcp/servers.json`. */
   readonly mcpServers: string;
-  /** `llm/harness/rules/decisions/`. */
+  /** `harness/rules/decisions/`. */
   readonly decisions: string;
   /** DSH's harness home: `~/.dsh`, or `DSH_HOME`. */
   readonly dshHome: string;
@@ -96,11 +96,11 @@ export interface DshApplyPaths {
   readonly agentsSkills: string;
   /** Set when `DSH_AGENTS_HOME` moved the skills root. */
   readonly agentsSkillsVia: "DSH_AGENTS_HOME" | "default";
-  /** `<dshHome>/settings.yaml`, reported only (manager.sh's link to the repo file the tiers half writes). */
+  /** `<dshHome>/settings.yaml`, reported only (home-manager's link to the repo file the tiers half writes). */
   readonly settingsYaml: string;
-  /** `<dshHome>/hooks.claude.json`, reported only (manager.sh's expanded copy). */
+  /** `<dshHome>/hooks.claude.json`, reported only (`jig setup`'s expanded copy). */
   readonly hooksClaudeJson: string;
-  /** `jig/adapters/dsh`, the guard plugin manager.sh builds and links per profile; reported only. */
+  /** `jig/adapters/dsh`, the guard plugin `jig setup` builds and links per profile; reported only. */
   readonly pluginDir: string;
   /** Substituted into mcp command paths; `{{HOME}}`. */
   readonly home: string;
@@ -114,7 +114,7 @@ export interface DshProfileReport {
   readonly dir: string;
   /** `<dir>/cordis.patch.yml`. */
   readonly patchPath: string;
-  /** The repo's copy manager.sh installs there (expanded), for the "overwritten on its next run" note. */
+  /** The repo's copy `jig setup` installs there (expanded), for the "overwritten on its next run" note. */
   readonly sourcePatch: string;
   readonly outcome: PlanAction;
   readonly diff: string;
@@ -126,7 +126,7 @@ export interface DshProfileReport {
   readonly invalid?: string;
   /** jig ids or server names declared outside the block: each a conflict. */
   readonly declaredOutside: readonly DeclaredOutside[];
-  /** `<dir>/node_modules/@esh2n/jig-dsh-guard`: whether manager.sh's `pnpm add link:` landed. Report only. */
+  /** `<dir>/node_modules/@esh2n/jig-dsh-guard`: whether `jig setup`'s `pnpm add link:` landed. Report only. */
   readonly guardPlugin: PathState;
 }
 
@@ -144,7 +144,7 @@ export interface DshHomePatchReport {
   readonly declaredOutside: readonly DeclaredOutside[];
 }
 
-/** Report only: a path manager.sh delivers until milestone 4, as found. */
+/** Report only: a path home-manager or `jig setup` delivers, as found. */
 export interface DshReportedPath {
   readonly path: string;
   readonly state: PathState;

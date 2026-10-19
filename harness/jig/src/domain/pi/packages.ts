@@ -20,7 +20,7 @@
  *
  * On the machine this is for, `~/.pi/agent/settings.json` is a symlink into
  * the repository (`home/shared/harness/pi/settings.json`, made by
- * `core/config/manager.sh link_pi_resources`), so the REPO file is the
+ * home-manager, `home/shared/harness/default.nix`), so the REPO file is the
  * source that is read here; the generator reads sources only.
  *
  * Pure: the caller hands over the file's text.

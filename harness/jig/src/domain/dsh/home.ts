@@ -7,8 +7,8 @@
  * current working directory." jig has no configured path, so the rule here
  * is the variable, else the default. Honoured for the reason the other
  * targets honour theirs: a moved home must not get a second copy at the
- * default path. `core/config/manager.sh link_dsh_resources` reads the same
- * variable (`${DSH_HOME:-${HOME}/.dsh}`).
+ * default path. `jig setup` resolves the home the same way
+ * (`resolveDshHome`, `src/cli/jig.ts`).
  *
  * Pure.
  */

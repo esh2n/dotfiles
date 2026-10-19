@@ -1,6 +1,6 @@
 /**
  * `jig apply --target claude` — deliver the Claude Code configuration from
- * the sources under `llm/harness/`, and either show what would change
+ * the sources under `harness/`, and either show what would change
  * (default) or do it (`--write`).
  *
  * Milestones 1 and 2 of the generator that retires `yoki-switch`, one
@@ -115,13 +115,13 @@ import type { ClaudeApplyPorts } from "./ports";
 export type { AgentsMdReport, LinkReport, ManagedDirReport, ManagedEntryReport };
 
 export interface ClaudeApplyPaths {
-  /** `llm/harness/`, absolute. `skills/`, `agents/`, `rules/` and `rules/common/` are under it. */
+  /** `harness/`, absolute. `skills/`, `agents/`, `rules/` and `rules/common/` are under it. */
   readonly harnessRoot: string;
-  /** `llm/harness/policy/guard-rules.json`. */
+  /** `harness/policy/guard-rules.json`. */
   readonly guardRules: string;
-  /** `llm/harness/mcp/servers.json`. */
+  /** `harness/mcp/servers.json`. */
   readonly mcpServers: string;
-  /** `llm/harness/rules/decisions/`. */
+  /** `harness/rules/decisions/`. */
   readonly decisions: string;
   /**
    * Where external skill packs are checked out (`resolvePluginsDir`); their

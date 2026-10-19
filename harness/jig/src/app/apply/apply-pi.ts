@@ -1,8 +1,8 @@
 /**
  * `jig apply --target pi` — deliver the pi configuration from the sources
- * under `llm/harness/`, and either show what would change (default) or do it
- * (`--write`). Milestone 3c-pi of the generator that retires `yoki-switch`
- * and `core/config/manager.sh`'s `link_pi_resources`; the same shape as
+ * under `harness/`, and either show what would change (default) or do it
+ * (`--write`). Milestone 3c-pi of the generator that retired `yoki-switch`
+ * and `core/config/manager.sh`'s `link_pi_resources` (both deleted); the same shape as
  * `./apply-omp.ts`, over pi's agent directory (`~/.pi/agent`, or
  * `PI_CODING_AGENT_DIR` — `domain/pi/agent-dir.ts`) and the cross-harness
  * skills mount.
@@ -13,8 +13,8 @@
  *   (https://pi.dev/docs/latest/configuration, "Agent directory":
  *   "`<agent-dir>/AGENTS.override.md`, `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`,
  *   or `CLAUDE.MD` — User instructions applied across working
- *   directories"). Today the path is a symlink into the repository
- *   (`home/shared/harness/pi/AGENTS.md`, linked by `link_pi_resources`); per
+ *   directories"). On a machine set up before the move the path is a symlink
+ *   into the repository (`home/shared/harness/pi/AGENTS.md`); per
  *   `rules/decisions/2026-09-22-config-layout-no-personal-layer.md`
  *   (Consequences, 2026-09-24: the generated AGENTS.md is identical for all
  *   five harnesses, pi's short one retires) the link is replaced by the
@@ -36,8 +36,8 @@
  *   source `~/.pi/agent/settings.json` links to) declares pi-mcp-adapter and
  *   tintinweb/pi-subagents (`domain/pi/packages.ts`), with the paste-able
  *   line for each that is missing; `<agentDir>/extensions/` — the links
- *   `link_pi_resources` makes into `home/shared/harness/pi/extensions/` until
- *   milestone 4, and everything else as not jig's; the one gap (no native
+ *   home-manager makes into `home/shared/harness/pi/extensions/`
+ *   (`home/shared/harness/default.nix`), and everything else as not jig's; the one gap (no native
  *   subagents — language guidance travels inside the language skills).
  *
  * The invariant is the Claude target's: sources → output, one way. The
@@ -75,13 +75,13 @@ import {
 import type { PiApplyPorts } from "./ports";
 
 export interface PiApplyPaths {
-  /** `llm/harness/`, absolute. `skills/` and `rules/` are under it. */
+  /** `harness/`, absolute. `skills/` and `rules/` are under it. */
   readonly harnessRoot: string;
   /** Where external skill packs are checked out (`resolvePluginsDir`). Absent: none. */
   readonly pluginsDir?: string;
-  /** `llm/harness/mcp/servers.json`. */
+  /** `harness/mcp/servers.json`. */
   readonly mcpServers: string;
-  /** `llm/harness/rules/decisions/`. */
+  /** `harness/rules/decisions/`. */
   readonly decisions: string;
   /** The trees yoki-switch linked skills from: a link under one of them is stale, not somebody's. */
   readonly formerSkillRoots: readonly string[];
@@ -97,7 +97,7 @@ export interface PiApplyPaths {
   readonly adapterOverride: string;
   /** `<agentDir>/extensions/`, reported only. */
   readonly extensionsDir: string;
-  /** Source of the extension links `link_pi_resources` makes: `home/shared/harness/pi/extensions`. */
+  /** Source of the extension links home-manager makes: `home/shared/harness/pi/extensions`. */
   readonly repoExtensionsDir: string;
   /** Source: `home/shared/harness/pi/settings.json`, the file `<agentDir>/settings.json` links to. */
   readonly repoSettings: string;
@@ -155,7 +155,7 @@ export interface PiPackagesReport {
 export interface PiExtensionsReport {
   readonly path: string;
   readonly dirState: PathState;
-  /** Links into `home/shared/harness/pi/extensions/`: `link_pi_resources`'s until milestone 4. */
+  /** Links into `home/shared/harness/pi/extensions/`: home-manager's (`home/shared/harness/default.nix`). */
   readonly managerLinks: readonly { readonly name: string; readonly target: string }[];
   /** Everything else: not jig's. */
   readonly foreign: readonly { readonly name: string; readonly what: string }[];

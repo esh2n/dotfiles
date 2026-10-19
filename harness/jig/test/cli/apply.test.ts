@@ -917,7 +917,7 @@ describe("applyCli --target omp", () => {
  * half (pi/models.json) and then the agent-directory half, and the sections
  * of the latter — the shared mount, AGENTS.md over the symlink with the
  * source-side cleanup, the adapter's config, the packages check with its
- * paste-able lines, the extensions as manager.sh leaves them, the two gaps —
+ * paste-able lines, the extensions as home-manager leaves them, the two gaps —
  * are what a reader agrees to before `--write`.
  */
 describe("applyCli --target pi", () => {
@@ -1032,14 +1032,16 @@ describe("applyCli --target pi", () => {
     expect(result.stdout).toContain(
       "source-side cleanup (yours, not jig's): /repo/config/pi/AGENTS.md is a regular file",
     );
-    expect(result.stdout).toContain("drop AGENTS.md from core/config/manager.sh link_pi_resources");
+    expect(result.stdout).toContain(
+      "home-manager (home/shared/harness/default.nix) no longer links it",
+    );
     expect(result.stdout).toMatch(/pi-mcp-adapter +present \(npm:pi-mcp-adapter@1\.0\.0\)/);
     expect(result.stdout).toMatch(
       /@tintinweb\/pi-subagents +present \(npm:@tintinweb\/pi-subagents\)/,
     );
     expect(result.stdout).not.toContain("run once:");
     expect(result.stdout).toContain(
-      "delivered by core/config/manager.sh link_pi_resources until milestone 4 (1), links into home/shared/harness/pi/extensions/:",
+      "delivered by home-manager (home/shared/harness/default.nix) (1), links into home/shared/harness/pi/extensions/:",
     );
     expect(result.stdout).toMatch(
       /guard\.ts +a symlink → \/repo\/config\/pi\/extensions\/guard\.ts/,
@@ -1047,7 +1049,7 @@ describe("applyCli --target pi", () => {
     expect(result.stdout).toMatch(
       /not jig's \(1\), left alone:\n +orca-prefill\.ts +a regular file/,
     );
-    expect(result.stdout).toContain("Nothing here is linked or unlinked by this milestone.");
+    expect(result.stdout).toContain("Nothing here is linked or unlinked by jig.");
   });
 
   test("the adapter config: carried-through entries and keys, and the diff", async () => {

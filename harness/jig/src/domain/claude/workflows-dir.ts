@@ -1,6 +1,6 @@
 /**
  * `~/.claude/workflows/`: a managed directory of links (`managed-dir.ts`),
- * one per workflow script of `llm/harness/workflows/` —
+ * one per workflow script of `harness/workflows/` —
  * `~/.claude/workflows/<name>.js` → `<harness>/workflows/<name>.js` — plus
  * one for `lib/` when the source tree has it.
  *

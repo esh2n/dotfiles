@@ -251,7 +251,7 @@ export const AGENTS_SKILLS_MOUNT_TARGETS = ["codex", "omp", "pi"] as const;
 export type AgentsSkillsMountTarget = (typeof AGENTS_SKILLS_MOUNT_TARGETS)[number];
 
 export interface AgentsSkillsMountPaths {
-  /** `llm/harness/`, absolute. */
+  /** `harness/`, absolute. */
   readonly harnessRoot: string;
   /** Destination: `~/.agents/skills`. */
   readonly agentsSkills: string;

@@ -42,7 +42,7 @@
  * with `targets.dsh` uses either transport today.]
  *
  * `{{HOME}}` is jig's and substituted here: DSH reads paths literally
- * (`core/config/manager.sh install_expanded` exists for that reason). A
+ * (`jig setup` expands the repo copies with `expandPlaceholders` for that reason). A
  * `${VAR}` reference is not something DSH expands either — its documented
  * form is a `!!js` expression evaluated at boot ("interpolate `!!js`
  * expressions at boot", dsh-app-boot README, "cordis.patch.yml"), so every

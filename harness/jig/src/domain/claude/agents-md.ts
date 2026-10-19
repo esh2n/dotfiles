@@ -3,21 +3,23 @@
  * naming the sources, the always-on rules of `rules/common/` verbatim, and the
  * two parts that already have a ruling:
  *
- * - `rules/decisions/2026-09-22-decision-records.md`: 「行動を縛る決定は、
- *   生成される AGENTS.md に太字一行とメモへのリンクとして入れる。」 One bold
- *   line per accepted note, linking the note. The note itself is the record;
- *   AGENTS.md is the binding.
- * - `rules/decisions/2026-09-22-writeup-markdown-source-two-builds.md`:
- *   「索引 `rules/research/INDEX.md` … から『調べる前に索引を読め。確立済みの
- *   事実は再調査しない』で指す。」 One line, pointing at the index.
+ * - `rules/decisions/2026-09-22-decision-records.md`: one line per accepted
+ *   note. The note itself is the record; AGENTS.md is the binding. Lines are
+ *   plain, not bold (`2026-10-18-decision-scope.md`): every one binds, so bold
+ *   would mark nothing. Each ends with its note's file name, and the notes'
+ *   directory is named once per section.
+ * - `rules/decisions/2026-09-22-writeup-markdown-source-two-builds.md` and
+ *   `2026-09-27-records-flow-and-stock.md`: one opening line pointing at the
+ *   two indexes, `rules/knowledge/INDEX.md` (settled facts) and
+ *   `rules/research/INDEX.md` (research of the last 14 days).
  *
- * The bold line is the note's `rule:` line, copied verbatim, and never the
+ * The line is the note's `rule:` line, copied verbatim, and never the
  * note's Japanese title. `rules/decisions/2026-09-23-model-facing-english.md`
  * rules both halves of that: what the model reads is English, what the owner
  * reads stays Japanese, and 「継ぎ目は自動翻訳しない。各決定メモの先頭に、
  * 裁定の時点で人が書く英語一行 `rule:` を持たせ、生成器はそれをそのまま
- * AGENTS.md の太字一行に写す。」 So this renderer transforms nothing: it
- * locates one line and copies it. An accepted note with no `rule:` line is
+ * AGENTS.md の太字一行に写す。」 (the bold was dropped later, as above.) So
+ * this renderer transforms nothing: it locates one line and copies it. An accepted note with no `rule:` line is
  * *not* rendered — a note whose binding text a human has not yet written has
  * no binding text, and inventing one from the title would be the machine
  * translation the ruling forbids. It is reported instead, so the gap is
@@ -206,7 +208,7 @@ export function isCommonRule(file: string): boolean {
 }
 
 export interface AgentsMdInput {
-  /** Absolute path of `llm/harness/`. */
+  /** Absolute path of `harness/`. */
   readonly harnessRoot: string;
   /** `rules/common/*.md`, README already excluded. Any order — rendered in file-name order. */
   readonly common: readonly RuleSource[];

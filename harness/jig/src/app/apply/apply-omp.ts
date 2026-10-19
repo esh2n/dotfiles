@@ -1,6 +1,6 @@
 /**
  * `jig apply --target omp` — deliver the omp (oh-my-pi) configuration from
- * the sources under `llm/harness/`, and either show what would change
+ * the sources under `harness/`, and either show what would change
  * (default) or do it (`--write`). Milestone 3b of the generator that retires
  * `yoki-switch`; the same shape as `./apply-codex.ts`, over omp's agent
  * directory (`~/.omp/agent`, or the active profile's — `domain/omp/agent-dir.ts`)
@@ -91,11 +91,11 @@ import type { OmpApplyPorts } from "./ports";
 export const OMP_EXTENSION_LINK_NAME = "jig.ts";
 
 export interface OmpApplyPaths {
-  /** `llm/harness/`, absolute. `skills/` and `agents/` are under it. */
+  /** `harness/`, absolute. `skills/` and `agents/` are under it. */
   readonly harnessRoot: string;
   /** Where external skill packs are checked out (`resolvePluginsDir`). Absent: none. */
   readonly pluginsDir?: string;
-  /** `llm/harness/mcp/servers.json`. */
+  /** `harness/mcp/servers.json`. */
   readonly mcpServers: string;
   /** The trees yoki-switch linked skills from: a link under one of them is stale, not somebody's. */
   readonly formerSkillRoots: readonly string[];

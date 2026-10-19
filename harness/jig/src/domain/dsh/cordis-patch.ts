@@ -12,15 +12,15 @@
  * patch does not deep-merge", dsh-app-boot README) or carrying `insert:
  * EntryOptions[]` (new entries appended). Rows are therefore mergeable: jig
  * adds one `- insert:` row of its own and every other row — the repo's
- * `agent-default-model` override and `jig-guard` insert that manager.sh
+ * `agent-default-model` override and `jig-guard` insert that `jig setup`
  * installs, anything added by hand — is carried through byte for byte,
  * comments included, because the file is spliced as text and never
  * re-serialised.
  *
  * The block sits between `# jig:begin mcp` and `# jig:end mcp` at the end
  * of the file (YAML comments are legal between sequence items), and
- * hand-edit detection compares the block, not the file, so manager.sh's
- * next `install_expanded` of the repo copy — which drops the block — reads
+ * hand-edit detection compares the block, not the file, so `jig setup`'s
+ * next install of the expanded repo copy — which drops the block — reads
  * as "write again", not as a conflict.
  *
  * Two DSH facts shape the edge cases:

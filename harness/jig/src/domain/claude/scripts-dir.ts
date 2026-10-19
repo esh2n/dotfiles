@@ -1,6 +1,6 @@
 /**
  * `~/.claude/scripts/`: a managed directory of links (`managed-dir.ts`), one
- * per regular file of `llm/harness/scripts/` —
+ * per regular file of `harness/scripts/` —
  * `~/.claude/scripts/<name>` → `<harness>/scripts/<name>`.
  *
  * Milestone 4. The directory holds the scripts `settings.json` names by

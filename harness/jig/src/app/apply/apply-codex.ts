@@ -1,6 +1,6 @@
 /**
  * `jig apply --target codex` — deliver the Codex configuration from the
- * sources under `llm/harness/`, and either show what would change (default)
+ * sources under `harness/`, and either show what would change (default)
  * or do it (`--write`). Milestone 3a of the generator that retires
  * `yoki-switch`; the same shape as `./apply-claude.ts`, over
  * `$CODEX_HOME` (default `~/.codex`) and the cross-harness skills mount.
@@ -92,13 +92,13 @@ import { agentPlan, loadPlugins } from "./plugins";
 import type { CodexApplyPorts } from "./ports";
 
 export interface CodexApplyPaths {
-  /** `llm/harness/`, absolute. `skills/`, `agents/` and `rules/` are under it. */
+  /** `harness/`, absolute. `skills/`, `agents/` and `rules/` are under it. */
   readonly harnessRoot: string;
   /** Where external skill packs are checked out (`resolvePluginsDir`). Absent: none. */
   readonly pluginsDir?: string;
-  /** `llm/harness/mcp/servers.json`. */
+  /** `harness/mcp/servers.json`. */
   readonly mcpServers: string;
-  /** `llm/harness/rules/decisions/`. */
+  /** `harness/rules/decisions/`. */
   readonly decisions: string;
   /**
    * The trees yoki-switch linked skills from (`claude-profiles/{core,packs,personal}/skills`

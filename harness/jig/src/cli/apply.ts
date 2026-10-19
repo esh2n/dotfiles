@@ -1,6 +1,6 @@
 /**
  * `jig apply` — regenerate a target's configuration from the canonical sources
- * under `llm/harness/` and either show the diff (default) or write it
+ * under `harness/` and either show the diff (default) or write it
  * (`--write`). Thin: argv parsing and text formatting only, delegating the
  * actual decision-making to `app/apply/*`. The composition root (`./jig.ts`)
  * builds the real ports and resolves the paths; this module never touches
@@ -1012,7 +1012,7 @@ function ompLeftoverLines(report: OmpApplyReport): readonly string[] {
  * there today (with the source-side cleanup it leaves), pi-mcp-adapter's
  * config with what is carried through, the two packages the delivery
  * relies on with the paste-able line for each that is missing, the
- * extensions directory as manager.sh leaves it, and the two gaps.
+ * extensions directory as home-manager leaves it, and the two gaps.
  */
 function formatPi(report: PiApplyReport, paths: PiApplyPaths): string {
   const lines: string[] = [
@@ -1068,8 +1068,8 @@ function piAgentsMdLines(report: PiApplyReport): readonly string[] {
     lines.push(
       `  source-side cleanup (yours, not jig's): ${retiredAgentsMd.path} is ${describePathState(retiredAgentsMd.state)}`,
       "  and unused once the generated file lands — pi's short AGENTS.md retires. jig does not delete repository",
-      "  files; remove it by hand, and drop AGENTS.md from core/config/manager.sh link_pi_resources, which would",
-      "  otherwise put the symlink back on its next run (milestone 4 retires the whole function).",
+      "  files; remove it by hand. home-manager (home/shared/harness/default.nix) no longer links it, so the",
+      "  symlink does not come back.",
     );
   }
   return lines;
@@ -1118,7 +1118,7 @@ function piPackageLines(report: PiApplyReport): readonly string[] {
   const width = Math.max(PAD, ...packages.packages.map((entry) => entry.name.length + 3));
   const lines = [
     `packages (report only): ${packages.path}`,
-    "  the source ~/.pi/agent/settings.json links to (manager.sh); `packages` is where `pi install` records a package",
+    "  the source ~/.pi/agent/settings.json links to (home-manager); `packages` is where `pi install` records a package",
     "  (docs packages.md). jig does not edit settings.json in this milestone.",
     ...(packages.invalid === undefined
       ? []
@@ -1140,7 +1140,7 @@ function piPackageLines(report: PiApplyReport): readonly string[] {
   return lines;
 }
 
-/** Report only: what manager.sh links here today, and everything else. */
+/** Report only: what home-manager links here, and everything else. */
 function piExtensionLines(report: PiApplyReport): readonly string[] {
   const { extensions } = report;
   const width = Math.max(
@@ -1149,7 +1149,7 @@ function piExtensionLines(report: PiApplyReport): readonly string[] {
   );
   const lines = [
     `extensions (report only): ${extensions.path}${extensions.dirState.kind === "missing" ? "  (absent)" : ""}`,
-    `  delivered by core/config/manager.sh link_pi_resources until milestone 4 (${extensions.managerLinks.length}), links into home/shared/harness/pi/extensions/:`,
+    `  delivered by home-manager (home/shared/harness/default.nix) (${extensions.managerLinks.length}), links into home/shared/harness/pi/extensions/:`,
     ...(extensions.managerLinks.length === 0
       ? ["    (none)"]
       : extensions.managerLinks.map(
@@ -1162,7 +1162,7 @@ function piExtensionLines(report: PiApplyReport): readonly string[] {
       ...extensions.foreign.map((entry) => `    ${entry.name.padEnd(width - 2)}${entry.what}`),
     );
   }
-  lines.push("  Nothing here is linked or unlinked by this milestone.");
+  lines.push("  Nothing here is linked or unlinked by jig.");
   return lines;
 }
 
@@ -1171,7 +1171,7 @@ function piExtensionLines(report: PiApplyReport): readonly string[] {
  * profiles found against the repo's, the MCP rows and the block per
  * profile with its conflicts and diff, the home-level patch layer, the
  * generated AGENTS.md against DSH's budget, then what reaches DSH
- * natively or through manager.sh — and the facts the delivery could not
+ * natively or through home-manager and `jig setup` — and the facts the delivery could not
  * verify, marked as such.
  */
 function formatDsh(report: DshApplyReport, paths: DshApplyPaths): string {
@@ -1207,7 +1207,7 @@ function dshProfileLines(report: DshApplyReport, paths: DshApplyPaths): readonly
   const lines = [
     `profiles: ${report.profilesDir.path}${report.profilesDir.state.kind === "dir" ? "" : `  (${describePathState(report.profilesDir.state)})`}`,
     `  a profile counts when DSH scaffolded it there AND the repo owns ${paths.repoProfilesDir}/<name>/cordis.patch.yml`,
-    "  (the rule core/config/manager.sh link_dsh_resources applies); jig never creates a profile directory.",
+    "  (the rule `jig setup` applies too); jig never creates a profile directory.",
   ];
   if (!report.scaffolded) {
     lines.push(
@@ -1240,7 +1240,7 @@ function dshProfileLines(report: DshApplyReport, paths: DshApplyPaths): readonly
 /** One profile's block: what stands there, the conflicts that stop a write, the guard plugin, the diff. */
 function dshProfileBlockLines(profile: DshProfileReport): readonly string[] {
   const lines = [
-    `  ${profile.name}: ${profile.outcome}  ${profile.patchPath}${profile.state.kind === "missing" ? "  (absent: created with jig's block only; the repo's rows come from manager.sh)" : profile.state.kind === "file" ? "" : `  (${describePathState(profile.state)})`}`,
+    `  ${profile.name}: ${profile.outcome}  ${profile.patchPath}${profile.state.kind === "missing" ? "  (absent: created with jig's block only; the repo's rows come from jig setup)" : profile.state.kind === "file" ? "" : `  (${describePathState(profile.state)})`}`,
   ];
   if (profile.replacesEmptyLayer) {
     lines.push(
@@ -1259,7 +1259,7 @@ function dshProfileBlockLines(profile: DshProfileReport): readonly string[] {
     );
   }
   lines.push(
-    `    guard plugin (report only): ${profile.guardPlugin.kind === "missing" ? "NOT linked into node_modules/@esh2n/jig-dsh-guard — the jig-guard row fails to load until manager.sh link_dsh_resources runs" : `linked (${describePathState(profile.guardPlugin)} at node_modules/@esh2n/jig-dsh-guard)`}`,
+    `    guard plugin (report only): ${profile.guardPlugin.kind === "missing" ? "NOT linked into node_modules/@esh2n/jig-dsh-guard — the jig-guard row fails to load until jig setup --target dsh runs" : `linked (${describePathState(profile.guardPlugin)} at node_modules/@esh2n/jig-dsh-guard)`}`,
     ...(profile.diff === ""
       ? ["    (no differences)"]
       : ["    --- diff (current vs generated) ---", profile.diff]),
@@ -1283,9 +1283,9 @@ function dshMcpLines(report: DshApplyReport): readonly string[] {
   if (report.scaffolded) {
     for (const profile of report.profiles) lines.push(...dshProfileBlockLines(profile));
     lines.push(
-      "  Until milestone 4, core/config/manager.sh link_dsh_resources overwrites each of these files with the",
-      "  repo copy (install_expanded) on every run and drops the block: re-run `jig apply --target dsh --write`",
-      "  after it (the block's absence reads as write, never as a conflict).",
+      "  `jig setup --target dsh` overwrites each of these files with the expanded repo copy and drops the",
+      "  block, then runs `jig apply --target dsh --write` itself; a copy installed any other way needs that",
+      "  apply again (the block's absence reads as write, never as a conflict).",
     );
   }
   lines.push(
@@ -1330,7 +1330,7 @@ function dshAgentsMdLines(report: DshApplyReport, paths: DshApplyPaths): readonl
   ];
 }
 
-/** What reaches DSH natively, and what manager.sh still delivers. */
+/** What reaches DSH natively, and what home-manager and `jig setup` deliver. */
 function dshReportOnlyLines(report: DshApplyReport, paths: DshApplyPaths): readonly string[] {
   const state = (entry: { readonly state: PathState }) =>
     entry.state.kind === "missing" ? "absent" : describePathState(entry.state);
@@ -1340,7 +1340,7 @@ function dshReportOnlyLines(report: DshApplyReport, paths: DshApplyPaths): reado
     "  agentsHome = $DSH_AGENTS_HOME or ~/.agents, rank 500; <dshHome>/skills at rank 400). The mount is",
     "  --target codex/omp/pi's delivery (one plan, planAgentsSkillsMount); this target plans nothing there.",
     "",
-    "delivered by core/config/manager.sh link_dsh_resources until milestone 4 (report only):",
+    "delivered by home-manager (settings.yaml) and jig setup (the rest) (report only):",
     `  settings.yaml      ${report.settingsYaml.path}: ${state(report.settingsYaml)}  (link to the repo file the tiers half above writes)`,
     `  hooks.claude.json  ${report.hooksClaudeJson.path}: ${state(report.hooksClaudeJson)}  (expanded copy for the dsh-hooks-claude-code bridge; the profiles compose jig-guard instead)`,
     `  jig-guard plugin   ${paths.pluginDir}: build + link  (bun run build, then pnpm add link: per profile — see each profile above)`,

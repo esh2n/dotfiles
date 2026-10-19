@@ -271,9 +271,9 @@ function ompApplyOptions(
  * directory is. The MCP file is pi-mcp-adapter's user-global shared config,
  * `~/.config/mcp/mcp.json` as its README spells it (`domain/pi/mcp.ts`; no
  * XDG variable is documented, so none is honoured). The repo-side paths
- * name what `core/config/manager.sh link_pi_resources` links today: the
+ * name what home-manager links (`home/shared/harness/default.nix`): the
  * settings file (read as the `packages` source), the extensions directory
- * (reported), and the AGENTS.md that retires.
+ * (reported), and the AGENTS.md that retired.
  */
 function resolvePiApplyPaths(): PiApplyPaths {
   const harness = harnessRoot();
@@ -302,8 +302,7 @@ function resolvePiApplyPaths(): PiApplyPaths {
  * Where the DSH target's harness-home half reads from and writes to.
  *
  * The home follows DSH's own rule (`domain/dsh/home.ts`: `DSH_HOME`, else
- * `~/.dsh`), the rule `core/config/manager.sh link_dsh_resources` reads
- * too. Profiles live under `<home>/profiles/<name>`, scaffolded by DSH; the
+ * `~/.dsh`), the rule `jig setup` reads too. Profiles live under `<home>/profiles/<name>`, scaffolded by DSH; the
  * repo's own profile patches are under `home/shared/harness/dsh/profiles`.
  * The skills root DSH reads is `$DSH_AGENTS_HOME/skills`, else
  * `~/.agents/skills` (dsh-skill-filesystem README) — the mount the Codex,
@@ -865,10 +864,10 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  only servers it wrote and refusing one of the same name it did not.\n" +
           "  The same run generates ~/.claude/AGENTS.md from rules/common and rules/decisions (with\n" +
           "  CLAUDE.md -> AGENTS.md), manages skills/, agents/ and rules/ as real directories of\n" +
-          "  per-entry links into llm/harness/ (entries that are not jig's, such as Claude Code's\n" +
+          "  per-entry links into harness/ (entries that are not jig's, such as Claude Code's\n" +
           "  own skills/synced, are left alone), and retires commands/. A file or real directory\n" +
           "  in a link's way is renamed aside, never deleted. Milestone 4 adds scripts/ (one link per\n" +
-          "  file of llm/harness/scripts/) and workflows/ (one per *.js of llm/harness/workflows/, plus\n" +
+          "  file of harness/scripts/) and workflows/ (one per *.js of harness/workflows/, plus\n" +
           "  lib/) as two more managed directories; a source directory that does not exist yet is\n" +
           "  reported and its destination left as found. hooks and the .<x>-merged staging dirs are\n" +
           "  `jig retire yoki`'s.\n" +
@@ -908,11 +907,12 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  agent dir per OMP_PROFILE/PI_PROFILE/PI_CODING_AGENT_DIR): the same ~/.agents/skills mount the\n" +
           "  codex target delivers (one plan, either target); ~/.omp/agent/agents/<name>.md generated from\n" +
           "  agents/*.md (omp's own frontmatter; tools mapped to omp ids, unmappable ones dropped and counted;\n" +
-          "  model from agents/models.json's omp table, empty until ruled, so left out and counted; body\n" +
+          "  model from agents/models.json's omp table (proxy/<tier>), effort as thinking; body\n" +
           "  verbatim); jig's entries in\n" +
           "  ~/.omp/agent/mcp.json for targets.omp servers, every other entry and key carried through; and\n" +
-          "  extensions/jig.ts -> jig's omp extension. yoki-hooks.json, RULES.md, .yoki/, config.yml and\n" +
-          "  yoki's extension links are reported as leftovers, not touched; config.yml is not jig's yet.\n" +
+          "  extensions/jig.ts -> jig's omp extension; and jig's keys of config.yml (modelRoles,\n" +
+          "  tools.approvalMode, tools.approval.eval, retry.*, statusLine), every other key carried through.\n" +
+          "  yoki-hooks.json, RULES.md, .yoki/ and yoki's extension links are reported as leftovers, not touched.\n" +
           "  Conditional paths: rules are not delivered to omp in this milestone (the dry-run says so).\n" +
           "  Dry-run by default; --write does all of it in one run; never part of --target all.\n" +
           "  apply --target pi runs both halves for the one harness: pi/models.json from policy/tiers.json\n" +
@@ -923,7 +923,7 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  and jig's entries in pi-mcp-adapter's ~/.config/mcp/mcp.json for targets.pi servers, every other\n" +
           "  entry and key carried through. Report only: whether packages in home/shared/harness/pi/settings.json\n" +
           "  declares pi-mcp-adapter and @tintinweb/pi-subagents (the paste-able line is printed when not),\n" +
-          "  what ~/.pi/agent/extensions holds (manager.sh's links until milestone 4), and the two gaps\n" +
+          "  what ~/.pi/agent/extensions holds (home-manager's links), and the two gaps\n" +
           "  (no native subagents; conditional paths: rules not delivered). Dry-run by default; --write.\n" +
           "  apply --target dsh runs both halves for the one harness: dsh/settings.yaml's managed block from\n" +
           "  policy/tiers.json (the tiers half, the only part --target all runs), then the harness home\n" +
@@ -934,8 +934,8 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  and $DSH_HOME/AGENTS.md, the same generated file as ~/.claude/AGENTS.md (DSH reads it first, then\n" +
           "  the project chain). No matching profile: nothing is delivered and no directory is created. Report\n" +
           "  only: ~/.agents/skills (DSH reads it natively; the codex/omp/pi mount), the home-level\n" +
-          "  cordis.patch.yml, settings.yaml, hooks.claude.json and the jig-guard plugin (manager.sh's until\n" +
-          "  milestone 4), and the [unverified] list. Dry-run by default; --write.\n" +
+          "  cordis.patch.yml, settings.yaml, hooks.claude.json and the jig-guard plugin (home-manager's and\n" +
+          "  jig setup's), and the [unverified] list. Dry-run by default; --write.\n" +
           "  apply regenerates pi/models.json and the managed blocks of dsh/settings.yaml, omp's models.yml\n" +
           "  and litellm's config.yaml from policy/tiers.json and the model catalog policy/models.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +

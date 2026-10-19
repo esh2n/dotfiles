@@ -1,6 +1,6 @@
 /**
  * `~/.claude/skills/`: a managed directory of links (`managed-dir.ts`), one
- * per skill directory of `llm/harness/skills/` —
+ * per skill directory of `harness/skills/` —
  * `~/.claude/skills/<name>` → `<harness>/skills/<name>`.
  *
  * Why a directory of links and not one link to the tree: Claude Code writes

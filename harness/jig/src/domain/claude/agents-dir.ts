@@ -1,6 +1,6 @@
 /**
  * `~/.claude/agents/`: a managed directory of links (`managed-dir.ts`), one
- * per agent definition of `llm/harness/agents/` —
+ * per agent definition of `harness/agents/` —
  * `~/.claude/agents/<name>.md` → `<harness>/agents/<name>.md`.
  *
  * Same shape as `skills/`, for the same reason and for symmetry: the
