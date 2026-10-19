@@ -15,9 +15,11 @@ behind an EXPLAIN plan, an index shape decision, or a migration sequencing
 call. Use both together: database-reviewer for the pass/fail checklist,
 this skill for "why is this actually slow."
 
+The review checklist for SQL, schemas and migrations (PostgreSQL and Spanner), read when writing them and by `code-reviewer`, is [references/review-standard.md](references/review-standard.md).
+
 ## EXPLAIN reading judgment (Postgres)
 
-Always run `EXPLAIN (ANALYZE, BUFFERS)`, never plain `EXPLAIN`. A plan
+When tuning a query you wrote, run `EXPLAIN (ANALYZE, BUFFERS)` on a development database, never plain `EXPLAIN`; when reviewing someone else's change, use plain `EXPLAIN` only, unless `JIG_REVIEW_EXEC=1` allows execution. A plan
 without ANALYZE only shows what the planner *guesses* it will do — it never
 proves what actually happened, and BUFFERS is the only view into disk vs.
 cache activity, which is usually the real cost.
@@ -113,6 +115,22 @@ cache activity, which is usually the real cost.
   OFFSET is fine for shallow, UI-driven "page 2 of a small result set";
   treat any deep-pagination or infinite-scroll/export use case as a
   keyset case by default.
+
+## Isolation and retries
+
+- **Read Committed (PostgreSQL's default) gives each statement a new
+  snapshot**, so a `SELECT` followed by an `INSERT`/`UPDATE` based on its
+  result races with a concurrent copy of itself. Close the gap with a
+  constraint, `INSERT ... ON CONFLICT`, `SELECT ... FOR UPDATE`, a single
+  conditional `UPDATE ... WHERE`, or a higher isolation level.
+- **Repeatable Read and Serializable fail instead of blocking** (SQLSTATE
+  `40001`). The caller must retry the whole transaction, including the
+  code that decided what to write; PostgreSQL never retries for you.
+  Repeatable Read still allows write skew; Serializable does not.
+- **Spanner defaults to serializable**, aborts under contention, and its
+  client libraries rerun the transaction function — so anything with an
+  outside effect (HTTP call, queue publish) belongs after commit. Spanner's
+  repeatable read allows write skew; guard invariants with `FOR UPDATE`.
 
 ## Lock contention judgment
 
