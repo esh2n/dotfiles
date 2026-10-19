@@ -54,7 +54,8 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	! grep -q "^docker run -d .*-e POSTGRES_PASSWORD " "$LOG"
 	f="${HOME}/.local/state/litellm-secrets/db_password"
 	[ "$(cat "$f")" = the-db-pw ]
-	[ "$(stat -f %Lp "$f" 2>/dev/null || stat -c %a "$f")" = 600 ]
+	# GNU stat -c first: GNU stat -f is a filesystem query that also succeeds
+	[ "$(stat -c %a "$f" 2>/dev/null || stat -f %Lp "$f")" = 600 ]
 }
 
 @test "litellm-up: a running DB is reused, not recreated" {

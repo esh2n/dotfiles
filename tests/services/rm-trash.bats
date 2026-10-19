@@ -11,7 +11,7 @@ setup() {
 	printf '#!/usr/bin/env bash\nprintf "%%s|" "$@" >>"%s"\n' "${LOG}" >"${DOTFILES_TRASH}"
 	chmod +x "${DOTFILES_TRASH}"
 	cd "${BATS_TEST_TMPDIR}"
-	mkdir dir && touch file "-name"
+	mkdir dir && touch -- file "-name"
 }
 
 in_shell() { # in_shell <bash|zsh> <rm arguments...>
