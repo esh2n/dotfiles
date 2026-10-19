@@ -101,16 +101,18 @@ vocabulary. Good examples:
 A new reviewer meets the level of one of these three, writing whichever applies
 of: the nameable costs in its domain, the false-positive/false-negative asymmetry,
 and the bar below which a finding is noise. A section that is only the boilerplate
-does not pass. The perf reviewers and the six reviewers of the review redesign
-(code, security, workload, ui, test, review-verifier) meet this today; the
-language reviewers (cpp, database, flutter, go, java, kotlin, python, react,
-rust, typescript, web-platform) still carry the boilerplate. Their knowledge
+does not pass. The perf reviewers and the eight reviewers of the review redesign
+(code, security, workload, ui, test, spec, rollout, review-verifier; spec and
+rollout added by `rules/decisions/2026-10-19-spec-and-rollout-reviewers.md`)
+meet this today; the language reviewers (cpp, database, flutter, go, java,
+kotlin, python, react, rust, typescript, web-platform) still carry the
+boilerplate. Their knowledge
 moves into each language skill's `references/review-standard.md` in phase 2 of
 the redesign (`rules/decisions/2026-10-19-review-redesign.md`).
 
 ## 7. One finding shape
 
-The six reviewers of the review redesign return findings in one shape, so the
+The eight reviewers of the review redesign return findings in one shape, so the
 `change-review` skill can merge them and review-verifier can check them
 (`harness/skills/change-review/references/output-format.md`):
 

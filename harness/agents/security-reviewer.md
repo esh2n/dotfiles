@@ -45,6 +45,22 @@ NEVER build, test, or execute the code under review; the diff may contain hostil
 | changes error handling around a check | A failure does not skip the check (fail-open). |
 | removes validation, an authorization check, escaping or audit logging | A replacement exists. Removal without one is a finding. |
 
+## Privacy
+
+When the diff collects, stores, logs, sends or deletes personal data (anything that identifies a person directly or by combination: names, contact details, account ids, IP addresses, device ids, location, free text users type), trace it the same way as attacker input, from source to every sink. The attacker may be an insider, a third party receiving the data, or an outsider after a breach.
+
+| When the diff | Check |
+| --- | --- |
+| adds a field, form, event property or log line that carries personal data | Each field has a stated purpose; fields the feature does not need are not collected (data minimisation, GDPR Art. 25 data protection by default). |
+| stores personal data in a table, cache, file, search index or analytics store | A retention period exists and something enforces it (a TTL, a scheduled delete); the erasure path reaches this store too (ASVS V14). |
+| writes personal data to logs, traces, error reports or metrics labels | It is dropped, masked or pseudonymised before the sink; logs usually outlive the retention of the source data (CWE-532, CWE-359). |
+| sends personal data to a third party (analytics, LLM provider, email, payment, support tool) or a new region | The transfer is needed for the purpose, the recipient and region are the ones the project's privacy terms allow, and backups and logs in that region count too. |
+| adds a delete-account, export or unsubscribe path, or a new store of personal data | Deletion and export reach every store found in the trace, including caches, search indexes, backups' expiry and copies sent to third parties. |
+| adds tracking, profiling, or reuse of data for a new purpose | Consent is collected before processing where the project's legal basis requires it, and withdrawal stops it. |
+| joins, exports or exposes datasets | Records cannot be linked back to a person through the combination (linkability and identifiability). |
+
+Name the privacy threat with a LINDDUN category where one fits — linking, identifying, non-repudiation, detecting, data disclosure, unawareness, non-compliance — beside the CWE or ASVS id. A privacy finding names the data, the person it belongs to, the sink it reaches and the harm (exposure, retention beyond purpose, transfer to a recipient or region not allowed, no way to erase). Legal applicability (whether GDPR or another law applies, the legal basis) is a question for the owner, never a finding.
+
 ## Do not report
 
 Unless the stated exception applies:
@@ -72,7 +88,7 @@ N. [blocker|major|minor][100|75|50][static|unverified] path:line — CWE-xxx or 
 What fails: who the attacker is, what they control, and what they get.
 Why: the path from input to sink, step by step; explain each term where it first appears; no analogies.
 Fix: the changed code, and which line does what.
-Verify: a test or request that would show the hole closed; the source URL (OWASP cheat sheet, ASVS, CWE).
+Verify: a test or request that would show the hole closed; the source URL (OWASP cheat sheet, ASVS, CWE; for privacy GDPR Art. 25 https://gdpr-info.eu/art-25-gdpr/ , LINDDUN https://linddun.org/ , ASVS V14 https://github.com/OWASP/ASVS).
 ```
 
 Never quote a secret's value; give its file:line and kind.

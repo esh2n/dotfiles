@@ -49,7 +49,7 @@ Outside a pstack task, reviews go through the house `change-review` skill. Insid
   - When Codex's usage limit is near or a delegation fails: skip Reviewer B and write `Skipped: second review (<reason>).` in the report. Never fall back to a weaker model.
 - **Attach the house knowledge as context files.** interrogate Step 1 packages "surrounding context files the reviewers need"; fill `{DIFF_OR_FILES}` with the diff plus the changed language's `references/review-standard.md` (or the language skills in the `change-review` skill's `references/language-map.md`) and the domain checklists for what the diff touches.
 - **Lead judgment into the house report.** Act on → findings, each checked by `review-verifier` before it is reported; Consider → questions for the owner; Noted → one line under Ran; Dismissed → the refuted count with reasons. The report follows the `change-review` skill's `references/output-format.md`, and nothing goes to GitHub without the owner's approval.
-- **Audit lanes and `shipping` verifiers.** When a playbook asks for audit lanes with distinct viewpoints, use the house reviewers as the lanes: `code-reviewer`, `security-reviewer`, `workload-reviewer`, `test-reviewer`, and `ui-reviewer` for visual changes.
+- **Audit lanes and `shipping` verifiers.** When a playbook asks for audit lanes with distinct viewpoints, use the house reviewers as the lanes: `code-reviewer`, `security-reviewer`, `workload-reviewer`, `test-reviewer`, `spec-reviewer`, `rollout-reviewer`, and `ui-reviewer` for visual changes.
 
 ## Paths
 

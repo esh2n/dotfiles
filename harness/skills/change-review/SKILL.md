@@ -7,7 +7,7 @@ metadata:
 
 # Review
 
-One procedure for every review. Depth changes with the change; the steps do not. Reviewers are agents (`code-reviewer`, `security-reviewer`, `workload-reviewer`, `ui-reviewer`, `test-reviewer`, `review-verifier`); this skill decides which run, what they read, and where the result goes. The judgment rules behind a review (grounding, anchoring, refutation, merging) are in the `code-review-discipline` skill, section 12.
+One procedure for every review. Depth changes with the change; the steps do not. Reviewers are agents (`code-reviewer`, `security-reviewer`, `workload-reviewer`, `ui-reviewer`, `test-reviewer`, `spec-reviewer`, `rollout-reviewer`, `review-verifier`); this skill decides which run, what they read, and where the result goes. The judgment rules behind a review (grounding, anchoring, refutation, merging) are in the `code-review-discipline` skill, section 12.
 
 Inside a pstack task, pstack's own review steps (`interrogate`, `no-comments`, `shipping`) stay; the `pstack-adapter` skill's Review section says how house reviewers feed them.
 
@@ -22,10 +22,13 @@ Classify before anything else:
 | changes about 200 or more executable lines (not tests, lockfiles, generated files, docs) | heavy |
 | touches auth, sessions or permissions; secrets, keys or env files; money or billing; a public API, schema or wire format; a migration; CI (`.github/`, pipelines); dependency manifests or lockfiles; an LLM feature (prompts, tool calls, model output used as input) | risky, therefore heavy |
 | changes styles, components, templates, layout or visual assets | UI |
+| has a PR description, ticket, plan, acceptance criteria or decision note to compare against; or changes docs (README, API docs, changelog) or a public surface (exported API, CLI flag, route, config key, user-visible text) | spec |
+| changes an API contract, event or message schema, database schema, stored, cached or serialized format, migration, feature flag, config default, or anything whose deploy order matters | rollout |
+| collects, stores, logs, sends to a third party or deletes personal data | privacy |
 | is a design, plan or spec with no code | design: follow `references/design-review.md` instead of steps 3 to 6 |
 | is a request to audit a whole codebase for security | audit: follow `references/security-audit.md` |
 
-Anything else is light. Light and heavy run the same steps; heavy adds step 6.
+A change that is not heavy is light. UI, spec, rollout and privacy add to either; they only decide which reviewers run. Light and heavy run the same steps; heavy adds step 6.
 
 ## 2. Gather context
 
@@ -33,8 +36,11 @@ Collect paths and quote load-bearing lines verbatim; do not paraphrase rules.
 
 - Intent: PR description, linked issue or ticket, plan file, acceptance criteria, commit subjects. Write the intent as one paragraph. If you cannot state it, ask the owner before spawning anyone.
 - Decisions: the project's ADRs and decision notes that touch the changed paths (`docs/adr/`, `harness/rules/decisions/`, `AGENTS.md`/`CLAUDE.md`, `.claude/rules/`, `CONTRIBUTING*`).
+- Deploy: how the code ships (rolling, blue-green, canary), whether migrations run before or after the code, which old clients stay in use and for how long, how rollback works. From deploy docs, CI/CD config, or the PR. `rollout-reviewer` needs it.
 - Workload: the project's workload description file (expected traffic, data volume, SLOs, topology) if one exists; search for `workload`, `SLO`, `capacity` in `docs/`. The PR's one line on where the code runs counts too.
 - Knowledge for reviewers: the changed language's `references/review-standard.md` in its skill when it exists; until then the language skills in `references/language-map.md`. Domain checklists: every installed `skills/*/references/review-checklist.md` whose domain the diff touches.
+
+Pass the intent sources (PR description, ticket, plan, acceptance criteria), the decision notes and the README, API docs and changelog to `spec-reviewer` as paths, not as your summary; it compares them with the diff line by line. On a re-review, pass the earlier findings too.
 
 Each item you looked for and did not find goes into the report's Missing context section. Never proceed as if it were there.
 
@@ -54,10 +60,12 @@ Spawn in one message, in parallel, read-only. Each brief carries: the diff file 
 | When | Spawn |
 | --- | --- |
 | always | `code-reviewer` |
-| risky paths, or input handling, crypto, file handling, outbound requests | `security-reviewer` |
+| risky paths, or input handling, crypto, file handling, outbound requests; or privacy | `security-reviewer` (privacy: tell it to run its Privacy section) |
 | a command, handler, job, consumer, query, transaction boundary, retry, timeout, concurrency setting or external call changes; or an async UI flow, client state, API client or optimistic update changes | `workload-reviewer` |
 | UI | `ui-reviewer`, after step 7's screenshots |
 | tests change, or behaviour changes with no test change | `test-reviewer` |
+| spec | `spec-reviewer` |
+| rollout | `rollout-reviewer` |
 | a language with no `review-standard.md` yet has its own `<lang>-reviewer` agent | that agent too, for that language's files (interim until its standard exists) |
 | the change is performance-motivated or edits a known hot path, and a `<lang>-perf-reviewer` exists | that agent too |
 

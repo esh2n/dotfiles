@@ -12,11 +12,11 @@ Do not run pstack's `interrogate` on an abstract plan with no code: it invents r
 
    | Lane | Focus |
    | --- | --- |
-   | conventions | Does the design contradict a grounding document or written convention? An acknowledged, justified deviation is not a finding; an unacknowledged one is. |
+   | conventions | Does the design contradict a grounding document or written convention? Does it cover every requirement of its ticket or brief, add nothing unrequested, and read each requirement as written? An acknowledged, justified deviation is not a finding; an unacknowledged one is. Use `spec-reviewer` when a ticket, brief or acceptance criteria exist. |
    | architecture | Layer boundaries and dependency direction, where business logic lands, aggregate and bounded-context fit, whether new abstractions earn their place, transaction and consistency boundaries — judged against this repository's actual structure. |
    | security | Who can call what and where authorization sits, data exposure in responses and logs, tenant isolation on new data paths, secret handling, trust boundaries crossed. Use `security-reviewer`. |
    | wording | Names against the domain's language and what already ships; names that mislead about behaviour; API, field and endpoint naming coherence. |
-   | release | Rollout and rollback, backward compatibility for clients and data, migration order (expand and contract: is there a step where old code meets the new schema?), feature flags or dual writes, and whether the change is observable enough to tell it worked. |
+   | release | Rollout and rollback, backward compatibility for clients and data, migration order (expand and contract: is there a step where old code meets the new schema?), feature flags or dual writes, and whether the change is observable enough to tell it worked. Use `rollout-reviewer`. |
    | workload | Expected load against the design: queries per request, contention, retry amplification, what saturates first. Use `workload-reviewer`; without a workload description it reports missing context. |
    | failure modes | Only when domain checklists are installed: walk each external dependency, async boundary, new metric and health endpoint through the checklists' silences. A silence with a concrete consequence is a finding citing the checklist id; a trade-offs item is never a finding, only a question naming the options. |
 

@@ -15,8 +15,8 @@ Agent definitions name only a tier — `main`, `complex` or `executor` — and a
 |---|---|---|---|
 | design, architecture, or a plan for a multi-file change | complex | xhigh | architect |
 | a bug that survived two attempts, or a root cause to find | complex | high | spawn with `complex` |
-| a security review (auth, input handling, secrets) | complex | high | security-reviewer, through the `change-review` skill |
-| reviewing a change: correctness, workload, UI, tests, or verifying a finding | main | high | through the `change-review` skill: code-reviewer, workload-reviewer, ui-reviewer, test-reviewer, review-verifier (inherits) |
+| a security or privacy review (auth, input handling, secrets, personal data) | complex | high | security-reviewer, through the `change-review` skill |
+| reviewing a change: correctness, workload, UI, tests, match with its documents, rollout and compatibility, or verifying a finding | main | high | through the `change-review` skill: code-reviewer, workload-reviewer, ui-reviewer, test-reviewer, spec-reviewer, rollout-reviewer, review-verifier (inherits) |
 | implementation that needs judgment | main | inherit | build-error-resolver, or work in the session |
 | reading, searching, docs lookup, an industry survey | main | medium | docs-lookup, research |
 | carrying out a fully specified plan whose result a test, lint or type check confirms, when keeping the work local matters more than speed | executor | medium | spawn with `executor` |

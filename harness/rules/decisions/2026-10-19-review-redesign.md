@@ -58,7 +58,7 @@ rule: Review every change through the `change-review` skill: classify the diff (
 ## Sources
 
 - compound-engineering のレビュアー構成、信頼度の段階、validator、統合案: https://github.com/EveryInc/compound-engineering-plugin 、https://github.com/EveryInc/compound-engineering-plugin/blob/main/docs/plans/ce-code-review-reviewer-consolidation-and-standards-file.md
-- ClickHouse のレビュー skill（足りない証拠でも重大になりうる指摘を抑えない）: https://github.com/ClickHouse/ClickHouse/blob/master/.claude/skills/change-review/SKILL.md
+- ClickHouse のレビュー skill（足りない証拠でも重大になりうる指摘を抑えない）: https://github.com/ClickHouse/ClickHouse/blob/master/.claude/skills/review/SKILL.md
 - Anthropic のマネージド Code Review と PR の大きさごとの指摘率: https://code.claude.com/docs/en/code-review 、https://claude.dev/blog/solving-code-review-at-anthropic/
 - pstack の interrogate（モデルの多様性）: https://github.com/cursor/plugins/tree/main/pstack/skills/interrogate
 - 静的解析の結果を渡す効果（検出 96.9%）: https://arxiv.org/abs/2602.16741
