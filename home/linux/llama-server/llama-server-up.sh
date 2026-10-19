@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Foreground launcher for llama-server in router mode (the gpu role; systemd
+# Foreground launcher for llama-server in router mode (the model-provider role on Linux; systemd
 # --user owns the process). Decision:
 # rules/decisions/2026-09-24-home-llm-second-host-omarchy-llama-server.md.
 #

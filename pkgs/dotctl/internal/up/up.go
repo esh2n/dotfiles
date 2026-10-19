@@ -247,7 +247,7 @@ func setAsideEtc(s Sys, c Config) error {
 	return nil
 }
 
-// The gpu role's CUDA programs find the NVIDIA libraries through
+// On Linux, the model-provider role's CUDA programs find the NVIDIA libraries through
 // /run/opengl-driver, provided by a system service installed as root.
 func gpuDrivers(s Sys, c Config) {
 	setup := filepath.Join(c.Home, ".nix-profile", "bin", "non-nixos-gpu-setup")
@@ -287,7 +287,7 @@ func llamaFirewall(s Sys, c Config) {
 		return
 	}
 	if _, err := os.Stat(filepath.Join(c.Home, ".nix-profile", "bin", "non-nixos-gpu-setup")); err != nil {
-		return // no gpu role: no llama-server here
+		return // not a Linux model-provider: no llama-server here
 	}
 	marker := filepath.Join(c.Home, ".local", "state", "dotfiles", "ufw-llama-server")
 	if _, err := os.Stat(marker); err == nil {
