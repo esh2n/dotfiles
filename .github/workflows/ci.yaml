@@ -16,10 +16,11 @@ on:
 permissions:
   contents: read
 
-# a newer push to the same branch or PR cancels the run it supersedes
+# a newer push to a PR cancels the run it supersedes; every main commit
+# keeps a finished run so a breakage can be traced to its commit
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   shellcheck:
