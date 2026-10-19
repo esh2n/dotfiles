@@ -29,10 +29,10 @@ Each item is written once per condition, by the same model at the same effort, f
 
 ## Blind A/B by the owner
 
-1. For each item, pair plain-japanese with each other condition. Shuffle the pair order and strip any marks that reveal the condition (file names, check logs).
-2. Show the owner the fact list and the two outputs side by side. The owner picks A, B or tie on each of the seven criteria, then overall.
+1. For each item, pair plain-japanese with each other condition. Shuffle the pair order and strip any marks that reveal the condition (file names, check logs). The owner judges one pair per Japanese item, 15 in all, with the other condition rotated so each Japanese condition gets five; the model judge judges every pair (accepted by the owner, 2026-10-19: 45 pairs are too many for one person). The owner does not judge the English items.
+2. Show the owner the fact list and the two outputs side by side. The owner picks A, B or tie overall; the seven criteria are optional, picked where something stood out.
 3. Re-show a random half of the pairs a week later, in a new order, to measure how often the owner gives the same verdict (self-agreement). Report it next to the results.
-4. Run one model judge on the same pairs with the same criteria and report its agreement with the owner. Do not use its verdicts in the result.
+4. Run one model judge on all pairs with the same criteria and report its agreement with the owner on the owner's 15. Where agreement is high, report the model's verdicts on the other pairs beside the owner's result, labelled as the model's; they never replace the owner's.
 
 Criteria (in the owner's language):
 
@@ -55,7 +55,7 @@ Recorded for every output, reported beside the owner's verdicts:
 
 ## Decision rule
 
-Adopt plain-japanese as the default for Japanese writing if it wins or ties overall on at least 12 of the 15 Japanese items against each Japanese condition, with no loss on criterion 5 (no missing or added facts) attributable to the skill. If the owner's self-agreement is below 70%, report the result as inconclusive and re-run with clearer criteria first.
+Adopt plain-japanese as the default for Japanese writing if it wins or ties overall on at least 12 of the owner's 15 pairs, with no loss on criterion 5 (no missing or added facts) attributable to the skill. If the owner's self-agreement is below 70%, report the result as inconclusive and re-run with clearer criteria first.
 
 ## Running it
 
