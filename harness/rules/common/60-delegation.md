@@ -15,8 +15,8 @@ Agent definitions name only a tier — `main`, `complex` or `executor` — and a
 |---|---|---|---|
 | design, architecture, or a plan for a multi-file change | complex | xhigh | architect |
 | a bug that survived two attempts, or a root cause to find | complex | high | spawn with `complex` |
-| a security review (auth, input handling, secrets) | complex | high | security-reviewer |
-| a code review after a change | main | high | code-reviewer, `<lang>-reviewer` |
+| a security review (auth, input handling, secrets) | complex | high | security-reviewer, through the `change-review` skill |
+| reviewing a change: correctness, workload, UI, tests, or verifying a finding | main | high | through the `change-review` skill: code-reviewer, workload-reviewer, ui-reviewer, test-reviewer, review-verifier (inherits) |
 | implementation that needs judgment | main | inherit | build-error-resolver, or work in the session |
 | reading, searching, docs lookup, an industry survey | main | medium | docs-lookup, research |
 | carrying out a fully specified plan whose result a test, lint or type check confirms, when keeping the work local matters more than speed | executor | medium | spawn with `executor` |
@@ -36,8 +36,9 @@ Agent definitions name only a tier — `main`, `complex` or `executor` — and a
 
 ## Immediate Agent Use
 
-- After writing or modifying code: run the code-reviewer agent; address CRITICAL and HIGH findings, fix MEDIUM when possible
-- Before a commit touching auth, input handling, or secrets: run the security-reviewer agent
+- After writing or modifying code: follow the `change-review` skill; in your own work, fix verified blocker and major findings and report the rest by number for the owner's choice
+- Before a commit touching auth, input handling, secrets, CI or dependencies: the `change-review` skill's run includes security-reviewer; do not commit before it reports
+- Never post a review or comment to GitHub without the owner's approval of the text
 - For an architectural decision: run the architect agent
 - When a build fails: run the build-error-resolver agent, fix incrementally, verify after each fix
 - When evaluating an external skeleton or template to build on: run parallel read-only agents (security, extensibility, relevance) before adopting it as a foundation

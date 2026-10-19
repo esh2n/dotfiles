@@ -992,8 +992,8 @@ describe("milestone 4: scripts and workflows", () => {
       files: {
         [`${H}/scripts/statusline.sh`]: "#!/bin/sh\n",
         [`${H}/scripts/README.md`]: "# scripts\n",
-        [`${H}/workflows/review.js`]: "// review\n",
-        [`${H}/workflows/lib/lanes.js`]: "// lanes\n",
+        [`${H}/workflows/research.js`]: "// research\n",
+        [`${H}/workflows/lib/helpers.js`]: "// helpers\n",
         [`${H}/workflows/README.md`]: "# workflows\n",
       },
     });
@@ -1001,7 +1001,7 @@ describe("milestone 4: scripts and workflows", () => {
     expect(dry.scriptsDir.dir?.plan.state).toBe("replace");
     expect(dry.scriptsDir.dir?.selection.linked).toEqual(["statusline.sh"]);
     expect(dry.workflowsDir.dir?.plan.state).toBe("replace");
-    expect(dry.workflowsDir.dir?.selection.linked).toEqual(["lib", "review.js"]);
+    expect(dry.workflowsDir.dir?.selection.linked).toEqual(["lib", "research.js"]);
     expect(dry.outcome).toBe("write");
 
     const report = await run(ports, true);
@@ -1010,7 +1010,7 @@ describe("milestone 4: scripts and workflows", () => {
     expect(links[`${PATHS.scripts}/statusline.sh`]).toBe(`${H}/scripts/statusline.sh`);
     expect(links[`${PATHS.scripts}/README.md`]).toBeUndefined();
     expect(dirs.has(PATHS.workflows)).toBe(true);
-    expect(links[`${PATHS.workflows}/review.js`]).toBe(`${H}/workflows/review.js`);
+    expect(links[`${PATHS.workflows}/research.js`]).toBe(`${H}/workflows/research.js`);
     expect(links[`${PATHS.workflows}/lib`]).toBe(`${H}/workflows/lib`);
 
     // The second run finds every link ok.

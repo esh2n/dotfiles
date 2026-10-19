@@ -370,8 +370,8 @@ describe("applyCli --target claude", () => {
     const context = claudeContext(
       {
         [`${H}/scripts/statusline.sh`]: "#!/bin/sh\n",
-        [`${H}/workflows/review.js`]: "// review\n",
-        [`${H}/workflows/lib/lanes.js`]: "// lanes\n",
+        [`${H}/workflows/research.js`]: "// research\n",
+        [`${H}/workflows/lib/helpers.js`]: "// helpers\n",
         [`${H}/workflows/notes.md`]: "notes\n",
       },
       {
@@ -398,7 +398,7 @@ describe("applyCli --target claude", () => {
     );
     expect(result.stdout).toMatch(/lib +create +→ \/repo\/llm\/harness\/workflows\/lib/);
     expect(result.stdout).toMatch(
-      /review\.js +create +→ \/repo\/llm\/harness\/workflows\/review\.js/,
+      /research\.js +create +→ \/repo\/llm\/harness\/workflows\/research\.js/,
     );
     expect(result.stdout).toMatch(/notes\.md +not a \*\.js workflow script/);
   });

@@ -840,12 +840,11 @@ same mechanism as `skills/`, `agents/` and `rules/`
   for `lib/` when it is a directory (`domain/claude/workflows-dir.ts`). The
   scripts are the ones the
   [subagents decision](../rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md)
-  keeps: review, research, code-study, stocktake, design-review; preflight
-  and the yoki-graph engine go. As of 2026-09-23 none of them imports
-  `./lib/…` — `review.js`, `research.js` and `design-review.js` carry the
-  provider-lane helpers inline, `lib/lanes.js` being the canonical copy
-  (review.js:75) — so the `lib` link is there for the day one does, and
-  resolves the same whichever way the Workflow tool loads the file.
+  keeps, minus the review and design-review scripts that the
+  [review redesign](../rules/decisions/2026-10-19-review-redesign.md) retired
+  in favour of the `change-review` skill and reviewer agents: research and implement
+  today. Neither imports `./lib/…` and the source tree has no `lib/` now; the
+  `lib` link is there for the day a script does.
 
 Today both destinations are yoki-switch's symlinks to `.scripts-merged` and
 `.workflows-merged`: `replace`, exactly as `skills` was. A source directory

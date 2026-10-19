@@ -38,6 +38,19 @@ pstack skills name Cursor's tools. Read this once per session, then map each Cur
 
 Pick no model from a pstack slug. Claude Code subagents may take `model: opus`, `sonnet`, `haiku` or `fable` with an `effort` when the skill asks for a stronger or cheaper role: a slug `claude-<family>-<version>-<effort>[-fast]` such as `claude-opus-5-5-xhigh`, or a role value `<model> <effort>` such as `opus high`, maps to that family and effort; drop `-fast`. A `grok-*`, `gpt-*` or other non-Claude slug, `auto` and `inherit-parent` mean omit the model. In Codex, pi and omp, omit every model field: the session keeps its tier, and a stronger model is reached through a subagent whose tier says so (house rule). `setup-pstack` and `pstack-models.mdc` (`~/.cursor/rules/pstack-models.mdc`) have nothing to write here: say so and go on.
 
+## Review
+
+Outside a pstack task, reviews go through the house `change-review` skill. Inside one, pstack's review steps (`interrogate`, `no-comments`, `shipping`, the audit lanes) stay, with these mappings. The `change-review` skill's step 6 runs `interrogate` the same way.
+
+- **Reviewer B runs on a different model family.** This replaces the Models rule (omit non-Claude slugs) for interrogate's Reviewer B only; the model diversity is the point of interrogate. Reviewer A runs as the Models section says.
+  - Claude Code: Reviewer B is one delegation to Codex. Write the filled reviewer prompt to a temp file, run `codex exec --sandbox read-only --ephemeral -o <out-file> - < <prompt-file>` from the repository root, and read `<out-file>` as Reviewer B's answer. Set Reviewer A's `model` explicitly, because a `readonly` reviewer mapped to `Explore` may otherwise take that type's default model.
+  - omp, pi, DSH: run Reviewer B on a tier whose model is from a different family than the session's (the tier's `use` ids in `harness/policy/tiers.json`, their provider in `harness/policy/models.json`). `executor` does not count: review is not machine-checkable work. When no tier qualifies, make the same single `codex exec` delegation as Claude Code.
+  - Codex: no second family is in reach without `claude -p`, which the house does not use. Write `Skipped here: second-family review. No other family reachable from Codex.` and run Reviewer B on the session's model.
+  - Never put security-reviewer's findings in the prompt sent to another provider; send the diff, the intent and the context files only.
+- **Attach the house knowledge as context files.** interrogate Step 1 packages "surrounding context files the reviewers need"; fill `{DIFF_OR_FILES}` with the diff plus the changed language's `references/review-standard.md` (or the language skills in the `change-review` skill's `references/language-map.md`) and the domain checklists for what the diff touches.
+- **Lead judgment into the house report.** Act on → findings, each checked by `review-verifier` before it is reported; Consider → questions for the owner; Noted → one line under Ran; Dismissed → the refuted count with reasons. The report follows the `change-review` skill's `references/output-format.md`, and nothing goes to GitHub without the owner's approval.
+- **Audit lanes and `shipping` verifiers.** When a playbook asks for audit lanes with distinct viewpoints, use the house reviewers as the lanes: `code-reviewer`, `security-reviewer`, `workload-reviewer`, `test-reviewer`, and `ui-reviewer` for visual changes.
+
 ## Paths
 
 | Cursor | Here |

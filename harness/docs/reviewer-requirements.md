@@ -1,8 +1,11 @@
 # Reviewer agent requirements
 
 The minimum every reviewer agent in `harness/agents/*-reviewer.md` (including
-`security-reviewer` and the `*-perf-reviewer` agents) must meet. Check a reviewer
-against this list before writing a new one or editing an existing one.
+`security-reviewer` and the `*-perf-reviewer` agents) and `review-verifier` must
+meet. Check a reviewer against this list before writing a new one or editing an
+existing one. The procedure that spawns them is the `change-review` skill
+(`harness/skills/change-review/`); its judgment rules are `code-review-discipline`
+section 12.
 
 This file lives outside `harness/agents/` on purpose: jig links every top-level
 `*.md` file in that directory except `README.md` as an agent definition, and
@@ -87,9 +90,10 @@ vocabulary. Good examples:
 
 - `go-perf-reviewer.md` lists the kinds of cost each finding must name (extra
   allocs/op, contended lock, GC pause growth).
-- `security-reviewer.md` states an asymmetric calibration that weighs false
-  negatives above false positives, and requires naming the concrete attack path,
-  never a generic "could be unsafe".
+- `security-reviewer.md` starts from the measured false-positive rate of AI
+  security review, so it reports nothing on suspicion alone: each finding names
+  the attacker, what they control, the path to the sink and the impact, quotes
+  the sink line, and a weaker one is reported only as an `[unverified]` blocker.
 - `web-platform-reviewer.md` lists what is reported (a visible rendering break, an
   accessibility barrier, a maintainability trap with a specific mechanism, a
   measured or measurable performance cost) and what is not (taste).
@@ -97,19 +101,34 @@ vocabulary. Good examples:
 A new reviewer meets the level of one of these three, writing whichever applies
 of: the nameable costs in its domain, the false-positive/false-negative asymmetry,
 and the bar below which a finding is noise. A section that is only the boilerplate
-does not pass. The perf reviewers meet this today; most language reviewers
-(code, cpp, database, flutter, go, java, kotlin, python, react, rust, typescript,
-web-platform) still carry the boilerplate and are open work.
+does not pass. The perf reviewers and the six reviewers of the review redesign
+(code, security, workload, ui, test, review-verifier) meet this today; the
+language reviewers (cpp, database, flutter, go, java, kotlin, python, react,
+rust, typescript, web-platform) still carry the boilerplate. Their knowledge
+moves into each language skill's `references/review-standard.md` in phase 2 of
+the redesign (`rules/decisions/2026-10-19-review-redesign.md`).
+
+## 7. One finding shape
+
+The six reviewers of the review redesign return findings in one shape, so the
+`change-review` skill can merge them and review-verifier can check them
+(`harness/skills/change-review/references/output-format.md`):
+
+- a header `N. [severity][confidence][label] path:line — title`, with severity
+  `blocker`, `major` or `minor`, and confidence anchored rather than scored:
+  `100` (the motivating line quoted and the failing path traced), `75` (the line
+  quoted and the concrete input named, one link inferred), `50` (unconfirmed;
+  reported only as a `blocker`, labelled `[unverified]`);
+- four fields: what fails (a concrete input or situation), why (the mechanism,
+  terms explained where first used, no analogies), fix (the changed code and how
+  to read it), verify (a test or command and a source URL);
+- three sections: Findings, Questions for the owner (trade-offs, taste, design
+  calls), Missing context (inputs that were absent and what each would decide).
+
+The language and perf reviewers still use the `[C:x/I:x]` threshold until phase 2.
 
 ## Known deviation
 
-- **`security-reviewer` has `tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]`.**
-  This is a deliberate exception to requirement 3. As its own `## Write/Edit Scope`
-  section states, detection is the security lane of the `review` workflow
-  (`harness/workflows/review.js`), which runs it under a read-only sandbox; this
-  agent's Write/Edit exist only for targeted remediation on an explicit human
-  request (removing a hardcoded secret, parameterising a query, fixing XSS
-  sanitisation, pinning a vulnerable dependency). Refactoring unrelated code,
-  changing business logic and redesigning architecture remain forbidden. The
-  exception covers writing only, never execution. It puts a second role on the same
-  agent definition and is not a precedent for a new reviewer to copy.
+None. `security-reviewer` used to hold `Write` and `Edit` for remediation; since
+the review redesign (2026-10-19) it is read-only like every other reviewer, and
+remediation is a separate request handled outside the reviewer.
