@@ -27,6 +27,7 @@ Domain knowledge, by what the diff touches:
 
 | When the diff touches | Read |
 | --- | --- |
+| API surfaces: HTTP/REST, gRPC/protobuf, GraphQL schemas, public library or SDK signatures, webhooks, CLI flags and machine-readable output | `api-design/references/review-checklist.md` (compatibility, versioning and deprecation items go to `rollout-reviewer`; silences in a design go to `spec-reviewer`) |
 | network calls, timeouts, retries, queues sizing, health checks | `resilience-patterns/references/review-checklist.md` |
 | events, topics, consumers, outbox, sagas | `event-driven-patterns/references/review-checklist.md` |
 | metrics, logs, traces, alerts | `observability-patterns/references/review-checklist.md` |
