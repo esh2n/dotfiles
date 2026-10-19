@@ -2,7 +2,7 @@
 
 pstack (poteto-mode, its playbooks, the principle-* skills and the rest) is an external skill pack linked beside the house skills. It is written with Cursor's tool names: load the `pstack-adapter` skill once per session before following a pstack skill; its Overrides section explains each row below.
 
-pstack adds playbooks, principles and commands; it never replaces a house rule. Inside a task started with a pstack skill, wherever pstack and the house rules (these rules, accepted decision notes, house skills) disagree, follow the house, including conflicts not listed here; `pstack-adapter`'s Overrides says what to do at each known one. Reviews go through the `change-review` skill there too. Never run an installer under `sudo` or piped from `curl`. Known conflicts:
+Use both. Inside a task started with a pstack skill, follow pstack and the house rules (these rules, accepted decision notes, house skills) together wherever both can hold; two rules that check the same thing from different angles are both done. Only where one requires what the other forbids does the house win; the rows below are those, and `pstack-adapter`'s Overrides says how each combined step runs. `change-review` stays the entry for every review, with `interrogate` as its heavy second review; `/interrogate` also runs on its own for a contested design. Never run an installer under `sudo` or piped from `curl`. Where they contradict:
 
 | pstack says | Do instead |
 |---|---|
