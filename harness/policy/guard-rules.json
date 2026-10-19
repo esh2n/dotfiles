@@ -869,7 +869,7 @@
       "subject": {
         "program": "declscope"
       },
-      "why": "2026-09-30-declscope-file-scoped-private: declscope is not wired into hooks; the go-reviewer runs it on a diff",
+      "why": "2026-09-30-declscope-file-scoped-private: declscope is not wired into hooks; code-reviewer runs it on a Go diff",
       "profiles": [
         "minimal",
         "standard",
