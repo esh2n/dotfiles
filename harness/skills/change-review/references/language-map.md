@@ -10,7 +10,7 @@ Until a language's skill carries `references/review-standard.md`, `code-reviewer
 | `.py` | `python-patterns/references/review-standard.md` (it links `python-testing`, plus `django-patterns` or `fastapi-patterns` when used) | — |
 | `.rs` | `rust-patterns/references/review-standard.md` (it links `rust-testing` for detail) | — |
 | `.java` | `java-coding-standards` (plus `springboot-patterns` when used) | `java-reviewer` |
-| `.kt`, `.kts` | `kotlin-patterns`, `kotlin-coroutines-flows` | `kotlin-reviewer` |
+| `.kt`, `.kts` | `kotlin-patterns/references/review-standard.md` (it links `kotlin-coroutines-flows`, `kotlin-testing`, `compose-multiplatform-patterns`, `android-clean-architecture`, `kotlin-ktor-patterns`, `kotlin-exposed-patterns` for detail) | — |
 | `.c`, `.cc`, `.cpp`, `.h`, `.hpp` | `cpp-coding-standards` | `cpp-reviewer` |
 | `.cs` | `csharp-patterns` | — |
 | `.swift` | `swift-patterns` | — |
