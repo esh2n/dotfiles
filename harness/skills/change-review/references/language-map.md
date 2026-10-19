@@ -31,6 +31,7 @@ Domain knowledge, by what the diff touches:
 | network calls, timeouts, retries, queues sizing, health checks | `resilience-patterns/references/review-checklist.md` |
 | events, topics, consumers, outbox, sagas | `event-driven-patterns/references/review-checklist.md` |
 | metrics, logs, traces, alerts | `observability-patterns/references/review-checklist.md` |
+| a new service, endpoint, job, consumer or scheduled task; a data migration or backfill; a feature flag or config rollout; secrets, backups, deletion or decommissioning; deployment, scaling or on-call behaviour | `ops-readiness/references/review-checklist.md` (read by `rollout-reviewer` and `workload-reviewer`) |
 | aggregates, entities, bounded contexts | `ddd-modeling-review` |
 | layer boundaries, ports and adapters | `clean-architecture` |
 | `.github/workflows/*.yml`, `action.yml`, reusable workflows | `github-actions-patterns/references/review-checklist.md` (security items go to `security-reviewer`) |
