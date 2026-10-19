@@ -26,7 +26,7 @@ import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
 import { assignTier, describeTiers } from "../app/tiers/assign";
 import { type AgentModels, parseAgentModels } from "../domain/claude/agent-models";
-import type { ClaudeHookPaths } from "../domain/claude/hooks";
+import { type ClaudeHookPaths, SHARED_WRITE_MCP_MATCHER } from "../domain/claude/hooks";
 import { DSH_PROFILES_DIR, DSH_PROFILE_PATCH_FILENAME, resolveDshHome } from "../domain/dsh/home";
 import { resolveOmpAgentDir } from "../domain/omp/agent-dir";
 import { resolvePiAgentDir } from "../domain/pi/agent-dir";
@@ -53,6 +53,7 @@ import { recordJudgmentUsage } from "../infra/metrics/judgment-usage";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
 import { runCommand } from "../infra/proc/exec-file";
+import { packHistory } from "../infra/proc/pack-history";
 import { createSetupPorts } from "../infra/setup/setup-ports";
 import { readSkillCatalog } from "../infra/skills/catalog";
 import { detectRepoSignals } from "../infra/skills/repo-signals";
@@ -468,13 +469,15 @@ function codexRegistration(): {
     input: {
       command: `/usr/bin/env PATH=/usr/bin:/bin '${bun}' '${jig}' hooks pre-tool-use --harness codex`,
       // The MCP tails let jig see the destructive Terraform/container-use tool
-      // calls the ask-mcp-* rules judge; read-only MCP tools stay unmatched and
+      // calls and the Notion writes the ask-mcp-* rules judge; read-only MCP tools stay unmatched and
       // untaxed. (Whether codex fires PreToolUse for MCP at all is confirmed
       // per-deployment before this is relied on — see the codex MCP note.)
-      matcher:
-        "Bash|apply_patch|Write|Edit" +
-        "|mcp__terraform__(create_|delete_|update_|attach_|detach_|action_run|add_team_member|grant_team_access|force_unlock_workspace)" +
-        "|mcp__container-use__environment_(create|config|run_cmd|file_edit|file_write|file_delete|checkpoint|add_service)",
+      matcher: [
+        "Bash|apply_patch|Write|Edit",
+        "mcp__terraform__(create_|delete_|update_|attach_|detach_|action_run|add_team_member|grant_team_access|force_unlock_workspace)",
+        "mcp__container-use__environment_(create|config|run_cmd|file_edit|file_write|file_delete|checkpoint|add_service)",
+        SHARED_WRITE_MCP_MATCHER,
+      ].join("|"),
       timeoutSeconds: 10,
     },
   };
@@ -609,10 +612,10 @@ export async function main(argv: readonly string[]): Promise<number> {
       return result.code;
     }
     case "apply": {
-      const applyPorts = createNodeApplyFs({
-        stateDir: resolveStateDir(process.env),
-        jigVersion: VERSION,
-      });
+      const applyPorts = {
+        ...createNodeApplyFs({ stateDir: resolveStateDir(process.env), jigVersion: VERSION }),
+        packHistory,
+      };
       const agentModels = await readAgentModels();
       const result = await applyCli(
         argv.slice(1),

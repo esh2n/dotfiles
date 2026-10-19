@@ -54,6 +54,33 @@ describe("the five hooks", () => {
     expect(group("Stop")).not.toHaveProperty("matcher");
   });
 
+  test("the guard sees every Notion tool but the reads (ask-mcp-shared-write)", () => {
+    const hooks = buildClaudeHooks(PATHS);
+    const pre = (hooks.PreToolUse as { matcher: string }[])[0]?.matcher ?? "(?!)";
+    const fires = (tool: string) => new RegExp(`^(?:${pre})$`).test(tool);
+    for (const tool of [
+      "mcp__claude_ai_Notion__notion-create-pages",
+      "mcp__claude_ai_Notion__notion-update-page",
+      "mcp__claude_ai_Notion__notion-create-comment",
+      "mcp__claude_ai_Notion__notion-calendar-create-events",
+      "mcp__notion-mcp__notion-move-pages",
+      "mcp__notion-mcp__notion-delete-pages",
+      // fail-safe: a tool that is not a known read is matched
+      "mcp__claude_ai_Notion__notion-some-future-tool",
+      "mcp__claude_ai_Notion__notion-wait-session",
+    ]) {
+      expect(fires(tool)).toBe(true);
+    }
+    for (const tool of [
+      "mcp__claude_ai_Notion__notion-fetch",
+      "mcp__claude_ai_Notion__notion-search",
+      "mcp__notion-mcp__notion-get-comments",
+      "mcp__claude_ai_Notion__notion-calendar-list-events",
+    ]) {
+      expect(fires(tool)).toBe(false);
+    }
+  });
+
   test("every hook has a timeout — none is left to the harness default", () => {
     const hooks = buildClaudeHooks(PATHS);
     for (const event of CLAUDE_HOOK_EVENTS) {

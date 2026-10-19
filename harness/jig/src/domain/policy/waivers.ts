@@ -21,8 +21,8 @@
  * The waiver is about WHERE the session is, so a command that reaches into
  * another repository is not waived: git's `-C`, `-c`, `--git-dir`,
  * `--work-tree`, `--config-env`; any shell assignment on the line (`GIT_DIR=`,
- * `env GIT_WORK_TREE=` — the reader drops those, so only the raw text shows
- * them); a push naming its destination by URL or path; a `cd`/`pushd` on the
+ * `env GIT_WORK_TREE=`, `GH_REPO=` — the reader drops those, so only the raw text shows
+ * them); gh's `-R`/`--repo`; a push naming its destination by URL or path; a `cd`/`pushd` on the
  * same line; a cwd or path that climbs out with `..`; or a command the reader
  * could not resolve (a subshell, a carrier). Nothing is waived on a guess.
  */
@@ -73,6 +73,12 @@ const GIT_ELSEWHERE =
   /^(?:-C|-c|--git-dir(?:=.*)?|--work-tree(?:=.*)?|--config-env(?:=.*)?|--namespace(?:=.*)?)$/;
 const CHANGES_DIR: ReadonlySet<string> = new Set(["cd", "pushd"]);
 /**
+ * gh's `-R`/`--repo`: the command acts on the named repository, not the cwd's.
+ * `-R` may sit behind bundled bool shorthands (`-fR`, `-wR`); a false
+ * "elsewhere" only refuses the waiver, the safe side.
+ */
+const GH_ELSEWHERE = /^(?:-[A-Za-z]*R.*|--repo(?:=.*)?)$/;
+/**
  * A shell assignment anywhere on the line (`GIT_DIR=… git push`, `env GIT_WORK_TREE=…`).
  * The command reader drops literal prefix assignments and `env NAME=VALUE`, so the
  * resulting command looks exactly like a plain push; the raw text is the only place
@@ -94,7 +100,8 @@ function pushesToExplicitDestination(argv: readonly string[]): boolean {
  * when the reader could not resolve the command line, when the line carries
  * any shell assignment, when any command changes directory, when git is
  * pointed at another repository (`-C`, `-c`, `--git-dir`, `--work-tree`,
- * `--config-env`), or when a push names its destination by URL or path. A file
+ * `--config-env`), when gh is pointed at another repository (`-R`, `--repo`),
+ * or when a push names its destination by URL or path. A file
  * operation reaches elsewhere when its path, resolved against the cwd, is not
  * under the listed prefixes.
  */
@@ -111,6 +118,7 @@ export function reachesElsewhere(
       return extraction.commands.some((cmd) => {
         const program = basename(cmd.program);
         if (CHANGES_DIR.has(program)) return true;
+        if (program === "gh") return cmd.argv.some((arg) => GH_ELSEWHERE.test(arg));
         if (program !== "git") return false;
         return (
           cmd.argv.some((arg) => GIT_ELSEWHERE.test(arg)) || pushesToExplicitDestination(cmd.argv)
