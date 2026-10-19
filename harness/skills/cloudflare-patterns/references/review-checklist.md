@@ -1,6 +1,6 @@
 # cloudflare-patterns — review checklist
 
-Derived from ../SKILL.md. Read by `code-reviewer` and `workload-reviewer` through the `change-review` skill (defects; silences and trade-offs in a design or spec review) and by `grilling` (trade-offs). Every item points at the SKILL.md section it comes from; do not add rules that are not in SKILL.md.
+Derived from ../SKILL.md. Read by `code-reviewer` and `workload-reviewer` through the `change-review` skill (defects; silences and trade-offs in a design or spec review), by `security-reviewer` for the items from "## Secrets and configuration" and `cloudflare:self-zone-fetch-not-strict`, and by `grilling` (trade-offs). Every item points at the SKILL.md section it comes from; do not add rules that are not in SKILL.md.
 
 ## defects
 Objectively checkable in a diff or `wrangler.toml`/`wrangler.jsonc`. A match is a finding.
@@ -20,6 +20,21 @@ Objectively checkable in a diff or `wrangler.toml`/`wrangler.jsonc`. A match is 
   check: Module-scope `let`/`Map`/object used as a counter, session store, lock or rate limiter.
   section: "## Workers runtime judgment"
 
+- id: cloudflare:self-zone-fetch-not-strict
+  rule: `fetch()` to the Worker's own zone sets `global_fetch_strictly_public` so the request goes through Cloudflare's protections.
+  check: `fetch()` to a hostname on the Worker's own zone with no `global_fetch_strictly_public` in `compatibility_flags`.
+  section: "## Workers runtime judgment"
+
+- id: cloudflare:secret-in-vars
+  rule: Credentials are secrets or Secrets Store bindings, never `vars`.
+  check: Token, password or key under `vars` (or `[vars]`) in `wrangler.toml`/`wrangler.jsonc`.
+  section: "## Secrets and configuration"
+
+- id: cloudflare:local-secrets-committed
+  rule: `.dev.vars` and `.env` stay out of git.
+  check: `.dev.vars*` or `.env*` added to the repository, or missing from `.gitignore` in a Worker project.
+  section: "## Secrets and configuration"
+
 - id: cloudflare:kv-hot-key-write
   rule: Never write one KV key more than once per second.
   check: `KV.put` on a fixed or per-user key inside a request path (counter increment, session update per request).
@@ -38,6 +53,11 @@ Objectively checkable in a diff or `wrangler.toml`/`wrangler.jsonc`. A match is 
 - id: cloudflare:cache-key-fragmentation
   rule: Keep only inputs that change the response in the cache key.
   check: Custom cache key (Cache Rule, or the `Request` passed to `cache.put`) including headers, cookies or query params the response does not depend on.
+  section: "## Cache judgment"
+
+- id: cloudflare:cache-api-behind-access
+  rule: Do not rely on the Cache API for a Worker behind Cloudflare Access.
+  check: `caches.default` or `caches.open` used in a Worker whose route is protected by Cloudflare Access.
   section: "## Cache judgment"
 
 - id: cloudflare:stale-for-correctness-data
@@ -83,6 +103,11 @@ A design document must state these. Absence with a concrete consequence is a fin
   check: Design with WebSockets or long polling on Durable Objects and no duration (GB-s) estimate or hibernation plan.
   section: "## Cost model traps"
 
+- id: cloudflare:placement-unstated
+  rule: A Worker making several round trips per request to one distant back end states its placement.
+  check: Design or `wrangler` config for a Worker with multiple sequential calls to one database or regional API and no `placement` setting or stated reason to run at the edge.
+  section: "## Placement"
+
 - id: cloudflare:remote-validation-unstated
   rule: Behaviour local dev cannot show is validated against real resources.
   check: Test plan relying only on `wrangler dev` local simulation for KV consistency, or for Durable Object placement and latency.
@@ -105,6 +130,11 @@ Defensible either way. Never a finding — a question with options, what each ga
   rule: Queue vs synchronous call.
   options: Queue (absorbs spikes for a lower-ceiling downstream; added latency and a new failure mode) | synchronous (simpler, immediate; spike reaches the downstream)
   section: "## Storage decision table"
+
+- id: cloudflare:smart-or-hinted-placement
+  rule: Smart Placement vs an explicit placement hint.
+  options: Smart (`mode = "smart"`; adapts to several or unknown back ends, only `fetch` handlers, only locations the Worker already runs in) | hint (`region`/`host`/`hostname`; predictable, must be kept in step with where the back end lives) | none (lowest latency to the user, every back-end round trip pays the distance)
+  section: "## Placement"
 
 - id: cloudflare:workers-or-pages-functions
   rule: Worker vs Pages Functions.

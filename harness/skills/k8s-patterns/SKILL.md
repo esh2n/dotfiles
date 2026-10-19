@@ -72,10 +72,23 @@ unbound claims (https://kubernetes.io/docs/concepts/storage/persistent-volumes/#
   A downstream outage then becomes a restart storm across every pod that
   depends on it. Dependency checks belong in readiness only; liveness should
   check "is this process alive," nothing external.
+- **Slow starters get a `startupProbe`, not a stretched liveness probe.**
+  While a startup probe is configured, the kubelet runs no liveness or
+  readiness probe until it succeeds
+  (https://kubernetes.io/docs/concepts/workloads/pods/probes/). Give it the
+  same check as liveness with `failureThreshold * periodSeconds` covering the
+  worst-case startup time, so liveness keeps its fast reaction to deadlocks
+  (https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes).
+  A long `initialDelaySeconds` or high liveness `failureThreshold` used to
+  survive startup slows deadlock detection for the container's whole life.
 - **No PodDisruptionBudget** on anything serving traffic with >1 replica —
   a PDB is what limits how many replicas a voluntary disruption (node drain
   through the Eviction API, cluster upgrade) may take down at once
   (https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#pod-disruption-budgets).
+  It does not cover everything voluntary: deleting Pods or their Deployment
+  directly bypasses it, and a Deployment or StatefulSet rolling update is not
+  limited by it — rollout safety comes from the workload's own strategy
+  fields (same source).
 - **`image: foo:latest` or no digest pin.** The docs advise against `:latest`
   in production because it hides which version runs and makes rollback
   harder; a digest never changes while a tag can move; an omitted pull policy
@@ -110,6 +123,17 @@ unbound claims (https://kubernetes.io/docs/concepts/storage/persistent-volumes/#
   `runAsNonRoot`
   (https://kubernetes.io/docs/concepts/security/pod-security-standards/).
   Flag any manifest missing this on a workload with network exposure.
+- **Enforce a Pod Security Standard per namespace.** Pod Security Admission
+  (stable since v1.25; PodSecurityPolicy was removed in v1.25) reads namespace
+  labels `pod-security.kubernetes.io/<mode>: <level>`: `enforce` rejects
+  violating Pods, `audit` and `warn` only record or warn, and the optional
+  `<mode>-version` label pins the policy version
+  (https://kubernetes.io/docs/concepts/security/pod-security-admission/).
+  `enforce` checks Pod objects only, so a Deployment that violates it is
+  accepted and its Pods are then rejected; `warn` and `audit` also check
+  workload resources. A namespace running application workloads with no
+  `enforce` label at `baseline` or `restricted` relies on every manifest
+  getting `securityContext` right by hand.
 - Secret handling: the Kubernetes docs allow a Secret as env vars or as a
   volume and state no preference
   (https://kubernetes.io/docs/concepts/security/secrets-good-practices/). A
@@ -124,7 +148,11 @@ unbound claims (https://kubernetes.io/docs/concepts/storage/persistent-volumes/#
   cluster's network plugin enforces NetworkPolicy
   (https://kubernetes.io/docs/concepts/services-networking/network-policies/).
   Flag its absence on any namespace handling sensitive data — don't wait for
-  it to be requested.
+  it to be requested. A default-deny for ingress (`podSelector: {}`,
+  `policyTypes: [Ingress]`) leaves egress open; egress needs its own policy
+  with `Egress` in `policyTypes`. A default-deny egress also blocks DNS, so
+  it needs a separate policy allowing egress to the cluster DNS service
+  (https://kubernetes.io/docs/concepts/services-networking/network-policies/#default-deny-all-egress-traffic).
 
 ## What NOT to do
 
@@ -151,5 +179,6 @@ extension carries Helm values, CI configs and plenty else. Before applying
 anything above, confirm the file has `apiVersion:` and `kind:` at the top
 level (https://kubernetes.io/docs/concepts/overview/working-with-objects/#required-fields);
 only then run the review lanes (resource requests/limits, probes,
-PodDisruptionBudget, image pinning, security context, NetworkPolicy).
+PodDisruptionBudget, image pinning, security context, Pod Security
+Admission labels, NetworkPolicy).
 (Folded from `rules/k8s/manifests.md`, 2026-09-23.)

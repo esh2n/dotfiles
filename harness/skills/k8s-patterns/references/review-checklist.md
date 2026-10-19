@@ -1,6 +1,6 @@
 # k8s-patterns — review checklist
 
-Derived from ../SKILL.md. Read by `code-reviewer` and `workload-reviewer` through the `change-review` skill (defects; silences and trade-offs in a design or spec review), by `security-reviewer` for the items from "## Security review lane", by `rollout-reviewer` for the items from "## Rollout judgment", and by `grilling` (trade-offs). Every item points at the SKILL.md section it comes from; do not add rules that are not in SKILL.md.
+Derived from ../SKILL.md. Read by `code-reviewer` and `workload-reviewer` through the `change-review` skill (defects; silences and trade-offs in a design or spec review), by `security-reviewer` for the items from "## Security review lane", by `rollout-reviewer` for the items from "## Rollout judgment" and `k8s:pdb-assumed-for-rollout`, and by `grilling` (trade-offs). Every item points at the SKILL.md section it comes from; do not add rules that are not in SKILL.md.
 
 Apply these only to a file with top-level `apiVersion:` and `kind:`; other YAML is not a manifest ("## Is it a manifest?").
 
@@ -20,6 +20,11 @@ Objectively checkable in a diff or manifest. A match is a finding.
 - id: k8s:liveness-checks-dependency
   rule: Liveness checks only that the process is alive; dependency checks go in readiness.
   check: `livenessProbe` whose `httpGet` path, `exec` command or handler touches a database, cache, or another service; the same endpoint used for both liveness and readiness when that endpoint checks dependencies.
+  section: "## Manifest review judgment"
+
+- id: k8s:liveness-stretched-for-startup
+  rule: A slow-starting container gets a `startupProbe`, not a liveness probe stretched to survive startup.
+  check: `livenessProbe` with a long `initialDelaySeconds` or a `failureThreshold * periodSeconds` sized for startup time, and no `startupProbe` on the container.
   section: "## Manifest review judgment"
 
 - id: k8s:pdb-missing
@@ -42,6 +47,11 @@ Objectively checkable in a diff or manifest. A match is a finding.
   check: Pod or container `securityContext` with `privileged: true`; a workload behind a Service, Ingress or Gateway with `runAsNonRoot` unset at both Pod and container level.
   section: "## Security review lane"
 
+- id: k8s:pod-security-enforce-missing
+  rule: A namespace running application workloads enforces a Pod Security Standard.
+  check: Namespace manifest for application workloads with no `pod-security.kubernetes.io/enforce` label, or with `enforce: privileged`; `warn` or `audit` labels alone presented as enforcement.
+  section: "## Security review lane"
+
 - id: k8s:credential-in-env
   rule: Credentials reach the container as a mounted Secret volume, not env vars.
   check: `env[].valueFrom.secretKeyRef` or `envFrom.secretRef` carrying a password, token or key; any credential written as a literal `env[].value`.
@@ -50,6 +60,11 @@ Objectively checkable in a diff or manifest. A match is a finding.
 - id: k8s:networkpolicy-missing
   rule: A namespace handling sensitive data has a default-deny NetworkPolicy.
   check: Namespace (new or touched) holding workloads that process sensitive data with no NetworkPolicy that selects all Pods (`podSelector: {}`) and lists the policy types without allow rules.
+  section: "## Security review lane"
+
+- id: k8s:egress-deny-blocks-dns
+  rule: A default-deny egress policy comes with a policy allowing egress to the cluster DNS service.
+  check: NetworkPolicy with `Egress` in `policyTypes` and no egress rules, and no policy in the namespace allowing egress to the cluster DNS Pods (port 53).
   section: "## Security review lane"
 
 - id: k8s:gitops-imperative-edit
@@ -74,6 +89,16 @@ A design document must state these. Absence with a concrete consequence is a fin
   rule: A zero-unavailability rollout names the capacity for surge Pods and who acts on a stalled rollout.
   check: Design with `maxUnavailable: 0` that does not state cluster headroom for `maxSurge` Pods or what happens at `ProgressDeadlineExceeded` (Kubernetes does not roll back on its own).
   section: "## Rollout judgment"
+
+- id: k8s:pdb-assumed-for-rollout
+  rule: Availability during a rolling update or a direct delete comes from the workload strategy, not a PDB.
+  check: Design citing a PodDisruptionBudget as protection during a Deployment or StatefulSet rolling update, or against Pod or Deployment deletion, with no `maxUnavailable`/`maxSurge` reasoning.
+  section: "## Manifest review judgment"
+
+- id: k8s:egress-isolation-unstated
+  rule: A design claiming network isolation states egress as well as ingress.
+  check: Isolation described through a default-deny ingress policy only, with no statement of egress policy.
+  section: "## Security review lane"
 
 - id: k8s:networkpolicy-enforcement-unstated
   rule: A design relying on NetworkPolicy names a network plugin that enforces it.

@@ -48,6 +48,42 @@ the cloud.google.com links below redirect there.
 - Use IAM Conditions for time-bound or resource-bound grants (e.g. break-glass
   access) instead of a permanent broad binding that outlives the reason for it
   (same source).
+- **Grant impersonation on the service account, never on the project or
+  folder.** `roles/iam.serviceAccountTokenCreator` at project level lets the
+  holder impersonate every service account in the project and reach whatever
+  those accounts can reach, including resources outside it
+  (https://cloud.google.com/iam/docs/best-practices-service-accounts).
+  `roles/iam.serviceAccountUser` lets a principal attach a service account to
+  a resource and run code as it; it does not grant short-lived tokens or
+  `--impersonate-service-account`, which need Token Creator
+  (https://cloud.google.com/iam/docs/service-account-permissions). Bind
+  either role on the individual service account resource
+  (`google_service_account_iam_member`).
+- **Enforce guardrails with Organization Policy constraints, not review
+  alone.** Google's security baseline, enforced by default for organizations
+  created on or after 2024-05-03, includes
+  `iam.managed.disableServiceAccountKeyCreation`,
+  `iam.disableServiceAccountKeyUpload` and `iam.allowedPolicyMemberDomains`
+  (https://cloud.google.com/resource-manager/docs/secure-by-default-organizations).
+  Domain-restricted sharing limits IAM grants to identities of your
+  organization or Google Workspace customer ID: through the managed
+  `iam.managed.allowedPolicyMembers` constraint, a custom policy on
+  `iam.googleapis.com/AllowPolicy`, or the legacy
+  `iam.allowedPolicyMemberDomains`, whose allowed values must include your
+  own organization or nothing in it can be granted
+  (https://cloud.google.com/resource-manager/docs/organization-policy/restricting-domains).
+  The legacy `iam.disableServiceAccountKeyCreation` and
+  `iam.serviceAccountKeyExpiryHours` are also in the constraint list
+  (https://cloud.google.com/resource-manager/docs/organization-policy/org-policy-constraints).
+  Overriding or disabling one of these at project or folder level is a
+  security decision, not a fix for a failing deploy.
+- **VPC Service Controls for data exfiltration.** A service perimeter around
+  projects stops data protected services (Cloud Storage, BigQuery and others)
+  from being copied to resources outside it, even when IAM is misconfigured;
+  dry run mode logs what a perimeter would block without blocking it
+  (https://cloud.google.com/vpc-service-controls/docs/overview). Projects
+  holding sensitive data with no perimeter rely on IAM alone, and a new
+  perimeter goes through dry run before enforcement.
 
 ## Pub/Sub pitfalls
 

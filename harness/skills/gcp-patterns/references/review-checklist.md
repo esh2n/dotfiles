@@ -30,6 +30,16 @@ Objectively checkable in a diff, Terraform or script. A match is a finding.
   check: Binding described as temporary, break-glass or for a migration with no `condition` block (e.g. no `request.time` expiry).
   section: "## IAM judgment"
 
+- id: gcp:project-level-impersonation-grant
+  rule: Grant Service Account Token Creator or Service Account User on the individual service account, never on the project or folder.
+  check: `google_project_iam_*`, `google_folder_iam_*` or project/folder-level `add-iam-policy-binding` granting `roles/iam.serviceAccountTokenCreator` or `roles/iam.serviceAccountUser`.
+  section: "## IAM judgment"
+
+- id: gcp:org-policy-guardrail-weakened
+  rule: Do not override or disable the baseline IAM constraints to get past a failing deploy.
+  check: `google_org_policy_policy` (or `gcloud org-policies`) at project or folder level that disables or resets `iam.managed.disableServiceAccountKeyCreation`, `iam.disableServiceAccountKeyCreation`, `iam.disableServiceAccountKeyUpload`, `iam.allowedPolicyMemberDomains` or `iam.managed.allowedPolicyMembers`; a domain restriction whose allowed values omit the organization's own principal set or Workspace customer ID.
+  section: "## IAM judgment"
+
 - id: gcp:consumer-not-idempotent
   rule: A Pub/Sub consumer deduplicates before side effects, even with exactly-once delivery.
   check: Subscriber handler that writes, charges, sends or calls out with no dedup on message ID or an idempotency key; `enable_exactly_once_delivery` cited as the reason dedup is absent.
@@ -87,6 +97,11 @@ Objectively checkable in a diff, Terraform or script. A match is a finding.
 
 ## silences
 A design document must state these. Absence with a concrete consequence is a finding; the finding names what is unstated.
+
+- id: gcp:perimeter-unstated
+  rule: Projects holding sensitive data state their VPC Service Controls perimeter, and a new perimeter runs in dry run first.
+  check: Design placing sensitive data in Cloud Storage, BigQuery or another protected service with no perimeter decision; a perimeter enforced with no dry-run phase.
+  section: "## IAM judgment"
 
 - id: gcp:dlq-attempts-unjustified
   rule: The max-delivery-attempts value is chosen, not left at the default.

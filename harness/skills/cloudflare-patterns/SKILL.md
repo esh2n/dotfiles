@@ -41,6 +41,24 @@ tutorial. Sources checked 2026-10-19.
   never rely on it for correctness (counters, sessions, locks). Durable
   Objects are the actual mechanism for request-to-request state that must be
   correct.
+- **`fetch()` to the Worker's own zone skips the zone's protections unless
+  `global_fetch_strictly_public` is set.** Without the flag, such a request
+  goes straight to the zone's origin server, ignoring Workers on that URL and
+  bypassing Cloudflare security settings; with it, the request enters through
+  Cloudflare's front door like Internet traffic and can loop back to the same
+  Worker. The flag has no default-on compatibility date, so it must be listed
+  (https://developers.cloudflare.com/workers/configuration/compatibility-flags/).
+
+## Secrets and configuration
+
+Never put credentials in `vars` in the Wrangler configuration file; `vars`
+are plaintext. Use per-Worker secrets (`wrangler secret put`, or
+`wrangler versions secret put` with gradual deployments) or an account-level
+Secrets Store binding (`secrets_store_secrets`, read with
+`await env.<BINDING>.get()`); local values go in `.dev.vars` or `.env`, which
+must stay out of git
+(https://developers.cloudflare.com/workers/configuration/secrets/,
+https://developers.cloudflare.com/secrets-store/integrations/workers/).
 
 ## Storage decision table
 
@@ -73,6 +91,12 @@ https://developers.cloudflare.com/r2/api/s3/api/), Queues
   without custom Worker code. KV is global and durable but eventually
   consistent — use it when the same value must be readable from any
   location, not as a faster Cache API.
+- **Where the Cache API does nothing.** Cache API calls work on custom
+  domains and in Pages Functions, have no effect in the dashboard editor and
+  Playground previews, and are not available for Workers behind Cloudflare
+  Access (https://developers.cloudflare.com/workers/runtime-apis/cache/) — a
+  cache that "never hits" in those contexts is not a key-design bug, and a
+  design that depends on the Cache API behind Access needs another store.
 - **Cache key design determines the hit rate.** The default key includes the
   full URL with its query string; adding headers or cookies to the key, or
   keeping query params that don't change the response, fragments the cache
@@ -100,6 +124,20 @@ site and needs a few dynamic routes bolted on. A standalone API, a
 cron-triggered job, or anything using Durable Objects/Queues belongs in a
 plain Worker; fighting Pages' routing convention for a non-trivial backend is
 wasted effort.
+
+## Placement
+
+A Worker runs in the data center nearest the request by default. When it
+makes several round trips to one back end (a database, an API in one cloud
+region), running it near the back end cuts total request time. Smart
+Placement (`placement.mode = "smart"`) picks the location from observed
+request durations and suits several or unknown back-end locations; a
+`region`, `host` or `hostname` hint pins it near a known back end. Smart
+Placement only moves `fetch` handlers — not RPC methods or named
+entrypoints — and only to locations where the Worker already runs
+(https://developers.cloudflare.com/workers/configuration/placement/). A
+Worker that calls one distant back end several times per request with no
+placement setting pays that round-trip latency each time.
 
 ## Cold start reality
 

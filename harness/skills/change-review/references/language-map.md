@@ -36,6 +36,6 @@ Domain knowledge, by what the diff touches:
 | `*.tf`, `*.tofu`, `*.tfvars`, `.terraform.lock.hcl`, Terraform or OpenTofu modules, plan output | `terraform-patterns/references/review-checklist.md` (state, credentials, security misconfiguration and lock-file items go to `security-reviewer`; plan, refactoring and drift items to `rollout-reviewer`) |
 | Kubernetes manifests | `k8s-patterns/references/review-checklist.md` (security-lane items go to `security-reviewer`, rollout items to `rollout-reviewer`) |
 | GCP resources, IAM | `gcp-patterns/references/review-checklist.md` (IAM and Terraform items go to `security-reviewer`) |
-| Cloudflare Workers | `cloudflare-patterns/references/review-checklist.md` |
+| Cloudflare Workers | `cloudflare-patterns/references/review-checklist.md` (secrets and self-zone fetch items go to `security-reviewer`) |
 
 A path under `skills/` means the skill in your harness's skills directory (`~/.claude/skills` in Claude Code, `~/.agents/skills` elsewhere).
