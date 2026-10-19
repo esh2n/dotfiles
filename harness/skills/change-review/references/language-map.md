@@ -13,9 +13,9 @@ Until a language's skill carries `references/review-standard.md`, `code-reviewer
 | `.kt`, `.kts` | `kotlin-patterns/references/review-standard.md` (it links `kotlin-coroutines-flows`, `kotlin-testing`, `compose-multiplatform-patterns`, `android-clean-architecture`, `kotlin-ktor-patterns`, `kotlin-exposed-patterns` for detail) | — |
 | `.cc`, `.cpp`, `.hpp`, `.h` in a C++ project | `cpp-coding-standards/references/review-standard.md` (it links `cpp-testing` for detail) | — |
 | `.c`, `.h` in a C project | `cpp-coding-standards/references/review-standard.md` for the parts that apply to C (memory, undefined behaviour, sanitizers); say which C++-only items were skipped | — |
-| `.cs` | `csharp-patterns` | — |
-| `.swift` | `swift-patterns` | — |
-| `.php` | `php-patterns` (plus `laravel-patterns` when used) | — |
+| `.cs` | `csharp-patterns/references/review-standard.md` (it links `csharp-testing` for detail) | — |
+| `.swift` | `swift-patterns/references/review-standard.md` (it links `swift-testing` for detail) | — |
+| `.php` | `php-patterns/references/review-standard.md` (it links `php-testing`, plus `laravel-patterns`, `laravel-tdd`, `laravel-verification` when Laravel is used) | — |
 | `.dart` | `flutter-patterns/references/review-standard.md` | — |
 | `.sql`, migrations | `sql-tuning/references/review-standard.md` | — |
 | `.css`, `.scss` | `css-modern/references/review-standard.md` (it links `css-cascade`, `css-flow`, `css-units`, `defensive-css` for detail) | — |
