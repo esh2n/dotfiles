@@ -159,6 +159,8 @@ Where pstack and the house both speak, do both. Each line says how the step runs
 - **PR text.** Use both: the house summary and test-plan checklist from the full history (`rules/common/10-git.md`), with pstack's Why, Scope, Tradeoffs, Blast Radius and Verification as sections where they help.
 - **Run state.** Orchestrate's run ledger may live in its store; past work and rulings are recorded in the repository's plan files and decision notes (`rules/decisions/2026-09-22-memory-files-only.md`).
 
+- **Unattended runs.** pstack's `/loop` is Cursor's; use the harness's own features instead (`rules/decisions/2026-10-19-unattended-runs-native-goal-and-loop.md`). Run-until-predicate (Bug fix, Visual parity, Autonomous run): the goal feature, with a turn, time or token cap written into the condition. Fixed interval (`/loop 1h`), self-paced wake (Babysit's dynamic mode) and watchers (Autonomous run, Orchestrate): Claude Code's `/loop` with an interval, `/loop` without one (`ScheduleWakeup`), and Monitor for a watcher. omp has `/loop [count|duration]` with a shell continue-condition, which serves run-until-predicate only. Codex and pi have no interval or wake feature: run the step once and report (Babysit's check mode). pi has no goal feature unless the pi-goal extension is installed. Never build a loop from an outside scheduler. During any unattended run, write no test paths, run no credential or deploy commands, and start only with a machine-checkable success condition.
+
 ### Contradictions where the house wins
 
 Besides the table rows above, these are cases where one side requires what the other forbids.
