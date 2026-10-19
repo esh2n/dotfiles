@@ -75,7 +75,7 @@ setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
 @test "services: the home-LLM steps follow the roles: model-provider, observer; not at all without one" {
 	roles '"developer", "model-provider", "observer"'
 	run --separate-stderr setup_cmd darwin
-	[[ "$output" == *"dotctl llm setup --repo ${REPO_ROOT} --lmstudio --console\"" ]]
+	[[ "$output" == *"dotctl llm setup --repo ${REPO_ROOT} --model-provider --observer\"" ]]
 	roles '"developer"'
 	run --separate-stderr setup_cmd darwin
 	[[ "$output" == *"dotctl llm setup --repo ${REPO_ROOT}\"" ]]
@@ -83,7 +83,7 @@ setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
 	printf '{"roles": ["developer", "model-provider"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA=", "acceptLicense": true}}\n' >"${BATS_TEST_TMPDIR}/roles.json"
 	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
 	run --separate-stderr setup_cmd linux
-	[[ "$output" == *"dotctl llm setup --repo ${REPO_ROOT} --gpu\"" ]]
+	[[ "$output" == *"dotctl llm setup --repo ${REPO_ROOT} --model-provider\"" ]]
 	roles ''
 	run --separate-stderr setup_cmd darwin
 	[ "$output" = null ]
@@ -105,7 +105,7 @@ gpu_linux() { # gpu_linux <attr under config>
 	run --separate-stderr gpu_linux 'targets.genericLinux.gpu.nvidia'
 	[[ "$output" == *'"version":"580.82.09"'* ]]
 	run --separate-stderr gpu_linux 'dotfiles.setup.home-llm.command'
-	[[ "$output" == *"dotctl llm setup --repo ${REPO_ROOT} --gpu\"" ]]
+	[[ "$output" == *"dotctl llm setup --repo ${REPO_ROOT} --model-provider\"" ]]
 }
 
 @test "services: model-provider on linux without the host's driver in the roles file is an error that says what to add" {

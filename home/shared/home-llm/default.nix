@@ -30,9 +30,9 @@ in
         "--repo"
         (lib.escapeShellArg facts.repo)
       ]
-      ++ lib.optional cfg.lmstudio "--lmstudio"
-      ++ lib.optional cfg.console "--console"
-      ++ lib.optional cfg.gpu "--gpu"
+      # dotctl's flags name the role; it picks the engine by platform
+      ++ lib.optional (cfg.lmstudio || cfg.gpu) "--model-provider"
+      ++ lib.optional cfg.console "--observer"
     );
     # after the service manager has the current LiteLLM definition
     after = [

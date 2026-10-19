@@ -18,9 +18,6 @@ alias gtr="git log --graph --abbrev-commit --decorate --date=relative --format=f
 alias ghl='cd $(ghq root)/$(find $(ghq root)/*/*/* -type d -prune | sed -e "s#"$(ghq root)"/##" | sk)'
 alias vv='sk_edit_file'
 
-# Coding-agent harness profiles (thin entry points; the logic is in dotctl)
-alias claude-pstack='dotctl pstack run'
-
 # Utilities
 
 # jj with Fuzzy Finder (skim-based interactive selection)

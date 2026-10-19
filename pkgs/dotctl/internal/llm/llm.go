@@ -32,17 +32,26 @@ type Offer struct {
 	Console  bool // observer: Prometheus, Grafana, Open WebUI, the cost ledger
 }
 
-// Name is how the check's header names the offer ("lmstudio console").
+// OfferFor is the offer of a machine with the given roles on the given
+// platform: model-provider's engine follows the platform, never a name
+// (rules/decisions/2026-09-25-roles-named-as-people.md).
+func OfferFor(platform string, modelProvider, observer bool) Offer {
+	return Offer{
+		LMStudio: modelProvider && platform == "darwin",
+		GPU:      modelProvider && platform == "linux",
+		Console:  observer,
+	}
+}
+
+// Name is how the check's header names the offer, by role
+// ("model-provider observer").
 func (o Offer) Name() string {
 	var w []string
-	if o.LMStudio {
-		w = append(w, "lmstudio")
-	}
-	if o.GPU {
-		w = append(w, "gpu")
+	if o.LMStudio || o.GPU {
+		w = append(w, "model-provider")
 	}
 	if o.Console {
-		w = append(w, "console")
+		w = append(w, "observer")
 	}
 	return strings.Join(w, " ")
 }

@@ -14,8 +14,8 @@ import (
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/ui"
 )
 
-const llmUsage = `usage: dotctl llm setup [--repo DIR] [--lmstudio] [--gpu] [--console]
-       dotctl llm check [--repo DIR] [--lmstudio] [--gpu] [--console] [--complex]
+const llmUsage = `usage: dotctl llm setup [--repo DIR] [--model-provider] [--observer]
+       dotctl llm check [--repo DIR] [--model-provider] [--observer] [--complex]
        dotctl llm use [--repo DIR] <tier> <model>...   point a tier at catalog models (harness/policy/models.json)
        dotctl llm models [--repo DIR]                  what each model server (linux, mac) has, and what is loaded
        dotctl llm load|unload [--repo DIR] <server> <model>   change what a model server has loaded
@@ -37,11 +37,13 @@ func runLLM(home string, args []string, out, errOut io.Writer) int {
 	fs := flag.NewFlagSet("llm "+args[0], flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	repo := fs.String("repo", os.Getenv("DOTFILES_ROOT"), "the checkout (default $DOTFILES_ROOT)")
-	var o llm.Offer
-	fs.BoolVar(&o.LMStudio, "lmstudio", false, "this machine serves LM Studio (model-provider on macOS)")
-	fs.BoolVar(&o.GPU, "gpu", false, "this machine serves llama-server (model-provider on Linux)")
-	fs.BoolVar(&o.Console, "console", false, "this machine is the observer")
+	modelProvider := fs.Bool("model-provider", false, "this machine lends its models on the tailnet (LM Studio on macOS, llama-server on Linux)")
+	observer := fs.Bool("observer", false, "this machine is the observer (Prometheus, Grafana, the cost ledger, Open WebUI)")
 	withComplex := fs.Bool("complex", false, "also ask the complex tier (check)")
+	if old, role := renamedOfferFlag(args[1:]); old != "" {
+		fmt.Fprintf(errOut, "dotctl llm: --%s is now --%s (flags name the machine's role: rules/decisions/2026-09-25-roles-named-as-people.md)\n", old, role)
+		return 2
+	}
 	if err := fs.Parse(args[1:]); err != nil || fs.NArg() > 0 {
 		fmt.Fprint(errOut, llmUsage)
 		return 2
@@ -50,6 +52,7 @@ func runLLM(home string, args []string, out, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "dotctl llm: the checkout is unknown; pass --repo or set DOTFILES_ROOT")
 		return 2
 	}
+	o := llm.OfferFor(sys.OS{}.OS(), *modelProvider, *observer)
 	host, _ := os.Hostname()
 	e := llm.Env{
 		Home: home, Repo: *repo, Offer: o, Sys: sys.OS{},
@@ -75,6 +78,28 @@ func runLLM(home string, args []string, out, errOut io.Writer) int {
 	e.UI.Heading("home-llm: once, by hand")
 	e.UI.Steps(llm.Once(e)...)
 	return 0
+}
+
+// renamedOfferFlag finds a flag named for a product, a part or coined
+// jargon, which the roles replaced; it returns the old name and the role
+// that took its place. The old names are not kept as aliases, the same as
+// the roles themselves (rules/decisions/2026-09-25-roles-named-as-people.md).
+func renamedOfferFlag(args []string) (old, role string) {
+	renamed := map[string]string{"lmstudio": "model-provider", "gpu": "model-provider", "console": "observer"}
+	for _, a := range args {
+		if a == "--" {
+			break
+		}
+		name := strings.TrimLeft(a, "-")
+		if name == a {
+			continue
+		}
+		name, _, _ = strings.Cut(name, "=")
+		if r, ok := renamed[name]; ok {
+			return name, r
+		}
+	}
+	return "", ""
 }
 
 // checkLog is where every check's lines are kept, for whoever reads the

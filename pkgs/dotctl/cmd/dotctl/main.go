@@ -18,8 +18,11 @@ const usage = `usage: dotctl <command> [args]
 commands:
   up [--repo DIR]                        install or update this machine (what make up runs)
   setup [--repo DIR] <step>              one setup step Nix cannot declare (activation runs them)
-  llm setup|check [--lmstudio] [--gpu] [--console] [--complex]
+  llm setup|check [--model-provider] [--observer] [--complex]
                                          the home LLM's command steps, and its PASS/FAIL check
+  llm use <tier> <model>...              point a tier at catalog models (harness/policy/models.json)
+  llm models                             what each model server has, and what is loaded
+  llm load|unload <server> <model>       change what a model server has loaded
   nvim <custom|nvchad|lazyvim|astrovim>  point ~/.config/nvim at a distribution
   nvim current                           name the active distribution
   nvim list                              list distributions, marking the active one

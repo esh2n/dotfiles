@@ -46,7 +46,7 @@ func TestCheckAllPassOnAHealthyObserver(t *testing.T) {
 		t.Fatalf("%d FAIL:\n%s", fails, out)
 	}
 	for _, want := range []string{
-		"home-llm check (lmstudio console)",
+		"home-llm check (model-provider observer)",
 		"PASS LM Studio :1234 lists: qwen nomic",
 		"PASS executor falls back to LM Studio's qwen",
 		"PASS LiteLLM :4000 tiers: complex executor main",
@@ -132,8 +132,26 @@ func TestCheckPartialAnswersFail(t *testing.T) {
 	}
 }
 
+func TestOfferForPicksTheEngineByPlatform(t *testing.T) {
+	for _, c := range []struct {
+		platform string
+		mp, obs  bool
+		want     Offer
+	}{
+		{"darwin", true, true, Offer{LMStudio: true, Console: true}},
+		{"linux", true, false, Offer{GPU: true}},
+		{"darwin", false, true, Offer{Console: true}},
+		{"linux", false, false, Offer{}},
+		{"freebsd", true, false, Offer{}},
+	} {
+		if got := OfferFor(c.platform, c.mp, c.obs); got != c.want {
+			t.Errorf("OfferFor(%q, %v, %v) = %+v, want %+v", c.platform, c.mp, c.obs, got, c.want)
+		}
+	}
+}
+
 func TestOfferName(t *testing.T) {
-	if (Offer{}).Name() != "" || (Offer{LMStudio: true, GPU: true, Console: true}).Name() != "lmstudio gpu console" {
+	if (Offer{}).Name() != "" || (Offer{LMStudio: true, Console: true}).Name() != "model-provider observer" || (Offer{GPU: true}).Name() != "model-provider" {
 		t.Fatal("Offer.Name")
 	}
 	if clip("abcdef", 3) != "abc" || orNone("") != "none" {
