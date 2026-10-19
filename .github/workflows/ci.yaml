@@ -158,8 +158,8 @@ jobs:
         run: DOTFILES_ROLES_FILE="$RUNNER_TEMP/roles.json" nix build .#homeConfigurations.linux.activationPackage --impure --print-build-logs
 
   mac:
-    # no green run has measured the full build yet; tighten from the first ones
-    timeout-minutes: 120
+    # the first green run took 29 minutes (run on 9f412602)
+    timeout-minutes: 60
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
