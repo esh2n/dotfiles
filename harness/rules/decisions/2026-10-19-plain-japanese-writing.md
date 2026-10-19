@@ -1,6 +1,6 @@
 # 日本語の文章は natural-japanese の上に薄い plain-japanese を載せて書く。用語は残してその場で説明し、比喩・内輪の呼び名・記号の省略を使わない
 
-Status: accepted — 持ち主の裁定（2026-10-19）
+Status: superseded — 2026-10-19-plain-japanese-on-request.md が置き換える（盲検の判定で採用の基準に届かず、plain-japanese は頼まれたときだけ使う。書き方の決まりと terms.tsv は引き継ぐ）。もとの裁定は 2026-10-19
 
 rule: Write Japanese documents and chat replies with the `plain-japanese` skill layered on `natural-japanese`: keep technical terms and explain each at its first use in the same or the next sentence, never in a glossary or prerequisites block; no analogies, metaphors or personification; no names coined in the conversation or repository and no ordinary words with an in-house meaning (`terms.tsv`, plus a project's `.plain-japanese/terms.tsv`); no verbless fragments or symbol-speak; conclusion first; when asking again, restate the background, options and recommendation; a rewrite adds no facts, rankings, numbers or certainty, checked with `diff_content.py`. The checks list suspects for the writer to judge and are never run from a hook.
 

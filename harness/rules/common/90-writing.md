@@ -1,6 +1,6 @@
 ## Writing
 
-These apply to every reply and document, in Japanese or English; for Japanese, the `plain-japanese` skill has the full rules and the checks (`scripts/check.py` reads a draft reply from stdin).
+These apply to every reply and document, in Japanese or English. Use the `plain-japanese` skill and its checks (`scripts/check.py` reads a draft from stdin) only when the owner asks for it or complains about a text; `terms.tsv` in that skill lists the words to avoid.
 
 - Keep technical terms. Explain each one where it first appears, in the same or the next sentence; never in a glossary or a prerequisites block at the top. If a plainer word would change the meaning, split the sentence instead.
 - Do not explain with analogies, metaphors or personification. Say literally who does what.
