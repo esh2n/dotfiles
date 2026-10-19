@@ -16,11 +16,19 @@ on:
 permissions:
   contents: read
 
+# a newer push to the same branch or PR cancels the run it supersedes
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   shellcheck:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: shellcheck
         run: |
           shellcheck -x bootstrap.sh adopt-mac.sh tests/run.sh \
@@ -30,13 +38,16 @@ jobs:
 
   # jig, the harness generator and guard (harness/jig): types, lint, tests
   jig:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: harness/jig
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       - run: bun install --frozen-lockfile
       - run: bunx tsc --noEmit
       - run: bunx biome check .
@@ -45,10 +56,13 @@ jobs:
   # the artifact skill's CLI and its Worker: zero-dependency node:test suites
   # (the CLI's run against its own fake API on 127.0.0.1)
   artifact:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - name: artifact CLI
@@ -63,13 +77,16 @@ jobs:
         run: bash tests/run.sh tests/services/artifact-e2e.bats
 
   dotctl:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: pkgs/dotctl
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: pkgs/dotctl/go.mod
       - run: go vet ./...
@@ -85,19 +102,22 @@ jobs:
   # the cost-ledger sync's SQL against a real Postgres
   # (rules/decisions/2026-09-25-llm-cost-ledger-local-first.md)
   ledger:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # dotctl ledger sync is built from the checkout (tests/lib/dotctl.bash)
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: pkgs/dotctl/go.mod
       - name: ledger sync against Postgres
@@ -109,14 +129,18 @@ jobs:
         run: bash tests/integration/ledger-sync.sh
 
   linux:
+    # no green run has measured the full build yet; tighten from the first ones
+    timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v31
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
         with:
           extra_nix_config: experimental-features = nix-command flakes
       # tests drive dotctl built from the checkout (tests/lib/dotctl.bash)
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: pkgs/dotctl/go.mod
       # not model-provider: on Linux it builds llama.cpp with CUDA, which is in
@@ -133,14 +157,18 @@ jobs:
         run: DOTFILES_ROLES_FILE="$RUNNER_TEMP/roles.json" nix build .#homeConfigurations.linux.activationPackage --impure --print-build-logs
 
   mac:
+    # no green run has measured the full build yet; tighten from the first ones
+    timeout-minutes: 120
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v31
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
         with:
           extra_nix_config: experimental-features = nix-command flakes
       # tests drive dotctl built from the checkout (tests/lib/dotctl.bash)
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: pkgs/dotctl/go.mod
       - name: roles
