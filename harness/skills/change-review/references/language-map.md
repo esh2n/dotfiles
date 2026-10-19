@@ -45,6 +45,7 @@ Domain knowledge, by what the diff touches:
 | layer boundaries, ports and adapters | `clean-architecture` |
 | `.github/workflows/*.yml`, `action.yml`, reusable workflows | `github-actions-patterns/references/review-checklist.md` (security items go to `security-reviewer`) |
 | `*.tf`, `*.tofu`, `*.tfvars`, `.terraform.lock.hcl`, Terraform or OpenTofu modules, plan output | `terraform-patterns/references/review-checklist.md` (state, credentials, security misconfiguration and lock-file items go to `security-reviewer`; plan, refactoring and drift items to `rollout-reviewer`) |
+| `Dockerfile`, `Containerfile`, `.dockerignore`, `docker-compose*.yml`, `compose*.yaml`, container build config | `docker-patterns/references/review-checklist.md` (secrets, user, socket, published-port and bind-mount items go to `security-reviewer`; Compose start order, restart and HEALTHCHECK items to `workload-reviewer`; `FROM` digest pins stay with `supply-chain-review`) |
 | Kubernetes manifests | `k8s-patterns/references/review-checklist.md` (security-lane items go to `security-reviewer`, rollout items to `rollout-reviewer`) |
 | GCP resources, IAM | `gcp-patterns/references/review-checklist.md` (IAM and Terraform items go to `security-reviewer`) |
 | Cloudflare Workers | `cloudflare-patterns/references/review-checklist.md` (secrets and self-zone fetch items go to `security-reviewer`) |

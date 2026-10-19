@@ -46,7 +46,7 @@ Each item you looked for and did not find goes into the report's Missing context
 
 ## 3. Run static tools first
 
-Run what the project already uses on the changed files: its lint and type check (from `lefthook.yml`, `.pre-commit-config.yaml`, `package.json` scripts, `Makefile`, or the language default). For security-relevant changes, also run what is installed: `osv-scanner scan source -r .` (dependencies), `gitleaks dir` or `gitleaks git` (secrets), `zizmor .github/workflows` (Actions).
+Run what the project already uses on the changed files: its lint and type check (from `lefthook.yml`, `.pre-commit-config.yaml`, `package.json` scripts, `Makefile`, or the language default). For security-relevant changes, also run what is installed: `osv-scanner scan source -r .` (dependencies), `gitleaks dir` or `gitleaks git` (secrets), `zizmor .github/workflows` (Actions), `hadolint <Dockerfile>` and `docker build --check .` (Dockerfiles; neither runs a build step). Other domain tools are named in each checklist's `tools:` lines; run those that are installed.
 
 - Your own change in your own checkout: run them.
 - Someone else's change (an external PR): a project's lint config can execute code. Run only tools that do not load repository code, or all of them with `JIG_REVIEW_EXEC=1` set for this run.
