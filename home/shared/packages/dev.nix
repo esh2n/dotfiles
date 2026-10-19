@@ -31,6 +31,8 @@
       golangci-lint
       govulncheck
       protobuf
+      perlPackages.PerlCritic # perlcritic, run by the Perl review standard (perl-patterns, section 7)
+      perlPackages.PerlTidy # perltidy, the same standard's formatter (overlays bumps both)
       bundler
       pnpm
       yarn
