@@ -19,7 +19,13 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 // starts on another provider's default (pi #8810) — the handler puts it back
 // before the turn. `/tier <main|complex|executor>` changes the session's
 // tier (an owner's choice, applied from the next prompt); `/tier off` stops
-// enforcing; `/tier` shows the state. `PI_TIER` sets the tier at launch.
+// enforcing; `/tier` shows the state. `PI_TIER` sets the tier at launch; a
+// value that is not a tier name or `off` (the retired `deterministic`
+// included) is an error, never a silent `main`
+// (rules/decisions/2026-10-19-model-assignment.md): the router still holds
+// `main` — landing on a direct provider is the defect it exists to prevent —
+// and reports the bad value before every prompt and in `/tier` until
+// `/tier <tier>` or `/tier off` settles it.
 //
 // Resident cost: nothing — no HTTP call, no tools, no injected context.
 
@@ -31,15 +37,40 @@ export function isTier(value: unknown): value is Tier {
   return typeof value === "string" && (TIERS as readonly string[]).includes(value);
 }
 
-/** The launch-time mode: `PI_TIER=off` or a tier name; anything else is `main`. */
-export function initialMode(env: NodeJS.ProcessEnv): Mode {
+/**
+ * The router's one state: holding a tier, not enforcing, or holding `main`
+ * while reporting a bad `PI_TIER`. One value, so settling the error cannot
+ * be forgotten at one site.
+ */
+export type TierState =
+  | { readonly kind: "held"; readonly tier: Tier }
+  | { readonly kind: "off" }
+  | { readonly kind: "error"; readonly message: string; readonly tier: "main" };
+
+/** The mode a state shows: its tier, or `off`. */
+function modeOf(state: TierState): Mode {
+  return state.kind === "off" ? "off" : state.tier;
+}
+
+/**
+ * The launch-time state: unset (or empty) is `main`, `PI_TIER=off` stops
+ * enforcing, a tier name is that tier; any other word holds `main` and
+ * carries an error naming it.
+ */
+export function initialMode(env: NodeJS.ProcessEnv): TierState {
   const wanted = env.PI_TIER;
-  if (wanted === "off") return "off";
-  return isTier(wanted) ? wanted : "main";
+  if (wanted === undefined || wanted === "") return { kind: "held", tier: "main" };
+  if (wanted === "off") return { kind: "off" };
+  if (isTier(wanted)) return { kind: "held", tier: wanted };
+  return {
+    kind: "error",
+    tier: "main",
+    message: `unknown PI_TIER "${wanted}"; holding main until /tier <tier> or /tier off (valid: ${TIERS.join(", ")}, off)`,
+  };
 }
 
 export default function (pi: ExtensionAPI) {
-  let mode: Mode = initialMode(process.env);
+  let state: TierState = initialMode(process.env);
   const providerId = process.env.PI_TIER_PROVIDER ?? "proxy";
 
   /** Switch to `tier` if that is not already the active model. */
@@ -62,10 +93,12 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.on("before_agent_start", async (_event, ctx) => {
-    if (mode === "off") return;
-    const result = await holdTo(mode, ctx);
+    if (state.kind === "off") return;
+    if (state.kind === "error") ctx.ui.notify(`tier-router: ${state.message}`, "error");
+    const tier = state.tier;
+    const result = await holdTo(tier, ctx);
     if (result.switched) {
-      ctx.ui.notify(`tier-router: ${result.message} (the session's tier is ${mode})`, "info");
+      ctx.ui.notify(`tier-router: ${result.message} (the session's tier is ${tier})`, "info");
     } else if (!result.message.startsWith("already")) {
       console.error(`tier-router: ${result.message}`);
     }
@@ -79,12 +112,16 @@ export default function (pi: ExtensionAPI) {
 
       if (wanted === "") {
         const active = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "unknown";
-        ctx.ui.notify(`tier-router: session tier ${mode} — active model ${active}`, "info");
+        const shown = state.kind === "error" ? state.message : `session tier ${modeOf(state)}`;
+        ctx.ui.notify(
+          `tier-router: ${shown} — active model ${active}`,
+          state.kind === "error" ? "error" : "info",
+        );
         return;
       }
 
       if (wanted === "off") {
-        mode = "off";
+        state = { kind: "off" };
         ctx.ui.setStatus("tier", "off");
         ctx.ui.notify(
           "tier-router: not holding the model; /model is yours until /tier <tier>.",
@@ -101,7 +138,7 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      mode = wanted;
+      state = { kind: "held", tier: wanted };
       const result = await holdTo(wanted, ctx);
       ctx.ui.notify(
         result.switched || result.message.startsWith("already")

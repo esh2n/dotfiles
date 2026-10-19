@@ -20,7 +20,12 @@
  * session start and before every prompt the active model is checked and put
  * back on `<provider>/<tier>` when it is anything else. `/tier <main|complex|
  * executor>` changes the session's tier; `/tier off` stops enforcing;
- * `/tier` shows the state. `OMP_TIER` sets the tier at launch.
+ * `/tier` shows the state. `OMP_TIER` sets the tier at launch; a value that
+ * is not a tier name or `off` (the retired `deterministic` included) is an
+ * error, never a silent `main` (`2026-10-19-model-assignment.md`): the router
+ * still holds `main` — landing on a direct provider is the defect it exists
+ * to prevent — and reports the bad value at session start, before every
+ * prompt and in `/tier` until `/tier <tier>` or `/tier off` settles it.
  *
  * Failures are reported, never thrown: an unknown model, a build without
  * `ctx.setModel`, a refused switch — each becomes one notice, and the turn
@@ -37,11 +42,36 @@ export function isTier(value: unknown): value is Tier {
   return typeof value === "string" && (TIERS as readonly string[]).includes(value);
 }
 
-/** The launch-time mode: `OMP_TIER=off` or a tier name; anything else is `main`. */
-export function initialMode(env: NodeJS.ProcessEnv): TierMode {
+/**
+ * The router's one state: holding a tier, not enforcing, or holding `main`
+ * while reporting a bad `OMP_TIER`. One value, so settling the error cannot
+ * be forgotten at one site.
+ */
+export type TierState =
+  | { readonly kind: "held"; readonly tier: Tier }
+  | { readonly kind: "off" }
+  | { readonly kind: "error"; readonly message: string; readonly tier: "main" };
+
+/** The tier a state holds, or undefined when the router is off. */
+function heldTier(state: TierState): Tier | undefined {
+  return state.kind === "off" ? undefined : state.tier;
+}
+
+/**
+ * The launch-time state: unset (or empty) is `main`, `OMP_TIER=off` stops
+ * enforcing, a tier name is that tier; any other word holds `main` and
+ * carries an error naming it.
+ */
+export function initialMode(env: NodeJS.ProcessEnv): TierState {
   const wanted = env.OMP_TIER;
-  if (wanted === "off") return "off";
-  return isTier(wanted) ? wanted : "main";
+  if (wanted === undefined || wanted === "") return { kind: "held", tier: "main" };
+  if (wanted === "off") return { kind: "off" };
+  if (isTier(wanted)) return { kind: "held", tier: wanted };
+  return {
+    kind: "error",
+    tier: "main",
+    message: `unknown OMP_TIER "${wanted}"; holding main until /tier <tier> or /tier off (valid: ${TIERS.join(", ")}, off)`,
+  };
 }
 
 /** The active model as `provider/id`, or undefined when omp hands over nothing usable. */
@@ -93,7 +123,7 @@ export interface TierRouter {
 /** The session-tier state and its entry points; `index.ts` wires them to omp. */
 export function createTierRouter(deps: TierDeps = {}): TierRouter {
   const env = deps.env ?? process.env;
-  let mode: TierMode = initialMode(env);
+  let state: TierState = initialMode(env);
   const providerId = env.OMP_TIER_PROVIDER ?? "proxy";
 
   const status = (ctx: OmpContext, text: string): void => {
@@ -105,18 +135,20 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
 
   /** Put the session back on its tier; say so only when something changed or failed. */
   const hold = async (ctx: OmpContext, why: string): Promise<void> => {
-    if (mode === "off") return;
+    const tier = heldTier(state);
+    if (tier === undefined) return;
+    if (state.kind === "error") notify(ctx, `tier-router: ${state.message}`, "error");
     const was = activeSelector(ctx) ?? "no model";
-    const result = await routeTo(mode, providerId, ctx);
+    const result = await routeTo(tier, providerId, ctx);
     if (result.switched) {
-      status(ctx, mode);
+      status(ctx, tier);
       notify(
         ctx,
-        `tier-router: ${was} → ${providerId}/${mode} (${why}; the session's tier is ${mode})`,
+        `tier-router: ${was} → ${providerId}/${tier} (${why}; the session's tier is ${tier})`,
         "info",
       );
     } else if (result.message.startsWith("already")) {
-      status(ctx, mode);
+      status(ctx, tier);
     } else {
       status(ctx, "not on a tier");
       notify(ctx, `tier-router: ${result.message}`, "error");
@@ -124,7 +156,7 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
   };
 
   return {
-    mode: () => mode,
+    mode: () => heldTier(state) ?? "off",
 
     async onSessionStart(ctx) {
       await hold(ctx, "session start");
@@ -139,15 +171,17 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
     async onCommand(args, ctx) {
       const wanted = (args ?? "").trim();
       if (wanted === "") {
+        const shown =
+          state.kind === "error" ? state.message : `session tier ${heldTier(state) ?? "off"}`;
         notify(
           ctx,
-          `tier-router: session tier ${mode} — active model ${activeSelector(ctx) ?? "unknown"}`,
-          "info",
+          `tier-router: ${shown} — active model ${activeSelector(ctx) ?? "unknown"}`,
+          state.kind === "error" ? "error" : "info",
         );
         return;
       }
       if (wanted === "off") {
-        mode = "off";
+        state = { kind: "off" };
         status(ctx, "off");
         notify(
           ctx,
@@ -164,7 +198,7 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
         );
         return;
       }
-      mode = wanted;
+      state = { kind: "held", tier: wanted };
       const result = await routeTo(wanted, providerId, ctx);
       const ok = result.switched || result.message.startsWith("already");
       status(ctx, ok ? wanted : "not on a tier");

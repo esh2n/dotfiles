@@ -7,14 +7,12 @@ One omp extension carrying the five hooks
 |---|---|---|
 | `tool_call` | the guard — the enforcement point | `src/guard.ts` |
 | `session_start` | the session's model, written to `sessions.jsonl` | `src/session.ts` |
-| `before_agent_start` | hold the session on its LiteLLM tier (`proxy/main` unless `/tier` or `OMP_TIER` picked another): put the model back when omp's startup order or a `/model` pick landed on a direct provider — never a judgment, never automatic (`rules/decisions/2026-09-23-tier-fixed-main-subagent-escalation.md`); the same hold runs at `session_start` | `src/tier.ts` |
+| `before_agent_start` | hold the session on its LiteLLM tier (`proxy/main` unless `/tier` or `OMP_TIER` picked another): put the model back when omp's startup order or a `/model` pick landed on a direct provider — never a judgment, never automatic (`rules/decisions/2026-09-23-tier-fixed-main-subagent-escalation.md`); the same hold runs at `session_start`. An `OMP_TIER` that is not `main`, `complex`, `executor` or `off` is an error (`rules/decisions/2026-10-19-model-assignment.md`): no tier is held and the bad value is reported until `/tier` settles it | `src/tier.ts` |
 | `before_agent_start` (after the tier hold) | skill selection: the prompt goes to jig's judgment service (`/skill`), and a match comes back as one hidden message naming the skill's SKILL.md — never a system-prompt rewrite; `OMP_SKILL_ROUTER=off` turns it off | `src/skill.ts` |
 | `tool_result` | format the edited file, silently — the project's lefthook / pre-commit first, jig's table only without one | `src/format.ts` |
 | `session_stop` | the project's hooks on the touched files, else typecheck/lint; once, capped at 2 continuations | `src/gate.ts` |
 
-Skill selection at prompt submit stays Claude Code's; omp's prompt-submit
-slot only holds the session's tier. A stronger model is reached through a
-subagent whose `model:` maps to `proxy/complex` (`agents/models.json`), the
+A stronger model is reached through a subagent whose `model:` maps to `proxy/complex` (`agents/models.json`), the
 same shape pi's `extensions/tier-router.ts` now has.
 
 ## The tool table
@@ -69,8 +67,9 @@ a project with `lefthook.yml` / `.lefthook.yml` / `.pre-commit-config.yaml` gets
 `lefthook run pre-commit --file <f>…` / `pre-commit run --files <f>…` on the
 files the turn touched (`git diff --name-only --relative HEAD` plus untracked;
 git absent or nothing changed → nothing runs); only a project with no such
-file gets jig's table — `bunx tsc --noEmit`, `go vet ./...`, `ruff check`, or
-`cargo check`. omp allows 8 advisory continuations; this stops at **2 per
+file gets jig's table — the same eleven languages as the Stop-time column of
+the table in [jig's README](../../README.md#milestone-1-what-jig-apply---target-claude-does)
+(`src/domain/hooks/gate.ts`). omp allows 8 advisory continuations; this stops at **2 per
 session** and then lets the turn end. It never uses `{decision: "block"}`,
 which would keep blocking until a handler relents. A missing toolchain is not
 a failure — except the project's own hook runner, which is never replaced by

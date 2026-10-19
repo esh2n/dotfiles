@@ -83,7 +83,7 @@ type Loaded = LoadedPolicy | { readonly error: string };
 // Read once, at the first tool_call (not at module load — the env may not be
 // settled yet). Only a SUCCESSFUL load is cached, for the rest of the
 // process: a transient read/parse failure (the shared policy symlink
-// briefly unreadable mid `manager.sh link`, say) must retry on the NEXT
+// briefly unreadable during a home-manager switch, say) must retry on the NEXT
 // call rather than hard-blocking every bash call for the rest of the pi
 // session — a cached error here would need a full pi restart to clear, a
 // materially worse failure mode than the file being permanently missing.
@@ -190,7 +190,7 @@ export async function guardToolCall(
       block: true,
       reason:
         `jig guard policy unreadable at ${path} (${loaded.error}) — fix the link ` +
-        "(manager.sh link_jig_policy) or set JIG_POLICY_FILE",
+        "(make up; home-manager links ~/.config/jig/policy) or set JIG_POLICY_FILE",
     };
   }
 

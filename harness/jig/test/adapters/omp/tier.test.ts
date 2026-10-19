@@ -45,11 +45,23 @@ function ctxWith(
 }
 
 describe("initialMode (the session's tier at launch)", () => {
-  test("main unless OMP_TIER names another tier; off stops enforcing; nothing is ever automatic", () => {
-    expect(initialMode({})).toBe("main");
-    expect(initialMode({ OMP_TIER: "complex" })).toBe("complex");
-    expect(initialMode({ OMP_TIER: "off" })).toBe("off");
-    expect(initialMode({ OMP_TIER: "auto" })).toBe("main");
+  test("main unless OMP_TIER names another tier; off stops enforcing", () => {
+    expect(initialMode({})).toEqual({ kind: "held", tier: "main" });
+    expect(initialMode({ OMP_TIER: "" })).toEqual({ kind: "held", tier: "main" });
+    expect(initialMode({ OMP_TIER: "complex" })).toEqual({ kind: "held", tier: "complex" });
+    expect(initialMode({ OMP_TIER: "executor" })).toEqual({ kind: "held", tier: "executor" });
+    expect(initialMode({ OMP_TIER: "off" })).toEqual({ kind: "off" });
+  });
+  test("an unknown word holds main with an error naming it and the valid ones, never a silent main", () => {
+    for (const word of ["auto", "deterministic", "Main"]) {
+      const result = initialMode({ OMP_TIER: word });
+      expect(result.kind).toBe("error");
+      if (result.kind !== "error") continue;
+      expect(result.tier).toBe("main");
+      expect(result.message).toBe(
+        `unknown OMP_TIER "${word}"; holding main until /tier <tier> or /tier off (valid: main, complex, executor, off)`,
+      );
+    }
   });
 });
 
@@ -143,6 +155,42 @@ describe("the session tier is held, never judged", () => {
     await router.onCommand("auto", state.ctx);
     expect(state.notices.at(-1)).toMatch(/unknown tier "auto"/);
     expect(router.mode()).toBe("off");
+  });
+  test("an unknown OMP_TIER holds main and reports the bad value until /tier settles it", async () => {
+    const router = createTierRouter({ env: { OMP_TIER: "deterministic" } });
+    const state = ctxWith("lm-studio/qwen");
+    await router.onSessionStart(state.ctx);
+    expect(state.switches).toEqual(["proxy/main"]);
+    expect(router.mode()).toBe("main");
+    expect(state.statuses.at(-1)).toBe("jig-tier=tier: main");
+    const errors = () =>
+      state.notices.filter((n) => n.includes('unknown OMP_TIER "deterministic"'));
+    expect(errors()).toHaveLength(1);
+    expect(errors()[0]).toMatch(/holding main until \/tier <tier> or \/tier off/);
+    await router.onPrompt({ prompt: "x" }, state.ctx);
+    expect(state.switches).toEqual(["proxy/main"]);
+    expect(errors()).toHaveLength(2);
+
+    await router.onCommand("", state.ctx);
+    expect(state.notices.at(-1)).toMatch(/^tier-router: unknown OMP_TIER "deterministic"/);
+
+    await router.onCommand("executor", state.ctx);
+    expect(router.mode()).toBe("executor");
+    expect(state.active()).toBe("proxy/executor");
+    const before = state.notices.length;
+    await router.onPrompt({ prompt: "y" }, state.ctx);
+    expect(state.notices).toHaveLength(before);
+  });
+  test("/tier off also settles an unknown OMP_TIER", async () => {
+    const router = createTierRouter({ env: { OMP_TIER: "auto" } });
+    const state = ctxWith("lm-studio/qwen");
+    await router.onCommand("off", state.ctx);
+    const before = state.notices.length;
+    await router.onPrompt({ prompt: "x" }, state.ctx);
+    expect(state.notices).toHaveLength(before);
+    expect(state.switches).toEqual([]);
+    await router.onCommand("", state.ctx);
+    expect(state.notices.at(-1)).toMatch(/^tier-router: session tier off/);
   });
   test("a tier omp cannot resolve is reported and the turn goes on", async () => {
     const router = createTierRouter({ env: {} });

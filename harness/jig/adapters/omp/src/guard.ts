@@ -60,7 +60,7 @@ type Loaded = LoadedPolicy | { readonly error: string };
 
 // Only a SUCCESSFUL load is cached, and only for as long as the path holds:
 // a transient read failure (the policy symlink briefly gone during
-// `manager.sh link`) must retry on the next call rather than hard-block
+// a home-manager switch) must retry on the next call rather than hard-block
 // every tool call until omp restarts.
 let cache: { readonly path: string; readonly loaded: LoadedPolicy } | undefined;
 
@@ -161,7 +161,7 @@ export async function guardToolCall(
   if ("error" in loaded) {
     return block(
       `Blocked: jig guard policy unreadable at ${path} (${loaded.error}) — fix the link ` +
-        `(manager.sh link_jig_policy) or set JIG_POLICY_FILE. ${STAND_DOWN}`,
+        `(make up; home-manager links ~/.config/jig/policy) or set JIG_POLICY_FILE. ${STAND_DOWN}`,
     );
   }
 
