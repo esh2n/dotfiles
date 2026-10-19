@@ -109,7 +109,7 @@ Happens-before edges that actually exist ([go.dev/ref/mem](https://go.dev/ref/me
 | `go test -race` | Actual data races at runtime, only on exercised paths | CI, always for concurrency-touching packages |
 | `uber-go/goleak` | Leaked goroutines at test teardown (`goleak.VerifyNone`/`VerifyTestMain`) | Package tests that spawn goroutines |
 | `testing/synctest` | Deterministic goroutine quiescence + fake clock — no flaky `time.Sleep` polling | Tests that wait on concurrent timing |
-| pprof goroutine/mutex/block profiles | Live leaks; lock-contention and blocking hot spots (mutex/block profiles need `runtime.SetMutexProfileFraction`/`SetBlockProfileRate` enabled) | Staging/production investigation, or `go-optimize` |
+| pprof goroutine/mutex/block profiles | Live leaks; lock-contention and blocking hot spots (mutex/block profiles need `runtime.SetMutexProfileFraction`/`SetBlockProfileRate` enabled) | Staging/production investigation, or an optimization run (`go-performance`) |
 | `runtime/trace` | Scheduler-level view — goroutine states, GC pauses, syscalls over time | Rare, deep latency investigations |
 
 ## Review Checklist

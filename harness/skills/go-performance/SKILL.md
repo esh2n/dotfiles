@@ -20,9 +20,8 @@ sources in `references/sources.md`.
 
 `go-perf-reviewer` reads this skill for methodology and knobs; it reads
 `go-concurrency` for primitive choice (mutex vs atomic vs channel) since
-that's a design-time decision, not a measurement one. The `go-optimize`
-workflow runs the full loop below end to end, gated by benchstat and a
-verifier pass.
+that's a design-time decision, not a measurement one. It is also the
+verifier for "Gating Candidate Changes" below.
 
 One-line rule: **a claim this skill can settle by profiling or benchmarking
 is "measure it"; a claim about which primitive to write belongs to
@@ -65,6 +64,19 @@ evidence chain a reviewer demands, in order:
 - **unverified** — everything else, including "obviously" true claims
   (`defer` in a hot loop, `fmt.Sprintf` for concatenation). State the claim,
   state that it is unverified, do not imply measurement happened.
+
+## Gating Candidate Changes
+
+Rules for an optimization run, including a one-off workflow that tries
+several candidates:
+
+- **No benchmark covers the hot path** → propose one (target function, `b.Loop()` body, setup outside the loop) and stop; do not optimize unbenchmarked code.
+- **Several benchmarks exist** → target exactly one (`-bench '^BenchmarkX$'`) so profile, gate and verdict all describe the same thing.
+- **Before benchmarking a candidate** → `go build ./... && go vet ./... && go test -race -count=1 <pkg>`; on failure revert and record the error, never bench it. In a workflow, the script runs this gate itself — a candidate's own "build passes" is not evidence.
+- **Trying several ideas** → one candidate per angle (allocation, algorithm/data structure, contention, runtime knob), each in its own worktree, each one change, each benched against the *same* baseline file. Write bench output and profiles outside the worktree so they survive its removal.
+- **Accept** only when benchstat shows p < 0.05 *and* an improvement ≥ 5% (or the caller's threshold) on the target bench, *and* the `-diff_base` CPU profile shows the hypothesized function's cost went down. Unparseable benchstat output for the target line → reject.
+- **After the gate** → have `go-perf-reviewer` try to refute it, defaulting to reject when unsure: is the gain an artifact of the microbenchmark's shape rather than a real-workload hot path; is the readability cost out of proportion to the gain; does it rest on a knob tuned to this machine (GOGC/GOMEMLIMIT) or a PGO profile that will go stale; could `-race` have missed a concurrency bug it introduces?
+- **Delivering** → a report by default: per accepted candidate the diff, benchstat line, pprof-diff excerpt and verifier reason; every rejected candidate with the stage that rejected it and why. Commit (one commit per accepted candidate) only when the caller asked for commits.
 
 ## Decision Tables
 

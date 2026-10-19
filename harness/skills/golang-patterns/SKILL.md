@@ -383,8 +383,8 @@ s.Log("Starting...") // Calls embedded Logger.Log
 Allocation, GC, benchmarking methodology, and the evidence-chain for
 performance claims now live in `skill: go-performance` — see its SKILL.md
 and `references/`. Performance review for Go diffs runs through
-`agent: go-perf-reviewer` (static mode in `/review`, measured mode in
-`go-optimize`), not this section.
+`agent: go-perf-reviewer` (static mode in a review, measured mode in an
+optimization run — see `go-performance`), not this section.
 
 ## Go Tooling Integration
 

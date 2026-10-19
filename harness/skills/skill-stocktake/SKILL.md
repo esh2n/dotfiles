@@ -75,7 +75,7 @@ Scanning:
 | Skill | Description |
 |-------|-------------|
 
-使用実績の集計列は設けない（使用実績は claude-mem 等から手動確認する）。
+使用実績の集計列は設けない（使用実績は jig の監査ログで確認する。少ないことだけを外す理由にしない）。
 
 ### Phase 2 — Quality Evaluation
 
@@ -166,6 +166,18 @@ Evaluation is **holistic AI judgment** — not a numeric rubric. Guiding dimensi
    - User decides whether to act
 3. **Update**: present updated content with sources checked
 4. Check MEMORY.md line count; propose compression if >100 lines
+
+## Harness-wide Stocktake
+
+When the request is a periodic stocktake of the whole harness (not only skills), also cover these areas. Every finding is `keep` / `drop-candidate` / `fix` / `unknown` with the concrete observation it rests on.
+
+- **Skills (structure)** — broken symlinks, empty skill dirs, near-duplicate frontmatter descriptions → `fix` or `drop-candidate`. `node_modules`, build output or media inside a skill dir → `fix` (move out); a skill's own tool with its `package.json` beside it is intentional → `keep`.
+- **Hooks** — for each hook wired in `~/.claude/settings.json`: script exists, is executable, passes `bash -n` / `node --check`; scan hook logs for recent errors. A script in `~/.claude/hooks` wired nowhere → `drop-candidate`.
+- **MCP** — compare configured servers (`~/.claude/settings.json`, `~/.claude.json`) with the audit log. Zero logged calls → "not used well yet": judge by fit with industry practice and use case, never drop on usage alone. Plugin-provided tools the log may not capture → `unknown`.
+- **Memory and caches** — memory index lines whose target file is gone → `fix`; report sizes of memory/cache stores and stale `.tmp` piles. Grilling slug dirs under `.claude/.cache/grilling/` older than 60 days → `drop-candidate`; a slug dir with `round-<n>.md` but no `transcript.md` → `fix` (abandoned grilling).
+- **Freshness** — collect `verified:` dates (`grep -rn "verified:" --include=SKILL.md`). Flag a skill when its date is older than 90 days, or it is undated but states version-pinned facts (version numbers, "ES20xx", framework features tied to a release); judgment-only skills are out of scope. WebSearch the 3–5 riskiest and report each as `fix`: "<skill> verified <date> but <ecosystem> is now at <version/change> as of <source>".
+- When an area cannot be audited → name it as unaudited with the one-line reason in the report; never guess its contents, and never fill fields with placeholders (an honest error beats fabrication). One failed area does not discard the others.
+- Report → in the owner's language, grouped by area, drop candidates first (with why), then fixes. Report only: delete or edit nothing during the stocktake.
 
 ## Results File Schema
 

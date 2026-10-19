@@ -32,7 +32,7 @@ The invoking prompt selects the mode. If it does not say, default to `static`.
   - `[needs-measurement]` — plausible but depends on actual hot-path share, allocation profile, or contention under load. Say what would confirm it (the exact `go test -bench` / `pprof` invocation), but do not run it.
 - Do not claim a static finding is `verified`. Static findings are `unverified` by construction — see Evidence chain below.
 
-### measure (requires explicit opt-in — used by `go-optimize`, or when explicitly asked to measure)
+### measure (requires explicit opt-in — when explicitly asked to measure, including as the verifier of an optimization run)
 
 Only run this mode when the environment has `JIG_REVIEW_EXEC=1` set. Without it, stay in `static` mode and report `[needs-measurement]` naming the exact command a human should run — do not execute benchmarks, builds, or tests against a diff by default; it may contain hostile build scripts.
 
