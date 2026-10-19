@@ -28,8 +28,8 @@ When invoked:
    - If required checks are failing or pending, stop and report that review should wait for green CI.
    - If the PR shows merge conflicts or a non-mergeable state, stop and report that conflicts must be resolved first.
    - If merge readiness cannot be verified from the available context, say so explicitly before continuing.
-3. Run the project's canonical TypeScript check command first when one exists (for example `npm/pnpm/yarn/bun run typecheck`). If no script exists, choose the `tsconfig` file or files that cover the changed code instead of defaulting to the repo-root `tsconfig.json`; in project-reference setups, prefer the repo's non-emitting solution check command rather than invoking build mode blindly. Otherwise use `tsc --noEmit -p <relevant-config>`. Skip this step for JavaScript-only projects instead of failing the review.
-4. Run `eslint . --ext .ts,.tsx,.js,.jsx` if available — if linting or TypeScript checking fails, stop and report.
+3. Type-check statically: choose the `tsconfig` file or files that cover the changed code instead of defaulting to the repo-root `tsconfig.json`, and run the PATH-resolved `tsc --noEmit -p <relevant-config>` (never `npx tsc` or the project's `node_modules` binary). In project-reference setups, do not invoke build mode. Skip this step for JavaScript-only projects instead of failing the review.
+4. Do not run the project's own scripts (`npm/pnpm/yarn/bun run typecheck`, `lint`) or `eslint`/`prettier` unless `JIG_REVIEW_EXEC=1` is set (see Diagnostic Commands) — they execute code the diff controls. Without the opt-in, name the command the author should run in the review instead, and read existing CI results (`gh pr checks`) when available. If a check you did run fails, stop and report.
 5. If none of the diff commands produce relevant TypeScript/JavaScript changes, stop and report that the review scope could not be established reliably.
 6. Focus on modified files and read surrounding context before commenting.
 7. Begin review
@@ -144,7 +144,7 @@ Never quote the value of a secret, key, or token in a finding — show only its 
 
 ## Reference
 
-This repo does not yet ship a dedicated `typescript-patterns` skill. For detailed TypeScript and JavaScript patterns, use `coding-standards` plus `frontend-patterns` or `backend-patterns` based on the code being reviewed.
+For detailed TypeScript patterns, see `skill: typescript-patterns` and `skill: ts-modern`; for tests, `skill: typescript-testing`; for React code, `skill: react-patterns`; for Node backends on NestJS, `skill: nestjs-patterns`.
 
 ---
 

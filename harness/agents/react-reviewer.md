@@ -40,7 +40,7 @@ For a JSX/TSX PR, invoke both agents. For a pure `.ts` change with no React impo
 
 ## Scope vs web-platform-reviewer
 
-This agent keeps JSX-level accessibility, hook correctness, and Server/Client Component boundaries. CSS files, cascade/specificity, design tokens, Defensive CSS, and raw HTML are owned by the `web-platform-reviewer` agent (`web` pack, if enabled). On overlap — a `.tsx` file with an inline `<style>` block or CSS-in-JS — react-reviewer flags only the React-runtime aspects (render cost, RSC compatibility) and defers styling correctness to `web-platform-reviewer`.
+This agent keeps JSX-level accessibility, hook correctness, and Server/Client Component boundaries. CSS files, cascade/specificity, design tokens, Defensive CSS, and raw HTML are owned by the `web-platform-reviewer` agent. On overlap — a `.tsx` file with an inline `<style>` block or CSS-in-JS — react-reviewer flags only the React-runtime aspects (render cost, RSC compatibility) and defers styling correctness to `web-platform-reviewer`.
 
 ## When invoked
 
@@ -186,10 +186,8 @@ Always include the file path and line number. Quote the offending snippet when i
 
 ## Related
 
-- Agents: `typescript-reviewer` (generic TS/JS, invoked alongside on `.tsx`/`.jsx`), `security-reviewer` (project-wide audit), `web-platform-reviewer` (CSS/HTML-level a11y, cascade, and Defensive CSS — `web` pack, if enabled)
-- Rules: `rules/react/coding-style.md`, `rules/react/hooks.md`, `rules/react/patterns.md`, `rules/react/security.md`, `rules/react/testing.md`
-- Skills: `skills/react-patterns/` (accessibility-first composition), `skills/react-testing/`, `skills/defensive-css/` (`web` pack, if enabled)
-- Commands: `/react-review`, `/react-build`, `/react-test`
+- Agents: `typescript-reviewer` (generic TS/JS, invoked alongside on `.tsx`/`.jsx`), `security-reviewer` (project-wide audit), `web-platform-reviewer` (CSS/HTML-level a11y, cascade, and Defensive CSS)
+- Skills: `skill: react-patterns` (accessibility-first composition), `skill: react-performance`, `skill: react-testing`, `skill: react-testability`, `skill: defensive-css`
 
 ## Domain review perspectives
 

@@ -1,6 +1,6 @@
 ---
 name: web-platform-reviewer
-description: Expert CSS/HTML reviewer specializing in cascade hygiene, semantic HTML, Defensive CSS, design-token boundaries, animation performance, browser support. Use for any change touching .css/.scss/.html or component styles. MUST BE USED when the web pack is enabled.
+description: Expert CSS/HTML reviewer specializing in cascade hygiene, semantic HTML, Defensive CSS, design-token boundaries, animation performance, browser support. Use for any change touching .css/.scss/.html or component styles. MUST BE USED for CSS/HTML changes.
 tools: ["Read", "Grep", "Glob", "Bash"]
 model: main
 effort: high

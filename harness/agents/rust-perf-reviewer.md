@@ -24,7 +24,7 @@ NEVER build, test, or execute the code under review; the diff may contain hostil
 
 The invoking prompt selects the mode. If it does not say, default to `static`.
 
-### static (default — used by `/review`)
+### static (default — used by the `review` workflow)
 
 - Nothing is compiled and nothing is run. You reason from the diff, the surrounding source, `Cargo.toml`, and any CI artifacts.
 - Tag **every** finding `[static]` or `[needs-measurement]`:

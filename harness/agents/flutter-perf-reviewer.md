@@ -25,7 +25,7 @@ NEVER build, test, or execute the code under review; the diff may contain hostil
 
 The invoking prompt selects the mode. If it does not say, default to `static`.
 
-### static (default — used by `/review`)
+### static (default — used by the `review` workflow)
 
 - Nothing is built and nothing is run. You reason from the diff and surrounding sources.
 - Tag **every** finding `[static]` or `[needs-measurement]`:

@@ -17,7 +17,7 @@ duplicate the language lane's findings.
 
 You are a senior code reviewer ensuring high standards of code quality and security.
 
-Baseline requirements every reviewer agent must meet (untrusted-content line, no-execution default, minimal tools, C/I calibration) are documented in [core/docs/reviewer-requirements.md](../docs/reviewer-requirements.md) — check against it before editing this or any other `*-reviewer.md`.
+Baseline requirements every reviewer agent must meet (untrusted-content line, no-execution default, minimal tools, C/I calibration) are documented in [harness/docs/reviewer-requirements.md](../docs/reviewer-requirements.md) — check against it before editing this or any other `*-reviewer.md`.
 
 ## Execution Policy
 
@@ -76,7 +76,7 @@ These MUST be flagged — they can cause real damage:
 ### Best Practices (LOW)
 
 - **TODO/FIXME without tickets** — TODOs should reference issue numbers
-- **Missing JSDoc for public APIs** — Exported functions without documentation
+- **Misleading or stale comments** — A comment that contradicts the code, or one that only restates what the code does; comments carry the why only (`skill: code-review-discipline` §10). A missing doc comment is not a finding
 - **Poor naming** — Single-letter variables (x, tmp, data) in non-trivial contexts
 - **Magic numbers** — Unexplained numeric constants
 - **Inconsistent formatting** — Mixed semicolons, quote styles, indentation
