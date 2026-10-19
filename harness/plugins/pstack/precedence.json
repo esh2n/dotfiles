@@ -1,0 +1,114 @@
+{
+  "_comment": "One entry per row of the precedence table in rules/common/80-pstack.md (details in skills/pstack-adapter, Overrides). Each row quotes the pstack text it overrides, verbatim, with the file it sits in (relative to the repo in source.json). jig apply warns when a quote is no longer in the fetched pack, which means an upgrade rewrote or dropped that text and the row needs a fresh look, and names the rows whose files changed since `verifiedAt`. `verifiedAt` is the upstream commit the quotes were last checked against. Nothing from upstream is copied here beyond these short quotes (rules/decisions/2026-10-19-pstack-precedence-table.md).",
+  "verifiedAt": "019a6a20592c10bf92869e5740368f578a9997fd",
+  "rows": [
+    {
+      "id": "pr-readiness",
+      "quotes": [
+        {
+          "file": "pstack/skills/poteto-mode/playbooks/opening-a-pr.md",
+          "text": "Open every PR ready, never as a draft."
+        },
+        {
+          "file": "pstack/skills/poteto-mode/playbooks/multi-phase-plan.md",
+          "text": "Open the PR ready, never draft, per **Opening a PR**."
+        }
+      ]
+    },
+    {
+      "id": "outward-writes",
+      "quotes": [
+        {
+          "file": "pstack/skills/poteto-mode/SKILL.md",
+          "text": "Reversible work and external actions (team chat, ticket updates, kicking off evals) proceed without asking."
+        },
+        {
+          "file": "pstack/skills/reflect/SKILL.md",
+          "text": "File each Backlog item to your team's devex or backlog tracker without waiting."
+        }
+      ]
+    },
+    {
+      "id": "model-slugs",
+      "quotes": [
+        {
+          "file": "pstack/skills/poteto-mode/SKILL.md",
+          "text": "explicit model per role (configurable via `/setup-pstack`."
+        }
+      ]
+    },
+    {
+      "id": "stop-conditions",
+      "quotes": [
+        {
+          "file": "pstack/skills/principle-never-block-on-the-human/SKILL.md",
+          "text": "Proceed, then present."
+        },
+        {
+          "file": "pstack/skills/poteto-mode/SKILL.md",
+          "text": "Reserve the question for a genuine product or preference call no experiment can settle."
+        }
+      ]
+    },
+    {
+      "id": "worktrees",
+      "quotes": [
+        {
+          "file": "pstack/skills/poteto-mode/playbooks/worktree-cleanup.md",
+          "text": "Per path, `git worktree remove --force <path>`."
+        },
+        {
+          "file": "pstack/skills/poteto-mode/playbooks/worktree-cleanup.md",
+          "text": "If the dir survives on ignored build artifacts, `rm -rf` it, then `git worktree prune`."
+        },
+        {
+          "file": "pstack/docs/harness/claude-code.md",
+          "text": "| `environment: \"cloud\"` | `isolation: \"worktree\"`."
+        }
+      ]
+    },
+    {
+      "id": "merge",
+      "quotes": [
+        {
+          "file": "pstack/skills/poteto-mode/SKILL.md",
+          "text": "landing the contiguous verified run bottom-up through `gh` by default"
+        }
+      ]
+    },
+    {
+      "id": "missing-skills",
+      "quotes": [
+        {
+          "file": "pstack/skills/poteto-mode/SKILL.md",
+          "text": "Before commit → the `deslop` skill from the `cursor-team-kit` plugin (`/deslop`)."
+        },
+        {
+          "file": "pstack/skills/poteto-mode/SKILL.md",
+          "text": "`cursor-team-kit` publishes `control-cli` (CLIs and TUIs) and `control-ui` (browser / Electron / web UIs)."
+        },
+        {
+          "file": "pstack/skills/poteto-mode/SKILL.md",
+          "text": "Agent-facing prose also follows the **create-skill** skill (Cursor's built-in for authoring SKILL.md files)."
+        }
+      ]
+    },
+    {
+      "id": "pack-edits",
+      "quotes": [
+        {
+          "file": "pstack/skills/reflect/SKILL.md",
+          "text": "Trivial existing-skill edit (a one-line bullet, a tightened sentence, a stale fact corrected): the parent does it directly."
+        },
+        {
+          "file": "pstack/skills/automate-me/SKILL.md",
+          "text": "Otherwise default to `.cursor/skills/<handle>-mode/SKILL.md` in the project"
+        },
+        {
+          "file": "pstack/skills/correct/SKILL.md",
+          "text": "When the operator corrects you, fix the mistake and add the rule."
+        }
+      ]
+    }
+  ]
+}

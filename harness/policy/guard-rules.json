@@ -792,6 +792,77 @@
       ]
     },
     {
+      "id": "ask-gh-pr-create-ready",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "gh",
+        "argv": "^pr(?:\\s+-{1,2}[A-Za-z][\\w-]*(?:=\\S*)?(?:\\s+(?!-)\\S+)?)*\\s+(?:create|new)\\b(?!.*\\s(?<!(?:^|\\s)(?:-t|--title|-b|--body|-F|--body-file|-B|--base|-H|--head|-a|--assignee|-l|--label|-m|--milestone|-p|--project|-r|--reviewer|-T|--template)\\s)(?:--draft(?:=true)?|-d)(?:\\s|$))"
+      },
+      "why": "2026-10-19-pstack-precedence-table: outside the owner's personal repositories a PR opens as a draft and goes ready only after the agent's own review — confirm a PR opened ready. The --draft/-d opt-out is read from the space-joined arguments, so a title or body that contains it as a separate word (other than as the whole value of -t/-b) also passes",
+      "profiles": [
+        "standard",
+        "strict"
+      ],
+      "unlessCwdIn": "main-push-allowed"
+    },
+    {
+      "id": "ask-gh-pr-merge",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "gh",
+        "argv": "^(?:pr(?:\\s+-{1,2}[A-Za-z][\\w-]*(?:=\\S*)?(?:\\s+(?!-)\\S+)?)*\\s+merge\\b|api\\b.*(?:pulls/\\d+/merge\\b|\\bmergePullRequest\\b))"
+      },
+      "why": "2026-10-19-pstack-precedence-table: agents stop at merge-ready and hand the PR to the owner — merging is the owner's call",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-gh-pr-comment",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "gh",
+        "argv": "^(?:(?:pr|issue)(?:\\s+-{1,2}[A-Za-z][\\w-]*(?:=\\S*)?(?:\\s+(?!-)\\S+)?)*\\s+comment\\b|pr(?:\\s+-{1,2}[A-Za-z][\\w-]*(?:=\\S*)?(?:\\s+(?!-)\\S+)?)*\\s+review\\b|(?:pr|issue)(?:\\s+-{1,2}[A-Za-z][\\w-]*(?:=\\S*)?(?:\\s+(?!-)\\S+)?)*\\s+close\\b(?=.*\\s(?:--comment(?:[\\s=]|$)|-[A-Za-z]*c))|api\\b(?!.*\\s(?:-X\\s*|--method[\\s=]+)(?:GET|get)\\b)(?=.*(?:pulls/\\d+/(?:comments|reviews)|issues/\\d+/comments|(?:issues|pulls)/comments/\\d+)(?:[\\s/?]|$))(?=.*\\s(?:(?:-X\\s*|--method[\\s=]+)(?!GET\\b|get\\b)[A-Za-z]|(?:-f|-F|--field|--raw-field|--input)(?:[\\s=]|$)|-[fF]\\S))|api\\b.*\\b(?:addPullRequestReview|addPullRequestReviewComment|addPullRequestReviewThread|addPullRequestReviewThreadReply|submitPullRequestReview|updatePullRequestReview|deletePullRequestReview|updatePullRequestReviewComment|deletePullRequestReviewComment|addComment|updateIssueComment|deleteIssueComment|minimizeComment)\\b)"
+      },
+      "why": "owner ruling 2026-10-19: PR reviews and PR or issue comments (posting, editing, deleting, closing with a comment) are seen by others — only with the owner's approval. gh issue create is out of scope. The gh api -X GET exception is read from the space-joined arguments, so a field value containing ' -X GET' as separate words also passes",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-git-worktree-remove-force",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "(?:^|\\s)worktree\\s+remove\\b(?=.*\\s(?:--fo\\w*|-[a-z]*f[a-z]*)(?:\\s|$))"
+      },
+      "why": "2026-10-19-pstack-precedence-table: a forced worktree removal discards uncommitted, untracked and ignored files — clean up only clean, merged worktrees without --force, or confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-mcp-shared-write",
+      "effect": "ask",
+      "action": "mcp.call",
+      "subject": {
+        "program": "notion-mcp|claude_ai_Notion",
+        "argv": "^notion-(?!(?:fetch|search|get-|list-|query-|calendar-list-|download-|read-|memory-search))"
+      },
+      "why": "2026-10-19-pstack-precedence-table: Notion is a shared place others see — every Notion tool asks except the reads (fetch, search, get-, list-, query-, calendar-list-, download-, read-, memory-search), so a new write tool asks by default; a harness that cannot ask falls back to deny",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
       "id": "permit-declscope",
       "effect": "permit",
       "action": "shell.exec",

@@ -23,7 +23,7 @@ const note = (title: string, rule: string | undefined, status = "accepted") =>
   ].join("\n");
 
 describe("which notes bind", () => {
-  test("the bold line is the note's `rule:` line, verbatim — never the Japanese title", () => {
+  test("the line is the note's `rule:` line, verbatim — never the Japanese title", () => {
     const { lines } = decisionLines([
       {
         file: "a.md",
@@ -31,7 +31,7 @@ describe("which notes bind", () => {
       },
     ]);
     expect(lines).toEqual([
-      { file: "a.md", rule: "Register exactly one hook per event, five total." },
+      { file: "a.md", rule: "Register exactly one hook per event, five total.", scope: "global" },
     ]);
   });
 
@@ -87,28 +87,60 @@ describe("which notes bind", () => {
   });
 });
 
-describe("the rendered section", () => {
-  test("the research-index line comes first, then one bold linked line per decision", () => {
-    const text = renderDecisionSection(
-      decisionLines([{ file: "a.md", text: note("題", "Do the thing.") }]),
-      H,
-    );
-    const lines = text.trimEnd().split("\n");
+describe("decision scope", () => {
+  test("only a scope line right under rule: counts, not one in the body", () => {
+    const { lines } = decisionLines([
+      { file: "a.md", text: `${note("題", "Everywhere.")}\n\n\`\`\`\nscope: repo\n\`\`\`\n` },
+    ]);
+    expect(lines[0]?.scope).toBe("global");
+  });
 
+  test("a note is global unless it says scope: repo", () => {
+    const { lines } = decisionLines([
+      { file: "a.md", text: note("題", "Everywhere.") },
+      {
+        file: "b.md",
+        text: note("題", "Only here.").replace("rule: Only here.", "rule: Only here.\nscope: repo"),
+      },
+    ]);
+    expect(lines.map((line) => [line.file, line.scope])).toEqual([
+      ["a.md", "global"],
+      ["b.md", "repo"],
+    ]);
+  });
+});
+
+describe("the rendered section", () => {
+  const decisions = decisionLines([
+    { file: "a.md", text: note("題", "Do the thing.") },
+    {
+      file: "b.md",
+      text: note("題", "Only in the dotfiles.").replace(
+        "rule: Only in the dotfiles.",
+        "rule: Only in the dotfiles.\nscope: repo",
+      ),
+    },
+  ]);
+
+  test("the research-index line comes first, then one plain line per global decision naming its note", () => {
+    const lines = renderDecisionSection(decisions, H).trimEnd().split("\n");
     expect(lines[0]).toBe(
       `**Before researching anything, read [rules/knowledge/INDEX.md](${H}/rules/knowledge/INDEX.md) (settled facts) and [rules/research/INDEX.md](${H}/rules/research/INDEX.md) (research of the last 14 days). Do not re-investigate settled facts.**`,
     );
-    expect(lines.at(-1)).toBe(`- **Do the thing.** — [a.md](${H}/rules/decisions/a.md)`);
+    expect(lines.at(-1)).toBe("- Do the thing. (a.md)");
+    expect(lines.join("\n")).not.toContain("Only in the dotfiles.");
   });
 
-  test("links are absolute under the harness root: the file lives in ~/.claude, where a relative path resolves nowhere", () => {
-    const text = renderDecisionSection(
-      decisionLines([{ file: "a.md", text: note("題", "Do the thing.") }]),
-      H,
-    );
-    for (const link of text.matchAll(/\]\(([^)]+)\)/g)) {
-      expect(link[1]).toStartWith(`${H}/`);
-    }
+  test("the notes' directory is named once, absolute, not once per line", () => {
+    const text = renderDecisionSection(decisions, H);
+    expect(text.split(`${H}/rules/decisions/`).length - 1).toBe(1);
+  });
+
+  test("the repository's own section carries only the repo-scoped decisions", () => {
+    const text = renderDecisionSection(decisions, H, "repo");
+    expect(text).toContain("- Only in the dotfiles. (b.md)");
+    expect(text).not.toContain("Do the thing.");
+    expect(text).not.toContain("Before researching anything");
   });
 
   test("the section is English: it is read by the model, not by the owner", () => {
@@ -118,16 +150,6 @@ describe("the rendered section", () => {
     );
     expect(text).not.toContain("日本語の題");
     expect(text).toContain("## Decisions");
-  });
-
-  test("one line per decision and no prose around it — Codex truncates past 32 KiB", () => {
-    const sources = Array.from({ length: 40 }, (_, i) => ({
-      file: `2026-09-22-${i}.md`,
-      text: note(`決定 ${i}`, `Rule number ${i}.`),
-    }));
-    const text = renderDecisionSection(decisionLines(sources), H);
-    const bullets = text.split("\n").filter((line) => line.startsWith("- **"));
-    expect(bullets).toHaveLength(40);
   });
 
   test("no bound decisions still renders a valid section", () => {

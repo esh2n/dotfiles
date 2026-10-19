@@ -8,18 +8,22 @@
  * block like the Codex one would not survive; ownership is by key.
  *
  * Owned:
- *  - `modelRoles` — every role on a LiteLLM tier (owner's ruling
- *    2026-09-23): the thorough roles (`slow`, `plan`, `advisor`) on
- *    `complex`, everything lightweight on `main`. `deterministic` is picked
- *    by hand, never by a role.
+ *  - `modelRoles` — every role on a LiteLLM tier
+ *    (rules/decisions/2026-10-19-model-assignment.md): the thinking roles
+ *    (`slow`, `plan`, `advisor`, `designer`) on `complex`, everything else,
+ *    `task` included, on `main`. `executor` is never a role's default;
+ *    `vision` waits until `main`'s model is known to read images.
  *  - `tools.approvalMode` and `tools.approval.eval` — untrusted repositories
  *    go to the sandbox, so the host runs `yolo`; `eval` still asks, since no
  *    Claude permission can express it and `bash.patterns` does not gate what
  *    an `eval` spawns.
+ *  - `retry.modelFallback` off and `retry.maxRetries` 0: LiteLLM is the one
+ *    retry layer; when a model fails omp stops with the cause, never
+ *    continuing on another model.
  *  - `statusLine` — the same content as Claude Code's statusline.sh in omp's
  *    own segments (rules/knowledge/statusline-across-harnesses.md):
  *    model and effort, directory, git, context used on the left; extension
- *    statuses (the tier, the Swarm), time spent and cost on the right.
+ *    statuses (the tier), time spent and cost on the right.
  *
  * Written only when the file does not exist yet (omp's own afterwards):
  * `symbolPreset`, `composer`, `theme`, `setupVersion`.
@@ -45,6 +49,7 @@ const MODEL_ROLES: YamlObject = {
   slow: "proxy/complex",
   plan: "proxy/complex",
   advisor: "proxy/complex",
+  designer: "proxy/complex",
 };
 
 const STATUS_LINE: YamlObject = {
@@ -71,6 +76,8 @@ export const OMP_OWNED_PATHS: readonly string[] = [
   "tools.approvalMode",
   "tools.approval.eval",
   "statusLine",
+  "retry.modelFallback",
+  "retry.maxRetries",
 ];
 
 const OWNED_VALUES: Readonly<Record<string, YamlValue>> = {
@@ -78,6 +85,12 @@ const OWNED_VALUES: Readonly<Record<string, YamlValue>> = {
   "tools.approvalMode": "yolo",
   "tools.approval.eval": "prompt",
   statusLine: STATUS_LINE,
+  // omp's default switches to another model after a hard error; a failure
+  // stops with its cause instead (rules/decisions/2026-10-19-model-assignment.md).
+  "retry.modelFallback": false,
+  // LiteLLM is the one retry layer (it alone can move to the same model's
+  // other deployment); retrying here too would multiply calls under failure.
+  "retry.maxRetries": 0,
 };
 
 function isObject(value: YamlValue | undefined): value is YamlObject {

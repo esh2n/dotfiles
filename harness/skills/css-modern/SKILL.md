@@ -8,6 +8,8 @@ metadata:
 
 # Modern CSS
 
+Writing or reviewing CSS: read `references/review-standard.md` first — the single CSS review standard (cascade, flow, units, modern CSS, defensive CSS, rendering performance; items with sources, Baseline gates, pipeline model, linter mapping) shared by the writer and `code-reviewer`; markup and accessibility are in `semantic-html`.
+
 ## Overview
 
 Models reach for pre-2022 CSS by default: viewport media queries, `!important`,
@@ -45,10 +47,10 @@ Everything above is Baseline widely available **except**:
 - **Same-document view transitions** — Baseline newly available since Firefox
   144 (Oct 2025). **Cross-document** (`@view-transition`) is still Chromium +
   Safari only; Firefox falls back to a normal navigation, which is acceptable.
-- **Scroll-driven animations** — not Baseline. Chromium and Safari 18+ only;
+- **Scroll-driven animations** — not Baseline. Chromium and Safari 26+ only (web-features 3.43.0);
   Firefox ships it in Nightly and it is an Interop 2026 priority. Ship it as
   enhancement over a readable static layout, never as the only path.
-- **`text-wrap: pretty`** — Chromium 117+, Safari 26+, Firefox 134+; degrades
+- **`text-wrap: pretty`** — not Baseline: Chromium 117+ and Safari 26+, no Firefox (web-features 3.43.0); degrades
   silently to normal wrapping. `text-wrap: balance` has broader support.
 
 ## One Worked Example

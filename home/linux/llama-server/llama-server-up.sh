@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Foreground launcher for llama-server in router mode (the gpu role; systemd
+# Foreground launcher for llama-server in router mode (the model-provider role on Linux; systemd
 # --user owns the process). Decision:
 # rules/decisions/2026-09-24-home-llm-second-host-omarchy-llama-server.md.
 #
@@ -11,7 +11,7 @@
 # setup` from models.json beside this file), chosen by the request's `model`
 # field: the file name without .gguf.
 #
-# The deterministic tier's settings (rules/decisions/2026-09-26-deterministic-
+# The executor tier's settings (rules/decisions/2026-09-26-deterministic-
 # on-the-gpu.md), inherited by every model the router starts: one slot with a
 # 65,536-token context (on 24GB the most one slot holds beside the 17.4GB
 # Qwen3.8-27B with an fp16 KV cache — llama-server divides -c among slots;

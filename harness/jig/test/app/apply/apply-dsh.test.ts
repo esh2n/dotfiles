@@ -327,7 +327,7 @@ describe("AGENTS.md in the harness home", () => {
     const dry = await run(ports);
     expect(dry.agentsMd?.outcome).toBe("write");
     expect(dry.agentsMd?.content).toContain("# Core");
-    expect(dry.agentsMd?.content).toContain("**Do the thing.**");
+    expect(dry.agentsMd?.content).toContain("- Do the thing. (a.md)");
     expect(dry.agentsMd?.bytes).toBeGreaterThan(0);
     expect(dry.agentsMd?.backupPath).toBe(`${DSH}/AGENTS.md.pre-jig.20260923-000000`);
 

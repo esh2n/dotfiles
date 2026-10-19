@@ -5,21 +5,17 @@
  * one for `lib/` when the source tree has it.
  *
  * Milestone 4. Claude Code's Workflow tool reads `~/.claude/workflows/*.js`
- * (the scripts of `rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md`,
- * Consequences: review, research, code-study, stocktake and design-review
- * survive as scripts; preflight and the yoki-graph engine go). Same shape as
- * `agents/`: a real directory, one link per entry, anything that is not
- * jig's reported and left alone.
+ * (the scripts of `rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md`).
+ * Kept today: research and implement. The review and design-review scripts
+ * were retired by `rules/decisions/2026-10-19-review-redesign.md` (reviews are
+ * the `change-review` skill and reviewer agents now), and their helper copy
+ * `lib/lanes.js` went with them. Same shape as `agents/`: a real directory, one
+ * link per entry, anything that is not jig's reported and left alone.
  *
- * Why `lib/` gets a link: the scripts and their helpers sit side by side in
- * the source tree — `lib/lanes.js` is the canonical copy of the provider-lane
- * helpers. As of 2026-09-23 no script imports it: `review.js`, `research.js`
- * and `design-review.js` each carry the helpers INLINE (review.js:75, "provider-lane
- * helpers (canonical copy: core/workflows/lib/lanes.js)"), and none of the
- * scripts in `claude-profiles/core/workflows/` has an `import` or `require`
- * at all. The link is kept so that a script that does grow a relative
- * `./lib/...` import resolves the same way whether the runner loads the
- * file through the link or through its real path.
+ * Why `lib/` gets a link when it exists: a script that grows a relative
+ * `./lib/...` import must resolve the same way whether the runner loads the
+ * file through the link or through its real path. No script imports one today
+ * and the source tree has no `lib/`, so no link is planned.
  *
  * Pure. The caller lists the source directory and hands over what it found;
  * a source directory that does not exist yet is the caller's report, not a

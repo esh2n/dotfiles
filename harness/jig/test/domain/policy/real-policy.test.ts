@@ -16,8 +16,9 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { SHARED_WRITE_MCP_MATCHER } from "../../../src/domain/claude/hooks";
 import { type HookProfile, type ToolCall, judge } from "../../../src/domain/hooks/decision";
-import { parsePolicy } from "../../../src/domain/policy/parse";
+import { parsePolicy, withWaivers } from "../../../src/domain/policy/parse";
 import { MCP_EDIT_TOOLS } from "../../../src/domain/policy/request";
 import type { Policy } from "../../../src/domain/policy/types";
 
@@ -945,4 +946,312 @@ describe("[yoki-fixture] Claude Code PreToolUse matcher covers every routed MCP 
       expect(matcher.test(tool)).toBe(true);
     }
   });
+});
+
+// The guard rules of rules/decisions/2026-10-19-pstack-precedence-table.md
+// and the owner's 2026-10-19 ruling on GitHub comments. The agents cannot
+// write the policy file, so until the owner promotes the candidate these
+// cases are skipped against the real file, named by the rule they wait on;
+// `JIG_REAL_POLICY_FILE=<candidate>` runs them before the promotion. The
+// five land together: a file holding only some of them fails below.
+const PRECEDENCE_RULE_IDS = [
+  "ask-gh-pr-create-ready",
+  "ask-gh-pr-merge",
+  "ask-gh-pr-comment",
+  "ask-git-worktree-remove-force",
+  "ask-mcp-shared-write",
+] as const;
+
+type ShellRow = readonly [label: string, command: string, expected: Outcome];
+
+function shellRows(rule: string, rows: readonly ShellRow[]): (Case & { rule: string })[] {
+  return rows.map(([label, command, expected]) => ({
+    rule,
+    label,
+    call: shellCall(command),
+    profile: "standard",
+    expected,
+  }));
+}
+
+/** Every Notion tool name either server exposes today (claude.ai connector naming). */
+// The reads ask-mcp-shared-write lets through; every other Notion tool asks.
+const NOTION_READ =
+  /^notion-(?:fetch|search|get-|list-|query-|calendar-list-|download-|read-|memory-search)/;
+
+const NOTION_TOOLS = [
+  "notion-calendar-cancel-events",
+  "notion-calendar-create-events",
+  "notion-calendar-list-calendar-resources",
+  "notion-calendar-list-calendars",
+  "notion-calendar-list-contacts",
+  "notion-calendar-list-coworkers-events",
+  "notion-calendar-list-events",
+  "notion-calendar-update-events",
+  "notion-check-mcp-next-steps",
+  "notion-convert-page-to-skill",
+  "notion-create-attachment",
+  "notion-create-comment",
+  "notion-create-database",
+  "notion-create-file-upload",
+  "notion-create-folder",
+  "notion-create-pages",
+  "notion-create-view",
+  "notion-delete-comment",
+  "notion-delete-databases",
+  "notion-delete-pages",
+  "notion-download-attachment",
+  "notion-download-skill",
+  "notion-duplicate-page",
+  "notion-fetch",
+  "notion-get-async-task",
+  "notion-get-comments",
+  "notion-get-enabled-skills",
+  "notion-get-file-download-urls",
+  "notion-get-groups",
+  "notion-get-self",
+  "notion-get-session-status",
+  "notion-get-teams",
+  "notion-get-tool-access",
+  "notion-get-users",
+  "notion-list-favorite-pages",
+  "notion-list-page-backlinks",
+  "notion-list-private-pages",
+  "notion-list-recent-pages",
+  "notion-list-session-events",
+  "notion-list-shared-pages",
+  "notion-memory-search",
+  "notion-move-pages",
+  "notion-query-data-sources",
+  "notion-query-meeting-notes",
+  "notion-query-multiple-data-sources",
+  "notion-query-sessions",
+  "notion-read-session-event",
+  "notion-restore-pages",
+  "notion-search",
+  "notion-search-agents",
+  "notion-search-sessions",
+  "notion-send-message-to-session",
+  "notion-set-comment-reaction",
+  "notion-set-discussion-resolved",
+  "notion-show-advanced-analysis-next-steps",
+  "notion-spawn-session",
+  "notion-stop-session",
+  "notion-update-comment",
+  "notion-update-data-source",
+  "notion-update-enabled-skills",
+  "notion-update-folder",
+  "notion-update-page",
+  "notion-update-view",
+  "notion-upload-skill",
+  "notion-wait-session",
+] as const;
+
+const PRECEDENCE_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
+  ...shellRows("ask-gh-pr-create-ready", [
+    ["gh pr create asks (opens ready)", "gh pr create -t x -b y", "ask"],
+    ["gh pr new is the same command", "gh pr new --fill", "ask"],
+    ["--draft=false opens ready", "gh pr create --draft=false --fill", "ask"],
+    [
+      "a persistent flag before the verb: gh pr --repo o/r create",
+      "gh pr --repo o/r create --fill",
+      "ask",
+    ],
+    ["gh pr -R o/r create", "gh pr -R o/r create --fill", "ask"],
+    [
+      "a title that is exactly --draft is a value, not the opt-out",
+      "gh pr create -t --draft -b x",
+      "ask",
+    ],
+    ["a body that is exactly -d is a value, not the opt-out", "gh pr create -b -d --fill", "ask"],
+    ["gh pr create --draft is allowed", "gh pr create --draft --fill", "allow"],
+    ["gh pr create -d is allowed", "gh pr create -t x -d", "allow"],
+    ["gh pr -R o/r create --draft is allowed", "gh pr -R o/r create --draft", "allow"],
+    ["gh pr list is not a create", "gh pr list", "allow"],
+    ["gh pr ready is not gated here", "gh pr ready 12", "allow"],
+  ]),
+  ...shellRows("ask-gh-pr-merge", [
+    ["gh pr merge asks", "gh pr merge 12 --squash", "ask"],
+    ["gh pr -R o/r merge asks", "gh pr -R o/r merge 12", "ask"],
+    ["gh pr --repo=o/r merge asks", "gh pr --repo=o/r merge 12", "ask"],
+    ["merge through the REST API asks", "gh api -X PUT repos/o/r/pulls/12/merge", "ask"],
+    [
+      "merge through GraphQL asks",
+      "gh api graphql -f query='mutation { mergePullRequest(input: {}) { clientMutationId } }'",
+      "ask",
+    ],
+    ["gh pr view is not a merge", "gh pr view 12", "allow"],
+    ["gh pr view --repo o/r is not a merge", "gh pr view --repo o/r 12", "allow"],
+  ]),
+  ...shellRows("ask-gh-pr-comment", [
+    ["gh pr comment asks", "gh pr comment 12 -b looks-good", "ask"],
+    ["gh pr -R o/r comment asks", "gh pr -R o/r comment 1 -b x", "ask"],
+    ["gh issue -R o/r comment asks", "gh issue -R o/r comment 3 -b x", "ask"],
+    ["gh pr review --approve asks", "gh pr review 12 --approve", "ask"],
+    ["gh pr review --request-changes asks", "gh pr review 12 --request-changes -b x", "ask"],
+    ["gh pr review --comment asks", "gh pr review 12 --comment -b x", "ask"],
+    ["gh pr -R o/r review asks", "gh pr -R o/r review 12 --approve", "ask"],
+    ["gh issue comment asks", "gh issue comment 3 --body x", "ask"],
+    ["gh pr close -c asks", "gh pr close 12 -c superseded", "ask"],
+    ["gh pr close --comment asks", "gh pr close 12 --comment superseded", "ask"],
+    ["gh pr close -dc (bundled) asks", "gh pr close 12 -dc superseded", "ask"],
+    ["gh issue close --comment= asks", "gh issue close 3 --comment=done", "ask"],
+    ["gh pr close without a comment is not a comment", "gh pr close 12", "allow"],
+    [
+      "gh issue close -r without a comment is not a comment",
+      "gh issue close 3 -r completed",
+      "allow",
+    ],
+    [
+      "POST to pulls/N/comments asks",
+      "gh api repos/o/r/pulls/12/comments -f body=x -f path=a.ts -F line=3",
+      "ask",
+    ],
+    ["POST to pulls/N/reviews asks", "gh api -X POST repos/o/r/pulls/12/reviews", "ask"],
+    [
+      "--method=POST to issues/N/comments asks",
+      "gh api --method=POST /repos/o/r/issues/3/comments",
+      "ask",
+    ],
+    [
+      "--input to pulls/N/reviews asks",
+      "gh api repos/o/r/pulls/12/reviews --input review.json",
+      "ask",
+    ],
+    [
+      "a reply to a review comment asks",
+      "gh api repos/o/r/pulls/12/comments/99/replies -f body=x",
+      "ask",
+    ],
+    [
+      "PATCH an issue comment asks",
+      "gh api -X PATCH repos/o/r/issues/comments/55 -f body=y",
+      "ask",
+    ],
+    ["DELETE an issue comment asks", "gh api -X DELETE repos/o/r/issues/comments/55", "ask"],
+    ["DELETE a review comment asks", "gh api --method DELETE repos/o/r/pulls/comments/77", "ask"],
+    [
+      "a GraphQL review mutation asks",
+      "gh api graphql -f query='mutation { addPullRequestReview(input: {}) { clientMutationId } }'",
+      "ask",
+    ],
+    [
+      "a GraphQL thread reply asks",
+      "gh api graphql -f query='mutation { addPullRequestReviewThreadReply(input: {}) { clientMutationId } }'",
+      "ask",
+    ],
+    [
+      "a GraphQL comment edit asks",
+      "gh api graphql -f query='mutation { updateIssueComment(input: {}) { clientMutationId } }'",
+      "ask",
+    ],
+    [
+      "a GraphQL comment delete asks",
+      "gh api graphql -f query='mutation { deleteIssueComment(input: {}) { clientMutationId } }'",
+      "ask",
+    ],
+    [
+      "a GraphQL review comment edit asks",
+      "gh api graphql -f query='mutation { updatePullRequestReviewComment(input: {}) { clientMutationId } }'",
+      "ask",
+    ],
+    ["reading the comments is allowed", "gh api repos/o/r/pulls/12/comments", "allow"],
+    ["reading one comment is allowed", "gh api repos/o/r/issues/comments/55", "allow"],
+    [
+      "an explicit GET is allowed",
+      "gh api -X GET repos/o/r/issues/3/comments -f per_page=100",
+      "allow",
+    ],
+    ["gh pr view --comments is allowed", "gh pr view 12 --comments", "allow"],
+    ["gh issue create is out of scope", "gh issue create -t x -b y", "allow"],
+  ]),
+  ...shellRows("ask-git-worktree-remove-force", [
+    ["git worktree remove --force asks", "git worktree remove --force .claude/worktrees/a", "ask"],
+    ["git worktree remove -f asks", "git worktree remove -f .claude/worktrees/a", "ask"],
+    ["the flag after the path asks too", "git worktree remove .claude/worktrees/a --force", "ask"],
+    ["-ff (locked) asks", "git worktree remove -ff .claude/worktrees/a", "ask"],
+    ["abbreviated --fo asks", "git worktree remove --fo wt", "ask"],
+    ["abbreviated --forc asks", "git worktree remove --forc wt", "ask"],
+    ["variant: git -C <dir> worktree remove -f asks", "git -C /r worktree remove -f wt", "ask"],
+    ["variant: spaced --git-dir asks", "git --git-dir /r/.git worktree remove -f wt", "ask"],
+    ["variant: spaced --work-tree asks", "git --work-tree /x worktree remove --force wt", "ask"],
+    ["variant: spaced --namespace asks", "git --namespace n worktree remove -f wt", "ask"],
+    ["a plain worktree remove is allowed", "git worktree remove .claude/worktrees/a", "allow"],
+    ["git worktree add -f is not a removal", "git worktree add -f wt feature", "allow"],
+    ["git worktree prune is not a removal", "git worktree prune", "allow"],
+  ]),
+  ...NOTION_TOOLS.map((tool) => ({
+    rule: "ask-mcp-shared-write",
+    label: `Notion ${tool} (claude.ai connector)`,
+    call: { tool: `mcp__claude_ai_Notion__${tool}`, input: {} },
+    profile: "standard" as const,
+    expected: (NOTION_READ.test(tool) ? "allow" : "ask") as Outcome,
+  })),
+  {
+    rule: "ask-mcp-shared-write",
+    label: "the house notion-mcp server's writes ask",
+    call: { tool: "mcp__notion-mcp__notion-move-pages", input: {} },
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    rule: "ask-mcp-shared-write",
+    label: "fail-safe: an unknown Notion tool asks",
+    call: { tool: "mcp__notion-mcp__notion-some-future-tool", input: {} },
+    profile: "standard",
+    expected: "ask",
+  },
+];
+
+describe("the real guard-rules.json — pstack precedence and GitHub comment rules", () => {
+  const policy = loadRealPolicy();
+  const present = new Set(policy.rules.map((rule) => rule.id));
+
+  test("the five rules are all present or all absent, never a partial promotion", () => {
+    const count = PRECEDENCE_RULE_IDS.filter((id) => present.has(id)).length;
+    expect([0, PRECEDENCE_RULE_IDS.length]).toContain(count);
+  });
+
+  test("the hook matcher routes every Notion tool to the guard, so the rule's read list decides", () => {
+    const routed = NOTION_TOOLS.filter((tool) =>
+      new RegExp(`^(?:${SHARED_WRITE_MCP_MATCHER})$`).test(`mcp__claude_ai_Notion__${tool}`),
+    );
+    expect(routed).toEqual([...NOTION_TOOLS]);
+  });
+
+  for (const { rule, label, call, profile, expected } of PRECEDENCE_RULE_CASES) {
+    test.skipIf(!present.has(rule))(`${rule}: ${label}`, () => {
+      expect(decide(policy, call, profile)).toBe(expected);
+    });
+  }
+
+  const personal = "/Users/owner/go/github.com/owner/dotfiles";
+  const work = "/Users/owner/go/github.com/acme/service";
+  const waived = withWaivers(policy, {
+    "main-push-allowed": ["/Users/owner/go/github.com/owner/"],
+  });
+  const at = (cwd: string) => ({ harness: "test", profile: "standard" as const, cwd });
+  test.skipIf(!present.has("ask-gh-pr-create-ready"))(
+    "ask-gh-pr-create-ready: a ready PR is free in a personal repository, asked elsewhere",
+    () => {
+      const create = shellCall("gh pr create --fill");
+      expect(judge(create, at(personal), waived).decision.kind).toBe("allow");
+      expect(judge(create, at(work), waived).decision.kind).toBe("ask");
+      for (const other of [
+        "gh pr create -R acme/service --fill",
+        "gh pr -R acme/service create --fill",
+        "gh pr create -fR acme/service",
+      ]) {
+        expect(judge(shellCall(other), at(personal), waived).decision.kind).toBe("ask");
+      }
+    },
+  );
+  test.skipIf(!present.has("ask-gh-pr-comment"))(
+    "ask-gh-pr-comment: no personal-repository exception",
+    () => {
+      expect(judge(shellCall("gh pr comment 1 -b x"), at(personal), waived).decision.kind).toBe(
+        "ask",
+      );
+    },
+  );
 });

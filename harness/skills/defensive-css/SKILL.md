@@ -92,7 +92,7 @@ accessible name).
 
 - `css-modern` — modern syntax replacements for legacy CSS idioms
 - `css-units` — relative-unit resolution and zoom-safe fluid typography
-- `web-platform-reviewer` — the agent that enforces this table on diffs
+- `code-reviewer`, reading `css-modern/references/review-standard.md` section 4.4, enforces this table on diffs
 - `storybook-guidelines` (react pack) — where the stress fixtures live as stories
 - `css-cascade` — cascade resolution order and specificity mechanism
 - `css-flow` — margin collapse mechanism and spacing patterns

@@ -3,6 +3,7 @@
 Status: accepted — staticcheck / clippy / race / html-validate の自動フック配線は業界で少数かつ低 star、ベンダー自身が CI 向けと位置付け、stylelint だけ PostToolUse への実配線が二桁ある（2026-09-23）
 
 rule: jig's own hook tables run formatters on edit and type-check/lint gates at Stop, nothing else; the one addition is stylelint on edit for .css/.scss/.sass/.less when the project has a stylelint config (config or silence). Never wire staticcheck, cargo clippy, go test -race or html-validate into hooks; make them runnable through guard permits and tell the model in AGENTS.md to run the language's static checks before claiming completion. Let rustfmt read the project's edition instead of hard-coding one.
+scope: repo
 
 ## Problem
 

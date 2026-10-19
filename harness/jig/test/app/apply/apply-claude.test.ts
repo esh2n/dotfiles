@@ -318,9 +318,7 @@ describe("--write", () => {
     expect(
       second.skillsDir.entries.map((e) => (e.kind === "link" ? e.plan.state : e.kind)),
     ).toEqual(["ok"]);
-    expect(
-      second.agentsDir.entries.map((e) => (e.kind === "link" ? e.plan.state : e.kind)),
-    ).toEqual(["ok"]);
+    expect(second.agentsDir.files.map((file) => file.outcome)).toEqual(["noop"]);
     expect(files[PATHS.settings]).toBe(after);
     expect(second.composition.removed).toEqual([]);
   });
@@ -423,7 +421,36 @@ describe("a machine with no settings.json yet", () => {
 });
 
 describe("AGENTS.md", () => {
-  test("is generated from rules/common and rules/decisions with absolute links, and sized", async () => {
+  test("the repo-scoped decisions go to the checkout's own AGENTS.md, with a CLAUDE.md link, and leave the global one", async () => {
+    const { ports, files, links } = fakePorts({
+      files: {
+        [`${PATHS.decisions}/2026-09-23-repo.md`]:
+          "# 題\n\nStatus: accepted — 理由（2026-09-23）\n\nrule: Build dotctl in Go.\nscope: repo\n",
+      },
+    });
+    const paths = { ...PATHS, repoAgentsMd: "/repo/AGENTS.md", repoClaudeMd: "/repo/CLAUDE.md" };
+    const report = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: true }, ports);
+
+    expect(report.agentsMd.content).toContain("- Do the one thing. (2026-09-22-one.md)");
+    expect(report.agentsMd.content).not.toContain("Build dotctl in Go.");
+    expect(files["/repo/AGENTS.md"]).toContain("## Decisions for this repository");
+    expect(files["/repo/AGENTS.md"]).toContain("- Build dotctl in Go. (2026-09-23-repo.md)");
+    expect(files["/repo/AGENTS.md"]).not.toContain("Do the one thing.");
+    expect(links["/repo/CLAUDE.md"]).toBe("AGENTS.md");
+    const again = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: false }, ports);
+    expect(again.repoAgentsMd?.outcome).toBe("noop");
+
+    // a hand edit there is skipped, and does not stop the rest of the apply
+    files["/repo/AGENTS.md"] = "edited by hand\n";
+    files[`${H}/rules/common/z-new.md`] = "# New\n\nnew rule\n";
+    const edited = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: true }, ports);
+    expect(edited.repoAgentsMd?.outcome).toBe("conflict");
+    expect(edited.outcome).toBe("write");
+    expect(files["/repo/AGENTS.md"]).toBe("edited by hand\n");
+    expect(files[PATHS.agentsMd]).toContain("new rule");
+  });
+
+  test("is generated from rules/common and rules/decisions, the notes' directory named once, and sized", async () => {
     const { ports } = fakePorts({
       files: {
         [`${H}/rules/common/b-git.md`]: "# Git\n\nCommit small.\n",
@@ -442,9 +469,8 @@ describe("AGENTS.md", () => {
     expect(agentsMd.content).not.toContain("paths: []");
     expect(agentsMd.content).toContain(`](${H}/rules/research/INDEX.md)`);
     // The note's `rule:` line, not its Japanese title.
-    expect(agentsMd.content).toContain(
-      `- **Do the one thing.** — [2026-09-22-one.md](${H}/rules/decisions/2026-09-22-one.md)`,
-    );
+    expect(agentsMd.content).toContain("- Do the one thing. (2026-09-22-one.md)");
+    expect(agentsMd.content).toContain(`${H}/rules/decisions/.`);
     expect(agentsMd.content).not.toContain("決定の題");
     expect(agentsMd.bytes).toBe(Buffer.byteLength(agentsMd.content));
     expect(agentsMd.overLimit).toBe(false);
@@ -546,20 +572,12 @@ describe("the links and directories, on the machine yoki-switch left", () => {
         plan: { path: `${PATHS.skills}/writeup`, target: `${H}/skills/writeup`, state: "create" },
       },
     ]);
-    expect(report.agentsDir.plan).toMatchObject({
-      state: "replace",
-      previousTarget: `${CLAUDE}/.agents-merged`,
+    expect(report.agentsDir.dirState).toEqual({
+      kind: "symlink",
+      target: `${CLAUDE}/.agents-merged`,
     });
-    expect(report.agentsDir.entries).toEqual([
-      {
-        kind: "link",
-        name: "research.md",
-        plan: {
-          path: `${PATHS.agents}/research.md`,
-          target: `${H}/agents/research.md`,
-          state: "create",
-        },
-      },
+    expect(report.agentsDir.files.map((file) => [file.name, file.outcome])).toEqual([
+      ["research.md", "write"],
     ]);
     expect(report.rulesDir.plan).toMatchObject({
       state: "replace",
@@ -587,7 +605,7 @@ describe("the links and directories, on the machine yoki-switch left", () => {
     expect(links[`${PATHS.skills}/README.md`]).toBeUndefined();
     expect(links[PATHS.agents]).toBeUndefined();
     expect(dirs.has(PATHS.agents)).toBe(true);
-    expect(links[`${PATHS.agents}/research.md`]).toBe(`${H}/agents/research.md`);
+    expect(files[`${PATHS.agents}/research.md`]).toContain("# research");
     // The rules directory is now real and empty of links (no conditional dirs exist yet).
     expect(links[PATHS.rulesDir]).toBeUndefined();
     expect(dirs.has(PATHS.rulesDir)).toBe(true);
@@ -703,41 +721,127 @@ describe("the skills directory", () => {
   });
 });
 
-describe("the agents directory", () => {
-  test("one link per *.md file; anything else in agents/ is not linked, with why", async () => {
-    const { ports, links } = fakePorts({
+describe("the agents directory (generated, rules/decisions/2026-10-19-model-assignment.md)", () => {
+  const MODELS = JSON.stringify({
+    schemaVersion: "jig.agent-models.v1",
+    claude: { complex: { model: "opus" }, main: { model: "sonnet" } },
+  });
+  const ARCHITECT = "---\nname: architect\nmodel: complex\neffort: xhigh\n---\nPlan.\n";
+
+  test("each *.md becomes a generated file with its tier turned into the Claude alias; anything else is not generated, with why", async () => {
+    const { ports, files, links } = fakePorts({
       files: {
-        [`${H}/agents/architect.md`]: "# architect\n",
+        [`${H}/agents/models.json`]: MODELS,
+        [`${H}/agents/architect.md`]: ARCHITECT,
         [`${H}/agents/notes.txt`]: "x",
       },
     });
     const report = await run(ports, true);
 
-    expect(report.agentsDir.selection.linked).toEqual(["architect.md", "research.md"]);
-    expect(report.agentsDir.selection.excluded).toEqual([
+    expect(report.agentsDir.files.map((file) => file.name)).toEqual([
+      "architect.md",
+      "research.md",
+    ]);
+    expect(report.agentsDir.excluded).toEqual([
+      { name: "models.json", reason: "not a *.md file" },
       { name: "notes.txt", reason: "not a *.md file" },
     ]);
-    expect(links[`${PATHS.agents}/architect.md`]).toBe(`${H}/agents/architect.md`);
-    expect(links[`${PATHS.agents}/research.md`]).toBe(`${H}/agents/research.md`);
-    expect(links[`${PATHS.agents}/notes.txt`]).toBeUndefined();
+    expect(files[`${PATHS.agents}/architect.md`]).toContain("\nmodel: opus\neffort: xhigh\n");
+    expect(links[`${PATHS.agents}/architect.md`]).toBeUndefined();
+    expect(files[`${PATHS.agents}/notes.txt`]).toBeUndefined();
+
+    const again = await run(ports);
+    expect(again.agentsDir.files.map((file) => file.outcome)).toEqual(["noop", "noop"]);
   });
 
-  test("a removed source file leaves a stale link that the next write removes; a user's own file stays", async () => {
+  test("jig's old link is replaced by the generated file, with no backup", async () => {
+    const { ports, files, links } = fakePorts({
+      files: { [`${H}/agents/models.json`]: MODELS, [`${H}/agents/architect.md`]: ARCHITECT },
+      links: { [`${PATHS.agents}/architect.md`]: `${H}/agents/architect.md` },
+      dirs: [PATHS.agents],
+    });
+    const dry = await run(ports);
+    expect(dry.agentsDir.files.find((f) => f.name === "architect.md")?.replacesLink).toBe(
+      `${H}/agents/architect.md`,
+    );
+
+    await run(ports, true);
+    expect(links[`${PATHS.agents}/architect.md`]).toBeUndefined();
+    expect(files[`${PATHS.agents}/architect.md`]).toContain("model: opus");
+    expect(Object.keys(files).some((path) => path.includes("architect.md.pre-jig"))).toBe(false);
+  });
+
+  test("a house agent naming a vendor model stops the apply, naming the file", async () => {
+    const { ports } = fakePorts({
+      files: { [`${H}/agents/old.md`]: "---\nname: old\nmodel: opus\n---\nx\n" },
+    });
+    await expect(run(ports)).rejects.toThrow(
+      'agents/old.md: model "opus" is not a tier (main, complex, executor)',
+    );
+  });
+
+  test("a removed source leaves a stale file the next write removes; jig's old link to a gone source goes too; a user's own file stays", async () => {
     const { ports, files, links } = fakePorts({
       files: { [`${PATHS.agents}/mine.md`]: "my agent" },
+      links: { [`${PATHS.agents}/gone.md`]: `${H}/agents/gone.md` },
+      dirs: [PATHS.agents],
     });
     await run(ports, true);
+    expect(links[`${PATHS.agents}/gone.md`]).toBeUndefined();
     delete files[`${H}/agents/research.md`];
 
     const dry = await run(ports);
-    expect(dry.agentsDir.entries.map((e) => `${e.name}:${e.kind}`)).toEqual([
-      "research.md:stale",
-      "mine.md:foreign",
-    ]);
+    expect(dry.agentsDir.stale.map((e) => e.name)).toEqual(["research.md"]);
+    expect(dry.agentsDir.foreign.map((e) => e.name)).toEqual(["mine.md"]);
 
     await run(ports, true);
-    expect(links[`${PATHS.agents}/research.md`]).toBeUndefined();
+    expect(files[`${PATHS.agents}/research.md`]).toBeUndefined();
     expect(files[`${PATHS.agents}/mine.md`]).toBe("my agent");
+  });
+});
+
+describe("the agents directory: edges", () => {
+  test("a relative link into the harness is jig's and is replaced", async () => {
+    const { ports, files, links } = fakePorts({
+      links: { [`${PATHS.agents}/research.md`]: "../../../../repo/llm/harness/agents/research.md" },
+      dirs: [PATHS.agents],
+    });
+    await run(ports, true);
+    expect(links[`${PATHS.agents}/research.md`]).toBeUndefined();
+    expect(files[`${PATHS.agents}/research.md`]).toContain("# research");
+  });
+
+  test("a link jig did not make is a conflict and is left alone", async () => {
+    const { ports, files, links } = fakePorts({
+      links: { [`${PATHS.agents}/research.md`]: "../../repo-harness-link-ignored" },
+      dirs: [PATHS.agents],
+    });
+    // A relative target that resolves outside the roots is somebody else's: a conflict.
+    const report = await run(ports);
+    expect(report.outcome).toBe("conflict");
+    expect(report.message).toContain("is a link jig did not make");
+    expect(links[`${PATHS.agents}/research.md`]).toBe("../../repo-harness-link-ignored");
+    expect(files[`${PATHS.agents}/research.md`]).toBeUndefined();
+  });
+
+  test("a regular file where the directory goes is a conflict", async () => {
+    const { ports } = fakePorts({ files: { [PATHS.agents]: "not a dir" } });
+    const report = await run(ports);
+    expect(report.outcome).toBe("conflict");
+    expect(report.message).toContain("is a regular file where the agents directory goes");
+  });
+
+  test("a file already matching what jig would write is recorded, so a later edit is caught", async () => {
+    const seed = fakePorts();
+    await run(seed.ports, true);
+    const generated = seed.files[`${PATHS.agents}/research.md`] ?? "";
+
+    const { ports, files } = fakePorts({ files: { [`${PATHS.agents}/research.md`]: generated } });
+    const first = await run(ports, true);
+    expect(first.agentsDir.files[0]?.outcome).toBe("noop");
+    files[`${PATHS.agents}/research.md`] = "edited by hand";
+    const second = await run(ports);
+    expect(second.outcome).toBe("conflict");
   });
 });
 
@@ -888,8 +992,8 @@ describe("milestone 4: scripts and workflows", () => {
       files: {
         [`${H}/scripts/statusline.sh`]: "#!/bin/sh\n",
         [`${H}/scripts/README.md`]: "# scripts\n",
-        [`${H}/workflows/review.js`]: "// review\n",
-        [`${H}/workflows/lib/lanes.js`]: "// lanes\n",
+        [`${H}/workflows/research.js`]: "// research\n",
+        [`${H}/workflows/lib/helpers.js`]: "// helpers\n",
         [`${H}/workflows/README.md`]: "# workflows\n",
       },
     });
@@ -897,7 +1001,7 @@ describe("milestone 4: scripts and workflows", () => {
     expect(dry.scriptsDir.dir?.plan.state).toBe("replace");
     expect(dry.scriptsDir.dir?.selection.linked).toEqual(["statusline.sh"]);
     expect(dry.workflowsDir.dir?.plan.state).toBe("replace");
-    expect(dry.workflowsDir.dir?.selection.linked).toEqual(["lib", "review.js"]);
+    expect(dry.workflowsDir.dir?.selection.linked).toEqual(["lib", "research.js"]);
     expect(dry.outcome).toBe("write");
 
     const report = await run(ports, true);
@@ -906,7 +1010,7 @@ describe("milestone 4: scripts and workflows", () => {
     expect(links[`${PATHS.scripts}/statusline.sh`]).toBe(`${H}/scripts/statusline.sh`);
     expect(links[`${PATHS.scripts}/README.md`]).toBeUndefined();
     expect(dirs.has(PATHS.workflows)).toBe(true);
-    expect(links[`${PATHS.workflows}/review.js`]).toBe(`${H}/workflows/review.js`);
+    expect(links[`${PATHS.workflows}/research.js`]).toBe(`${H}/workflows/research.js`);
     expect(links[`${PATHS.workflows}/lib`]).toBe(`${H}/workflows/lib`);
 
     // The second run finds every link ok.

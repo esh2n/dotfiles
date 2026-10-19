@@ -106,7 +106,7 @@ involved.
 
 **What it talks to.** `OPENAI_API_BASE_URL=http://host.docker.internal:4000/v1`
 — the LiteLLM gateway on the same Mac, so the phone gets the same three tiers
-(`main` / `complex` / `deterministic`) as pi, DSH and omp and its usage is
+(`main` / `complex` / `executor`) as pi, DSH and omp and its usage is
 measured like theirs (owner's ruling 2026-09-23; before that it pointed at LM
 Studio directly and the phone saw local models only, unmeasured).
 `OPENAI_API_KEY` is the proxy's master key, put in the environment by
@@ -174,14 +174,14 @@ of a copy; that is part of what the jig rebuild is for.
 
 | Axis | Label | Answers |
 |---|---|---|
-| requested alias | `requested_model` | was `main` / `complex` / `deterministic` actually used? |
+| requested alias | `requested_model` | was `main` / `complex` / `executor` actually used? |
 | served model | `model` | which real model answered |
 | harness | `user_agent` | which harness sent it — each names itself in its proxy config (`pi`, `dsh`, `omp`; Open WebUI cannot set a header (its env reference has none for backend calls) so the panel renames its `Python/… aiohttp/…` to `open-webui` with `label_replace`, and a client sending no header shows as `unnamed (no User-Agent header)`; litellm/check.sh sends `home-llm-check`) since 2026-09-24; before that the runtime's default (`Bun/…`, `None`) made them indistinguishable |
 | time | — | did a change help or hurt |
 
 Today's baseline, measured while writing this: 359 successful requests, 32.9M
 input / 0.49M output tokens, $1.09 total spend, TTFT mean ≈ 0.71 s. `complex` has
-served 1 request and `deterministic` has served 0 — the higher and local tiers are
+served 1 request and `executor` has served 0 — the higher and local tiers are
 wired but unused, so "is DeepSeek V4 Pro good enough" is still an open question
 that only measurement can answer.
 

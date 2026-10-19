@@ -80,6 +80,27 @@ describe("reconcileManagedDir", () => {
     });
   });
 
+  test("a link into another source tree of the plan is stale once no longer planned", () => {
+    const pack = "/home/u/.local/share/jig/plugins/pstack/pstack/skills";
+    const entries = [
+      { name: "arena", state: { kind: "symlink" as const, target: `${pack}/arena` } },
+      { name: "gone", state: { kind: "symlink" as const, target: `${pack}/gone` } },
+    ];
+    const actions = reconcileManagedDir({
+      dir: DIR,
+      sourceDir: SOURCE,
+      planned: ["arena"],
+      targetOf: (name) => `${pack}/${name}`,
+      otherSourceDirs: [pack],
+      entries,
+    });
+    expect(actions.map((a) => [a.kind, a.name])).toEqual([
+      ["link", "arena"],
+      ["stale", "gone"],
+    ]);
+    expect(actions[0]).toMatchObject({ plan: { state: "ok" } });
+  });
+
   test("a dangling link is stale only when the caller followed it and said so", () => {
     const target = "/gone/skills/x";
     const unprobed = reconcileManagedDir({

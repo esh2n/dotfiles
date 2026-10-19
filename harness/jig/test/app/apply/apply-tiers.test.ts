@@ -46,8 +46,8 @@ const MINIMAL_TIERS = {
       pi: { name: "complex" },
       dsh: { name: "complex" },
     },
-    deterministic: {
-      alias: "deterministic",
+    executor: {
+      alias: "executor",
       displayName: "local Qwen",
       use: ["qwen-local"],
       reasoning: true,
@@ -55,8 +55,8 @@ const MINIMAL_TIERS = {
       contextWindow: 131072,
       maxTokens: 32768,
       compat: { thinkingFormat: "qwen-chat-template", supportsReasoningEffort: false },
-      pi: { name: "deterministic" },
-      dsh: { name: "deterministic" },
+      pi: { name: "executor" },
+      dsh: { name: "executor" },
     },
   },
 };
@@ -279,7 +279,7 @@ describe("applyTiers", () => {
       );
 
     expect((await run()).results[0]?.outcome).toBe("write");
-    expect(files[LITELLM_PATH]).toContain("  - model_name: deterministic");
+    expect(files[LITELLM_PATH]).toContain("  - model_name: executor");
     expect(files[LITELLM_PATH]).toContain("model: lm_studio/qwen/qwen3.8-27b");
 
     files[LITELLM_PATH] = "model_list:\n";

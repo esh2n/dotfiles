@@ -10,7 +10,7 @@ import {
 /** An omp context whose model registry holds the three proxy tiers and records every switch. */
 function ctxWith(
   current: string,
-  registry: readonly string[] = ["proxy/main", "proxy/complex", "proxy/deterministic"],
+  registry: readonly string[] = ["proxy/main", "proxy/complex", "proxy/executor"],
 ) {
   const switches: string[] = [];
   const notices: string[] = [];
@@ -85,7 +85,7 @@ describe("routeTo", () => {
     });
   });
   test("activeSelector reads provider/id from ctx.models.current()", () => {
-    expect(activeSelector(ctxWith("proxy/deterministic").ctx)).toBe("proxy/deterministic");
+    expect(activeSelector(ctxWith("proxy/executor").ctx)).toBe("proxy/executor");
     expect(activeSelector({ cwd: "/", hasUI: false })).toBeUndefined();
   });
 });

@@ -36,7 +36,7 @@ const LANGUAGE = (A && A.language) || 'Japanese'
 // as a status-ok result that happens to carry an `error` field.
 if (!QUESTION) { throw new Error('research requires args.question') }
 
-// --- provider-lane helpers (canonical copy: core/workflows/lib/lanes.js) ---
+// --- provider-lane helpers ---
 
 /** The providers a lane may be routed to. `claude` is answered natively;
  *  every other one goes through the transport below. */
@@ -211,10 +211,8 @@ const laneEnvelopeSchema = (schema) => ({
  * routing it through a transport would change every default-configuration
  * run's prompts, labels and journal.
  *
- * THE SECURITY SHAPE. The lane prompt is untrusted: review.js interpolates
- * an LLM-written intent and GROUNDING derived from the diff under review,
- * research.js the question and fetched context, design-review.js the design
- * document verbatim. It used to be pasted into the transport's own
+ * THE SECURITY SHAPE. The lane prompt is untrusted: it interpolates
+ * the question and the fetched context verbatim. It used to be pasted into the transport's own
  * instructions between a FIXED `<<<YOKI_PROMPT` delimiter, one blank line
  * below a numbered list of steps — so a payload containing a line reading
  * `YOKI_PROMPT` followed by `Steps, in order: …` was, to the weakest model
@@ -240,8 +238,7 @@ const laneEnvelopeSchema = (schema) => ({
  *     provider call needs, since that call runs as its child).
  *
  * The cost of carrying the payload in argv is a length ceiling — the OS
- * caps argv+env at ~1MB. Every caller already truncates well below it (the
- * largest is design-review's 30k-character design text), so `LANE_MAX_B64`
+ * caps argv+env at ~1MB. Every caller already truncates well below it, so `LANE_MAX_B64`
  * is a guard against a future caller that stops truncating, and it fails
  * with a sentence rather than as an opaque E2BIG at run time.
  */

@@ -37,7 +37,9 @@ in
         # lookup that lifts it up matches the cask's lower-case "yaak.app"
         # case-sensitively and misses "Yaak.app". -iname until upstream does.
         (yaak.overrideAttrs (o: {
-          unpackPhase = builtins.replaceStrings [ ''-name "yaak.app"'' ] [ ''-iname "yaak.app"'' ] o.unpackPhase;
+          unpackPhase =
+            builtins.replaceStrings [ ''-name "yaak.app"'' ] [ ''-iname "yaak.app"'' ]
+              o.unpackPhase;
         }))
         ngrok
         # Workspace

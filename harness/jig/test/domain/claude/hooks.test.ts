@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { CLAUDE_HOOK_EVENTS, buildClaudeHooks } from "../../../src/domain/claude/hooks";
+import {
+  CLAUDE_HOOK_EVENTS,
+  SHARED_WRITE_MCP_MATCHER,
+  buildClaudeHooks,
+} from "../../../src/domain/claude/hooks";
 import { HOST_SANDBOX } from "../../../src/domain/claude/sandbox";
 
 const PATHS = { bun: "/abs/bun", jig: "/abs/jig/src/cli/jig.ts" };
@@ -52,6 +56,26 @@ describe("the five hooks", () => {
     expect(group("SessionStart")).not.toHaveProperty("matcher");
     expect(group("UserPromptSubmit")).not.toHaveProperty("matcher");
     expect(group("Stop")).not.toHaveProperty("matcher");
+  });
+
+  test("the guard sees every Notion tool; the rule tells reads from writes (ask-mcp-shared-write)", () => {
+    const hooks = buildClaudeHooks(PATHS);
+    const pre = (hooks.PreToolUse as { matcher: string }[])[0]?.matcher ?? "(?!)";
+    const fires = (tool: string) => new RegExp(`^(?:${pre})$`).test(tool);
+    for (const tool of [
+      "mcp__claude_ai_Notion__notion-create-pages",
+      "mcp__notion-mcp__notion-delete-pages",
+      "mcp__claude_ai_Notion__notion-some-future-tool",
+      "mcp__claude_ai_Notion__notion-fetch",
+      "mcp__notion-mcp__notion-get-comments",
+    ]) {
+      expect(fires(tool)).toBe(true);
+    }
+    expect(fires("mcp__claude_ai_Gmail__authenticate")).toBe(false);
+  });
+
+  test("the shared-write matcher has no lookaround — Codex compiles matchers with Rust's regex crate", () => {
+    expect(SHARED_WRITE_MCP_MATCHER).not.toMatch(/\(\?<?[=!]/);
   });
 
   test("every hook has a timeout — none is left to the harness default", () => {

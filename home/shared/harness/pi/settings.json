@@ -20,5 +20,8 @@
     "npm:pi-mcp-adapter",
     "npm:@tintinweb/pi-subagents"
   ],
-  "theme": "unkai"
+  "theme": "unkai",
+  "retry": {
+    "maxRetries": 0
+  }
 }

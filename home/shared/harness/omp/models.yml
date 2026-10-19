@@ -38,7 +38,7 @@ providers:
   # no measurement — which the routing ruling forbids for omp. Configuring the
   # id explicitly is the one documented way to stop the discovery; this entry
   # points nowhere and lists nothing, so it can never be selected. LM Studio
-  # is reached only as the proxy's `deterministic` tier.
+  # is reached only as the proxy's `executor` tier.
   lm-studio:
     baseUrl: http://127.0.0.1:9/v1
     api: openai-completions
@@ -68,8 +68,8 @@ providers:
         contextWindow: 1000000
         maxContextWindow: 1000000
         maxTokens: 32768
-      - id: deterministic
-        name: deterministic — Qwen3.8-27B on the Linux model server (LiteLLM tier)
+      - id: executor
+        name: executor — Qwen3.8-27B on the Linux model server (LiteLLM tier)
         reasoning: true
         input: [text]
         contextWindow: 65536

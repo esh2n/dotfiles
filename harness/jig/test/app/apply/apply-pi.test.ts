@@ -148,7 +148,7 @@ describe("AGENTS.md over the symlink", () => {
     expect(dry.agentsMd.replacesSymlink).toBe(`${REPO_PI}/AGENTS.md`);
     expect(dry.agentsMd.backupPath).toBeUndefined();
     expect(dry.agentsMd.content).toContain("# Core");
-    expect(dry.agentsMd.content).toContain("**Do the thing.**");
+    expect(dry.agentsMd.content).toContain("- Do the thing. (a.md)");
     expect(dry.agentsMd.diff).toContain("-# Working rules (all pi tiers)");
     expect(dry.retiredAgentsMd).toEqual({ path: `${REPO_PI}/AGENTS.md`, state: { kind: "file" } });
 

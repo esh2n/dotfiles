@@ -15,7 +15,7 @@ interface RawTierDoc {
   tiers: {
     main: Record<string, unknown> & { dsh: Record<string, unknown> };
     complex?: Record<string, unknown> & { dsh: Record<string, unknown> };
-    deterministic: Record<string, unknown>;
+    executor: Record<string, unknown>;
     [extra: string]: unknown;
   };
 }
@@ -57,8 +57,8 @@ function validDoc(): RawTierDoc {
         pi: { name: "complex — DeepSeek V4 Pro (proxy, measured)" },
         dsh: { name: "complex (Astra)" },
       },
-      deterministic: {
-        alias: "deterministic",
+      executor: {
+        alias: "executor",
         displayName: "local Qwen",
         use: ["qwen-local"],
         reasoning: true,
@@ -68,8 +68,8 @@ function validDoc(): RawTierDoc {
         compat: { thinkingFormat: "qwen-chat-template", supportsReasoningEffort: false },
         thinkingLevelMap: { minimal: null, low: null, medium: "medium", high: null },
         samplingParams: { temperature: 1, top_p: 0.95, top_k: 20 },
-        pi: { name: "deterministic — local Qwen (proxy, measured)" },
-        dsh: { name: "deterministic (local Qwen)" },
+        pi: { name: "executor — local Qwen (proxy, measured)" },
+        dsh: { name: "executor (local Qwen)" },
       },
     },
   };
@@ -80,7 +80,7 @@ describe("parseTiers", () => {
     const policy = parseTiers(validDoc(), TEST_CATALOG);
     expect(policy.version).toBe(1);
     expect(policy.tiers.main.alias).toBe("main");
-    expect(policy.tiers.deterministic.samplingParams?.temperature).toBe(1);
+    expect(policy.tiers.executor.samplingParams?.temperature).toBe(1);
     expect(policy.connections.proxy.baseUrl).toBe("http://localhost:4000/v1");
   });
 
@@ -177,8 +177,8 @@ describe("maxContextWindow (the provider window a harness may opt into)", () => 
 
   test("resolves use against the catalog, first model as the backend", () => {
     const doc = validDoc();
-    doc.tiers.deterministic.use = ["qwen-local", "deepseek-flash"];
-    const tier = parseTiers(doc, TEST_CATALOG).tiers.deterministic;
+    doc.tiers.executor.use = ["qwen-local", "deepseek-flash"];
+    const tier = parseTiers(doc, TEST_CATALOG).tiers.executor;
     expect(tier.deployments.map((d) => d.id)).toEqual(["qwen-local", "deepseek-flash"]);
     expect(tier.backend).toEqual({ provider: "lm_studio", model: "qwen/qwen3.8-27b" });
   });

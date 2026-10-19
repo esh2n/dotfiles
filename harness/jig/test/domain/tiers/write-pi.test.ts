@@ -41,7 +41,7 @@ describe("toPiModels", () => {
     expect(fields).toContain("main:dsh.name");
     expect(fields).toContain("main:dsh.reasoningEfforts");
     expect(fields).toContain("complex:backend");
-    expect(fields).toContain("deterministic:backend");
+    expect(fields).toContain("executor:backend");
   });
 
   test("never drops a field pi's own schema can express", () => {

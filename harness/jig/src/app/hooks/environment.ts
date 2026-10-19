@@ -32,6 +32,28 @@ export function resolveStateDir(env: Env): string {
   return env.JIG_STATE_DIR ?? join(homedir(), ".local", "state", "jig");
 }
 
+/**
+ * Where the skill router reads the list a Claude Code session shows:
+ * `JIG_SKILL_ROOT`, else `<config dir>/skills`, the directory Claude Code
+ * itself loads from. `CLAUDE_CONFIG_DIR` is honored because Claude Code
+ * honors it and hands its environment to the hook.
+ */
+export function resolveSkillRoot(env: Env, home: string = homedir()): string {
+  return env.JIG_SKILL_ROOT ?? join(env.CLAUDE_CONFIG_DIR ?? join(home, ".claude"), "skills");
+}
+
+/**
+ * Where external skill packs are checked out (`harness/plugins/<name>/`
+ * names them; `dotctl setup plugins` fetches them): `JIG_PLUGINS_DIR`, else
+ * `$XDG_DATA_HOME/jig/plugins`, else `~/.local/share/jig/plugins`. dotctl
+ * resolves the same way, so the two agree without passing a path.
+ */
+export function resolvePluginsDir(env: Env, home: string = homedir()): string {
+  if (env.JIG_PLUGINS_DIR) return env.JIG_PLUGINS_DIR;
+  const data = env.XDG_DATA_HOME ? env.XDG_DATA_HOME : join(home, ".local", "share");
+  return join(data, "jig", "plugins");
+}
+
 /** The guard audit log's path, derived from the state dir. */
 export function resolveAuditPath(env: Env): string {
   return join(resolveStateDir(env), "guard-audit.jsonl");

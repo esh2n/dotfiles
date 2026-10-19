@@ -54,7 +54,8 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	! grep -q "^docker run -d .*-e POSTGRES_PASSWORD " "$LOG"
 	f="${HOME}/.local/state/litellm-secrets/db_password"
 	[ "$(cat "$f")" = the-db-pw ]
-	[ "$(stat -f %Lp "$f" 2>/dev/null || stat -c %a "$f")" = 600 ]
+	# GNU stat -c first: GNU stat -f is a filesystem query that also succeeds
+	[ "$(stat -c %a "$f" 2>/dev/null || stat -f %Lp "$f")" = 600 ]
 }
 
 @test "litellm-up: a running DB is reused, not recreated" {
@@ -95,7 +96,7 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	! grep -q "^docker run" "$LOG"
 }
 
-@test "litellm-up: deterministic goes to the desktop's llama-server, its key passed by name only" {
+@test "litellm-up: executor goes to the desktop's llama-server, its key passed by name only" {
 	export LINUX_MODEL_HOST=desktop.example.ts.net
 	run up
 	[ "$status" -eq 0 ]
@@ -115,13 +116,13 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	grep -q "^docker run --rm .*-e MAC_MODEL_API_BASE=http://mac.example.ts.net:1234/v1 " "$LOG"
 }
 
-@test "litellm-up: on the mac deterministic falls back to its own LM Studio" {
+@test "litellm-up: on the mac executor falls back to its own LM Studio" {
 	run up
 	[ "$status" -eq 0 ]
 	grep -q "^docker run --rm .*-e MAC_MODEL_API_BASE=http://host.docker.internal:1234/v1 " "$LOG"
 }
 
-@test "litellm-up: without the desktop's name it still serves, and says deterministic will fail" {
+@test "litellm-up: without the desktop's name it still serves, and says executor will fail" {
 	unset LINUX_MODEL_HOST
 	run --separate-stderr up
 	[ "$status" -eq 0 ]

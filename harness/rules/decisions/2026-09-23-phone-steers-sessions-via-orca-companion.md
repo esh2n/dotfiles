@@ -3,6 +3,7 @@
 Status: accepted — 持ち主の裁定（2026-09-23）。スマホからすべての操作ができること（Claude Code や Cursor のクラウド版と同じ）を要件に、調査記録の結論と Orca の companion から推した形を採った
 
 rule: Steer a coding-agent session running on the Mac from the phone through Orca's mobile companion, paired by code and connected directly over the tailnet (never Orca Relay); Claude Code's Remote Control is a fallback for when Orca is not running, not a requirement. Do not build or adopt a relay app (Happy Coder and the like), a custom omp/pi bridge, or a Tailscale SSH + terminal-app setup for this purpose. Chat with the home models from the phone stays Open WebUI over Tailscale, pointed at the LiteLLM tiers.
+scope: repo
 
 ## Problem
 

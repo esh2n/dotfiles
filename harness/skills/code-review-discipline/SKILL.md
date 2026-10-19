@@ -1,6 +1,6 @@
 ---
 name: code-review-discipline
-description: Meta-discipline for how to judge and how to review code and design — not language rules, but the reasoning stance behind a review. Use when reviewing someone else's code, self-reviewing your own work before shipping, deciding whether a design decision is sound, weighing a trade-off, proposing an approach for approval, or judging AI/bot review comments. Applies in any language or project.
+description: Meta-discipline for how to judge and how to review code and design — not language rules, but the reasoning stance behind a review. Use when reviewing someone else's code, self-reviewing your own work before shipping, deciding whether a design decision is sound, weighing a trade-off, proposing an approach for approval, judging AI/bot review comments, or running reviewer agents and verifying their findings (the `change-review` skill's judgment rules). Applies in any language or project.
 metadata:
   namespaces: [practice]
   origin: extracted
@@ -209,6 +209,29 @@ When a defect *does* slip through, ask the second-order question: *why did the e
 
 ---
 
+## 12. Running a review with reviewer agents — grounding, refutation, merging
+
+The `change-review` skill runs reviewer agents and a verifier; these are the rules that make their output trustworthy. They carry over from the former `review` and `design-review` workflow scripts, which enforced them in code.
+
+- **Fresh context.** A reviewer sees the diff, the stated intent and the project's documents — not the author's session or reasoning. A reviewer that inherits the author's framing inherits its blind spots.
+- **Ground in what the project wrote down.** Read the project's own decisions first (`AGENTS.md`/`CLAUDE.md`, `.claude/rules/`, ADRs, decision notes, `CONTRIBUTING*`) and quote load-bearing rules verbatim. Never assert a convention the project has not written down; when a rule you need is absent, raise a question, not a finding. List the documents you looked for and did not find.
+- **A documented, intentional choice is not a defect.** A finding that restates a decision the project recorded is a false positive — but check the code against the decision; do not dismiss on the document's word alone. In a design, a deviation the design acknowledges and justifies is not a finding; an unacknowledged one is.
+- **Anchor to the change.** Every finding points at a line the change added or made reachable. Read surrounding files to confirm; do not sweep the repository.
+- **Enforce the bar, do not just request it.** Drop below-threshold findings when merging, even if a reviewer included them. Zero findings is a valid result.
+- **Trade-offs are questions.** An item a checklist files under trade-offs, or any choice between options with different costs, is never a finding: phrase it as a question naming the options and what each gains and loses.
+- **Checklist lanes cite ids.** A reviewer applying a checklist cites the item id in each finding; a rule that is not in the checklist is not a finding for that lane.
+- **Refute in a separate context.** Each finding goes to a verifier that tries to disprove it: holds, does not hold, or cannot verify. Uncertain means cannot verify, never does not hold, and failing to disprove is not confirmation. Agreement between reviewers is not proof — several reviewers have unanimously upheld a vulnerability that did not exist.
+- **Bound the verification, never drop the tail.** Verify the highest-stakes findings first up to a cap; report the rest as unverified.
+- **Merge duplicates as a union.** Two reviewers reporting the same defect (same file, line and substance) become one finding listing both. Agreement between independent model families is the strongest signal; a finding only one raised is labelled as such, not blended in. Evidence that a finding held is not lost because a duplicate came back unsettled.
+- **Verdicts come from held findings only.** For a design: proceed, proceed with changes, or rethink; an unresolved blocker or major finding rules out proceed. Unverified findings are listed, never weighed.
+- **Review the thing itself.** Reviewers read the diff or the design document, never only a summary of it.
+- **Never fabricate.** A reviewer that cannot read its input says so and returns nothing; a dropped lane is correct, an invented review is not. No placeholder values.
+- **Keep the exploit map in-house.** Security findings for unshipped code are not sent to an outside model provider unless the owner opts in for that run.
+- **Never quote a secret's value**, in findings, examples or posted comments.
+- **Show what ran.** Report each tool and its status and each reviewer with its counts (raised, held, refuted, unverified), so a skipped step is visible. A review procedure written down is not proof that it ran.
+
+---
+
 ## Quick Reference
 
 1. **Survey all examples** before judging — one is an anecdote.
@@ -222,3 +245,4 @@ When a defect *does* slip through, ask the second-order question: *why did the e
 9. **Record decisions up front** — rejected options + reasons; don't paste code into the record.
 10. **Comments carry WHY only**; prose reads like a human, free of machine tells.
 11. **Filter automated review** by confidence and impact, not severity labels — keep the real bugs.
+12. **Running reviewer agents**: fresh context, grounded in written decisions, anchored to the change, refuted in a separate context, merged as a union, and a visible record of what ran.

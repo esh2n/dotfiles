@@ -566,7 +566,7 @@ hr {
 }
 
 /* ---------------------------------------------------------------
-   .wu-terms — term list (dl)
+   .wu-terms — term list (dl); retired 2026-10-19, kept so older pages render
 --------------------------------------------------------------- */
 .wu-terms {
   margin: var(--wu-sp-4) 0;

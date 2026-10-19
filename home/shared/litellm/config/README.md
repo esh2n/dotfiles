@@ -20,7 +20,7 @@ The current assignment (`harness/bin/jig tiers` prints it):
 |---|---|---|---|
 | `main` | DeepSeek | `deepseek-flash` | everyday default, cheap/fast |
 | `complex` | DeepSeek | `deepseek-v4-pro` | hard judgment / design |
-| `deterministic` | llama-server on the Omarchy desktop (tailnet); the Mac's LM Studio while the desktop is off | `Qwen3.8-27B-Q4_K_M` / `qwen/qwen3.8-27b@4bit` | executes a plan a frontier model designed; falls back only to the same model |
+| `executor` | llama-server on the Omarchy desktop (tailnet); the Mac's LM Studio while the desktop is off | `Qwen3.8-27B-Q4_K_M` / `qwen/qwen3.8-27b@4bit` | executes a plan a frontier model designed; falls back only to the same model |
 
 A harness calls the proxy with `model` = one of these aliases; the proxy picks
 the provider. What each tier uses is `harness/policy/tiers.json` (`use`, ids
@@ -69,11 +69,11 @@ set up identically:
    definition. Logs: `~/Library/Logs/litellm-proxy.log`.
 4. Write the Omarchy desktop's Tailscale MagicDNS name into the roles file as
    `"linuxModelHost"`; the service passes it to `litellm-up.sh` as
-   `LINUX_MODEL_HOST`, and `deterministic` goes to
+   `LINUX_MODEL_HOST`, and `executor` goes to
    `http://<that name>:8080/v1` with the key
    `op://llm-automation/linux-model-server/credential`. On every machine but the
    Mac, also write the Mac's MagicDNS name as `"macModelHost"`: while the
-   desktop is off, `deterministic` falls back to the Mac's LM Studio
+   desktop is off, `executor` falls back to the Mac's LM Studio
    (rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md).
 
 After editing `litellm-up.sh` or the service declaration: `make up` (it
@@ -129,7 +129,7 @@ Each harness just sets its OpenAI base_url to the proxy and uses a tier alias as
 the model:
 
 - **pi** — in `models.json`, add a provider with `baseUrl:
-  http://localhost:4000` and models `main` / `complex` / `deterministic`
+  http://localhost:4000` and models `main` / `complex` / `executor`
   (api key = the LITELLM_MASTER_KEY value, or any string if metrics-only).
 - **omp** — `home/shared/harness/omp/models.yml` declares provider `proxy`
   with the three tiers as its models, and jig writes `~/.omp/agent/config.yml`'s

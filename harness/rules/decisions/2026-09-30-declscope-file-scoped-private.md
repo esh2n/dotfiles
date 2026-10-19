@@ -1,8 +1,9 @@
 # Go の小文字の名前はファイルの中に留める — declscope を CI と go-reviewer で使う
 
-Status: accepted — 持ち主の裁定（2026-09-30）
+Status: superseded by 2026-10-19-declscope-in-go-review-standard.md（持ち主の裁定 2026-09-30。新しいメモが規則の全体を、担当を code-reviewer に変えて引き継ぐ）
 
 rule: Go code keeps an unexported name in the file that declares it, checked by declscope (pinned, built by Nix from its release binary). dotctl commits `.declscope.yaml` and a baseline of what it already had, and CI fails on anything new. The go-reviewer runs declscope on every Go diff with a config outside the repository and no baseline, and keeps only crossings whose use is on a line the diff added: a finding where the project has a `.declscope.yaml`, an advisory question where it does not. Never wire declscope into a hook, and never write its config or baseline into a repository that has not adopted it.
+scope: repo
 
 ## Problem
 

@@ -1,8 +1,9 @@
 # Swarm は omp・pi の拡張として自分で持ち、実行系を持たない決めごとの例外にする
 
-Status: accepted — 持ち主の裁定（2026-09-27）。09-13 から求められていた Swarm を、09-13 と 09-22 の調査で見送りにしていた。`2026-09-22-subagents-and-workflows-by-scale.md` の「jig itself has no execution engine」と `2026-09-22-loop-native-goal.md` の「Never build a custom loop/execution engine」に、この拡張だけの例外を足す（両記録のほかの部分は変えない）
+Status: superseded by 2026-10-19-swarm-on-native-subagents.md（自作の実行系を退役し、pstack の swarm の手順と各ハーネスの本体のサブエージェントで組む。上限と費用を見せる要件は、各ハーネスの上限の設定と LiteLLM の台帳、常に見える一覧で引き継ぐ） — accepted — 持ち主の裁定（2026-09-27）。09-13 から求められていた Swarm を、09-13 と 09-22 の調査で見送りにしていた。`2026-09-22-subagents-and-workflows-by-scale.md` の「jig itself has no execution engine」と `2026-09-22-loop-native-goal.md` の「Never build a custom loop/execution engine」に、この拡張だけの例外を足す（両記録のほかの部分は変えない）
 
 rule: The Swarm extension for omp and pi is the one exception to "no custom execution engine": it spawns worker agents as headless harness processes that talk to LiteLLM by tier name, keeps its own queue with a concurrency limit (per tier; `deterministic` has one slot), and shows every worker in an always-visible table below the editor — name, model, effort, status (working, queued, unread, done, failed), progress, idle, age, note, cost and tokens. It never runs unattended loops (goal features still own those), never lets workers write the same files at once without isolation, and never hides cost: the concurrency cap and the running cost are always on screen.
+scope: repo
 
 ## Problem
 

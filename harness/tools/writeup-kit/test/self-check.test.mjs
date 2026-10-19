@@ -305,6 +305,36 @@ describe('self-check: adversarial rows', () => {
     assert.ok(result.warnings.some((w) => w.item === 'kind-sections' && /次にやること/.test(w.detail)))
   })
 
+  test('row 5: 設計 no longer requires a 用語 section', () => {
+    const body = ['目的と読者', '現状とギャップ', 'あるべき姿', '決定点', '進め方']
+      .map((h) => `<section class="wu-section"><h2>${h}</h2><p>短い文。</p></section>`).join('')
+    const result = itemsFor(page({ kind: '設計', body }))
+    assert.ok(!result.warnings.some((w) => w.item === 'kind-sections'), JSON.stringify(result.warnings))
+  })
+
+  test('row 5b (terms-block): a .wu-terms list is a warning pointing at inline explanation', () => {
+    const terms = '<section class="wu-section"><h2>補足</h2><dl class="wu-terms"><dt>a</dt><dd>b</dd></dl></section>'
+    const result = itemsFor(page({ body: DEFAULT_BODY + terms }))
+    const w = result.warnings.find((x) => x.item === 'terms-block')
+    assert.ok(w, JSON.stringify(result.warnings))
+    assert.match(w.detail, /first appears/)
+  })
+
+  test('row 5b (terms-block): a 用語 or 前提知識 h2 is a warning', () => {
+    for (const h of ['用語', '用語集', '前提知識']) {
+      const result = itemsFor(page({ body: `<section class="wu-section"><h2>${h}</h2><p>短い文。</p></section>` + DEFAULT_BODY }))
+      assert.ok(result.warnings.some((w) => w.item === 'terms-block' && w.detail.includes(h)), h)
+    }
+  })
+
+  test('row 5b (terms-block): 未決・前提 and a heading that merely contains 用語 are not flagged', () => {
+    const body = DEFAULT_BODY +
+      '<section class="wu-section"><h2>未決・前提</h2><p>短い文。</p></section>' +
+      '<section class="wu-section"><h2>用語の揺れを直す手順</h2><p>短い文。</p></section>'
+    const result = itemsFor(page({ body }))
+    assert.ok(!result.warnings.some((w) => w.item === 'terms-block'), JSON.stringify(result.warnings))
+  })
+
   test('row 6 (figure-pass): a .wu-figure without data-checks="pass" is an error', () => {
     const fig = '<figure class="wu-figure"><svg role="img"><title>t</title><desc>d</desc></svg><figcaption>c</figcaption></figure>'
     const result = itemsFor(page({ body: DEFAULT_BODY + fig }))

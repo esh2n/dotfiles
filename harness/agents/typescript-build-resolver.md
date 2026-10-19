@@ -2,7 +2,7 @@
 name: typescript-build-resolver
 description: TypeScript build and type error resolution specialist. Fixes tsc type errors, module resolution, and bundler/config issues with minimal diffs. Use when a TypeScript/JavaScript build fails or tsc reports type errors.
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: sonnet
+model: main
 ---
 
 # TypeScript Build Resolver

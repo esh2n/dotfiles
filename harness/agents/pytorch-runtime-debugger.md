@@ -2,7 +2,7 @@
 name: pytorch-runtime-debugger
 description: PyTorch runtime and CUDA debugging specialist. Fixes tensor shape mismatches, device placement errors, gradient issues, DataLoader problems, and mixed precision failures with minimal changes. Use when PyTorch training or inference crashes at runtime.
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: sonnet
+model: main
 ---
 
 # PyTorch Runtime Debugger

@@ -3,6 +3,7 @@
 Status: accepted — 主要ハーネスが commands を skills に統合し、実践者の移行が一年を通して続き、戻した例が無い（2026-09-22）
 
 rule: Do not create a commands/ directory; keep slash commands as skills under skills/ only, using disable-model-invocation: true for user-only commands and user-invocable: false for model-only background skills. Deliver SKILL.md as-is to Claude Code, Codex and omp; reach pi via its skill invocation mode (/skill:name).
+scope: repo
 
 ## Problem
 

@@ -171,6 +171,21 @@ describe("userPromptSubmit", () => {
     expect(first[0]?.promptHash).not.toBe(different[0]?.promptHash);
   });
 
+  test("records the session and the leading slash command, and no other part of the prompt", async () => {
+    const recorded: RouterLogEntry[] = [];
+    await userPromptSubmit(
+      JSON.stringify({ prompt: "/pstack:poteto-mode このバグを直して", session_id: "s-1" }),
+      deps({}, recorded),
+    );
+    expect(recorded[0]?.sessionId).toBe("s-1");
+    expect(recorded[0]?.command).toBe("/pstack:poteto-mode");
+
+    const plain: RouterLogEntry[] = [];
+    await userPromptSubmit(JSON.stringify({ prompt: "このバグを直して" }), deps({}, plain));
+    expect(plain[0]?.command).toBeUndefined();
+    expect(plain[0]?.sessionId).toBeUndefined();
+  });
+
   test("labels the line with the harness its wrapper declared", async () => {
     const recorded: RouterLogEntry[] = [];
     await userPromptSubmit(

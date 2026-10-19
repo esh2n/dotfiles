@@ -1,6 +1,6 @@
 /**
  * `~/.claude/rules/`: a managed directory of links (`managed-dir.ts`), one
- * per rule directory of `llm/harness/rules/` other than the three excluded
+ * per rule directory of `harness/rules/` other than the four excluded
  * below — `~/.claude/rules/<name>` → `<harness>/rules/<name>`. Claude Code
  * loads a rule file there when a file matching its `paths:` frontmatter is
  * touched; the always-on `common/` must not be linked (it is rendered into
@@ -22,15 +22,18 @@ import type { ManagedSelection } from "./managed-dir";
 /**
  * Subdirectories of `rules/` that are NOT conditional-rule directories and
  * must never be linked under `~/.claude/rules/`: `common` because AGENTS.md
- * already carries it, `decisions` and `research` because they are Markdown
- * for humans with no `paths:` frontmatter — linked, Claude Code would load
- * every note and every research record as an always-on rule.
+ * already carries it; `decisions`, `knowledge` and `research` because they
+ * are Markdown with no `paths:` frontmatter — linked, Claude Code would load
+ * every note as an always-on rule. `knowledge/` is read on demand through
+ * its INDEX.md, which AGENTS.md points at.
  */
-export const NOT_RULE_DIRS: readonly string[] = ["common", "decisions", "research"];
+export const NOT_RULE_DIRS: readonly string[] = ["common", "decisions", "knowledge", "research"];
 
 const EXCLUSION_REASON: Readonly<Record<string, string>> = {
   common: "always-on rules, rendered into AGENTS.md — never linked, or they would load twice",
   decisions: "decision notes for humans; linked, they would load as always-on rules",
+  knowledge:
+    "settled facts read on demand through INDEX.md; linked, every note would load as an always-on rule",
   research: "research records for humans; linked, they would load as always-on rules",
 };
 

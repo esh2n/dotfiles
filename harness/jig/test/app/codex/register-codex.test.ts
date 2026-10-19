@@ -55,16 +55,16 @@ describe("registerCodex", () => {
     expect(again.written).toBe(false);
   });
 
-  test("refuses when another tool already declares the same key", async () => {
+  test("takes over its own slot when Codex wrote an entry for it, leaving one table", async () => {
     const fs = new FakeFs();
     fs.files.set(
       paths.configToml,
       `[hooks.state."/h/hooks.json:pre_tool_use:0:0"]\ntrusted_hash = "sha256:x"\nenabled = true\n`,
     );
-    await expect(registerCodex(fs, paths, input, { write: true })).rejects.toThrow(
-      /another tool owns that slot/,
-    );
-    expect(fs.writes).toEqual([]);
+    await registerCodex(fs, paths, input, { write: true });
+    const written = fs.files.get(paths.configToml) ?? "";
+    expect(written.match(/\[hooks\.state\."\/h\/hooks\.json:pre_tool_use:0:0"\]/g)).toHaveLength(1);
+    expect(written).not.toContain("sha256:x");
   });
 
   test("a TOML validator can veto the write", async () => {

@@ -64,9 +64,9 @@ const MCP_SOURCE = JSON.stringify({
 });
 
 const RESEARCH_AGENT =
-  '---\nname: research\ndescription: Industry survey.\ntools: ["Read", "WebFetch", "NotebookEdit"]\nmodel: sonnet\n---\n\nSurvey first, judge second.\n';
+  '---\nname: research\ndescription: Industry survey.\ntools: ["Read", "WebFetch", "NotebookEdit"]\nmodel: main\n---\n\nSurvey first, judge second.\n';
 const SCOUT_AGENT =
-  "---\nname: scout\ndescription: Cheap lookups.\ntools: [Read]\nmodel: haiku\n---\n\nLook things up.\n";
+  "---\nname: scout\ndescription: Cheap lookups.\ntools: [Read]\nmodel: executor\n---\n\nLook things up.\n";
 
 /** The sources every test starts from; the destination side is the seed. */
 function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
@@ -87,6 +87,33 @@ function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
 
 const run = (ports: OmpApplyPorts, write = false) =>
   applyOmp({ paths: PATHS, options: OPTIONS, write }, ports);
+
+const PLUGINS = "/home/u/.local/share/jig/plugins";
+const PACK = `${PLUGINS}/pstack/pstack`;
+/** `models.omp` must be a mapping; a scalar there does not parse. */
+const BROKEN_AGENT = "---\nname: broken\nmodels:\n  omp: oops\n---\n\nx\n";
+
+/** The usual sources plus a fetched pack with two agents, one sharing the house's `scout`. */
+function packPorts(): FakeClaudeFs {
+  return fakePorts({
+    files: {
+      [`${H}/plugins/pstack/source.json`]: JSON.stringify({
+        repo: "https://github.com/cursor/plugins",
+        ref: "main",
+        skills: "pstack/skills",
+        agents: "pstack/agents",
+        translated: [],
+      }),
+      [`${PACK}/skills/poteto-mode/SKILL.md`]: "---\nname: poteto-mode\n---\n",
+      [`${PACK}/agents/poteto-agent.md`]:
+        "---\nname: poteto-agent\ndescription: Delegate.\n---\n\nRead poteto-mode first.\n",
+      [`${PACK}/agents/scout.md`]: "---\nname: scout\ndescription: Not ours.\n---\n\nNo.\n",
+    },
+  });
+}
+
+const runWithPack = (ports: OmpApplyPorts, write = false) =>
+  applyOmp({ paths: { ...PATHS, pluginsDir: PLUGINS }, options: OPTIONS, write }, ports);
 
 const LIVE_MCP_JSON = `${JSON.stringify(
   {
@@ -180,10 +207,10 @@ describe("the generated agent files", () => {
     expect(research?.content).not.toContain("model:");
     expect(research?.content.endsWith("---\n\nSurvey first, judge second.\n")).toBe(true);
     expect(research?.tools).toEqual({ tools: ["read"], unmapped: ["NotebookEdit"] });
-    expect(research?.model).toEqual({ kind: "unmapped", tier: "sonnet" });
+    expect(research?.model).toEqual({ kind: "unmapped", tier: "main" });
     expect(agents.unmappedTiers).toEqual([
-      { tier: "sonnet", count: 1 },
-      { tier: "haiku", count: 1 },
+      { tier: "main", count: 1 },
+      { tier: "executor", count: 1 },
     ]);
     expect(agents.unmappedTools).toEqual([{ tool: "NotebookEdit", count: 1 }]);
   });
@@ -193,7 +220,7 @@ describe("the generated agent files", () => {
     const report = await applyOmp(
       {
         paths: PATHS,
-        options: { ...OPTIONS, ompModels: { sonnet: { model: "@review" } } },
+        options: { ...OPTIONS, ompModels: { main: { model: "@review" } } },
         write: false,
       },
       ports,
@@ -201,28 +228,28 @@ describe("the generated agent files", () => {
     const [research, scout] = report.agents.files;
     expect(research?.content).toContain('model: "@review"');
     expect(scout?.content).not.toContain("model:");
-    expect(report.agents.unmappedTiers).toEqual([{ tier: "haiku", count: 1 }]);
+    expect(report.agents.unmappedTiers).toEqual([{ tier: "executor", count: 1 }]);
   });
 
   test("an agent's own models.omp wins over the table; a mapping's reasoningEffort is not written", async () => {
     const { ports } = fakePorts({
       files: {
         [`${H}/agents/scout.md`]:
-          '---\nname: scout\ndescription: Cheap lookups.\nmodel: haiku\nmodels: { omp: { model: "@cheap", reasoningEffort: "low" } }\n---\n\nLook things up.\n',
+          '---\nname: scout\ndescription: Cheap lookups.\nmodel: executor\nmodels: { omp: { model: "@cheap", reasoningEffort: "low" } }\n---\n\nLook things up.\n',
       },
     });
     const report = await run(ports);
     const scout = report.agents.files.find((file) => file.name === "scout.md");
     expect(scout?.model).toEqual({
       kind: "mapped",
-      tier: "haiku",
+      tier: "executor",
       model: "@cheap",
       reasoningEffort: "low",
       override: true,
     });
     expect(scout?.content).toContain('model: "@cheap"');
     expect(scout?.content).not.toContain("low");
-    expect(report.agents.unmappedTiers).toEqual([{ tier: "sonnet", count: 1 }]);
+    expect(report.agents.unmappedTiers).toEqual([{ tier: "main", count: 1 }]);
   });
 
   test("a malformed models: block is an error naming the file, not a dropped override", async () => {
@@ -286,6 +313,57 @@ describe("the generated agent files", () => {
       ),
     ).rejects.toThrow("refused");
     expect(files[`${PATHS.agentsDir}/research.md`]).toBeUndefined();
+  });
+});
+
+describe("skill pack agents", () => {
+  test("are generated beside the house's; the house keeps a shared name", async () => {
+    const report = await runWithPack(packPorts().ports);
+    expect(report.agents.files.map((f) => `${f.name}:${f.sourceFile}`)).toEqual([
+      "poteto-agent.md:poteto-agent.md",
+      "research.md:research.md",
+      "scout.md:scout.md",
+    ]);
+    expect(report.agents.files[0]?.content).toContain("Read poteto-mode first.");
+    expect(report.agents.excluded.map((e) => e.name)).toEqual(["scout.md"]);
+  });
+
+  test("one that does not parse is excluded with its reason; the rest is written", async () => {
+    const fs = packPorts();
+    fs.files[`${PACK}/agents/broken.md`] = BROKEN_AGENT;
+    const report = await runWithPack(fs.ports, true);
+    expect(report.agents.excluded.find((e) => e.name === "broken.md")?.reason).toBeDefined();
+    expect(fs.files[`${OMP}/agents/poteto-agent.md`]).toBeDefined();
+    expect(fs.files[`${OMP}/agents/broken.md`]).toBeUndefined();
+  });
+
+  test("a house agent that does not parse still stops the apply", async () => {
+    const fs = packPorts();
+    fs.files[`${H}/agents/broken.md`] = BROKEN_AGENT;
+    await expect(runWithPack(fs.ports)).rejects.toThrow("agents/broken.md");
+  });
+
+  test("an agent jig wrote goes when its source does; one edited since stays", async () => {
+    const fs = packPorts();
+    await runWithPack(fs.ports, true);
+    const poteto = `${OMP}/agents/poteto-agent.md`;
+    const research = `${OMP}/agents/research.md`;
+    delete fs.files[`${PACK}/agents/poteto-agent.md`];
+    delete fs.files[`${H}/agents/research.md`];
+    fs.files[research] = `${fs.files[research]}mine\n`;
+
+    const plan = await runWithPack(fs.ports);
+    expect(plan.agents.stale.map((f) => f.name)).toEqual(["poteto-agent.md"]);
+    expect(plan.agents.foreign).toContainEqual({
+      name: "research.md",
+      what: "written by jig, edited since",
+    });
+
+    await runWithPack(fs.ports, true);
+    expect(fs.files[poteto]).toBeUndefined();
+    expect(fs.manifest[poteto]).toBeUndefined();
+    expect(fs.files[research]).toContain("mine");
+    expect((await runWithPack(fs.ports)).agents.stale).toEqual([]);
   });
 });
 

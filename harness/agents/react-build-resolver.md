@@ -2,7 +2,7 @@
 name: react-build-resolver
 description: Diagnose and fix React build failures across Vite, webpack, Next.js, CRA, Parcel, esbuild, and Bun. Handles JSX/TSX compile errors, hydration mismatches, server/client component boundary failures, missing types, and bundler-specific configuration issues with minimal, surgical changes. Use when a React build fails.
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: sonnet
+model: main
 ---
 
 ## Prompt Defense Baseline
@@ -209,7 +209,7 @@ Final: `Build Status: SUCCESS | Errors Fixed: N | Files Modified: <list>` or `Bu
 
 ## Related
 
-- Agent: `react-reviewer` for code review after build is green
+- Review: once the build is green, the `change-review` skill reviews the diff (`code-reviewer` reads `react-patterns/references/review-standard.md`)
 - Rules: `rules/react/coding-style.md`, `rules/react/patterns.md`
 - Skills: `skills/react-patterns/`, `skills/frontend-patterns/`
 - Commands: `/react-build`, `/react-review`

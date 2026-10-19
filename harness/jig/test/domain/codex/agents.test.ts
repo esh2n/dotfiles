@@ -179,6 +179,33 @@ describe("tomlString", () => {
 
 describe("codexAgentFileName", () => {
   test("keeps the source stem", () => {
-    expect(codexAgentFileName("go-reviewer.md")).toBe("go-reviewer.toml");
+    expect(codexAgentFileName("code-reviewer.md")).toBe("code-reviewer.toml");
+  });
+});
+
+describe("renderCodexAgent: the agent's own effort", () => {
+  const withEffort = parseAgentDefinition(
+    "---\nname: r\ndescription: d\nmodel: main\neffort: xhigh\n---\nbody\n",
+    "r",
+  );
+
+  test("the agent's effort is written, and wins over the mapping's", () => {
+    const toml = renderCodexAgent({
+      definition: withEffort,
+      model: codexModelFor("main", { main: { model: "gpt-6-luna", reasoningEffort: "high" } }),
+      sourcePath: "/repo/agents/r.md",
+    });
+    expect((Bun.TOML.parse(toml) as Record<string, unknown>).model_reasoning_effort).toBe("xhigh");
+  });
+
+  test("an inherited model still carries the agent's effort", () => {
+    const toml = renderCodexAgent({
+      definition: withEffort,
+      model: { kind: "inherit" },
+      sourcePath: "/repo/agents/r.md",
+    });
+    const parsed = Bun.TOML.parse(toml) as Record<string, unknown>;
+    expect(parsed.model).toBeUndefined();
+    expect(parsed.model_reasoning_effort).toBe("xhigh");
   });
 });

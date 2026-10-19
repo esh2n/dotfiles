@@ -9,6 +9,8 @@ metadata:
 
 # C++ Coding Standards (C++ Core Guidelines)
 
+Writing or reviewing C++: read `references/review-standard.md` first — the single C++ review standard (items with sources, version gates, concurrency model, tool mapping) shared by the writer and `code-reviewer`; test patterns stay in `cpp-testing`.
+
 Comprehensive coding standards for modern C++ (C++17/20/23) derived from the [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines). Enforces type safety, resource safety, immutability, and clarity.
 
 ## When to Use

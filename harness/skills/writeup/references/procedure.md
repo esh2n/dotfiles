@@ -158,9 +158,9 @@ legacy store is served that way automatically.
 | "作業メモ残して", "今日やったこと書いといて" | 作業メモ (work note) |
 | "議事録にして", "MTGの決定と宿題まとめて" | 議事録 (meeting minutes) |
 
-A workflow report (research / design-review / acceptance / deliberate)
+A Markdown report (a research record, a `change-review` report)
 almost always maps to 調査まとめ, 設計, 決定記録, or 議事録 depending on
-what the workflow actually produced — read its Markdown first, then pick
+what the report actually holds — read its Markdown first, then pick
 the kind whose required sections it already roughly matches, rather than
 forcing every workflow report into 決定記録 by default.
 

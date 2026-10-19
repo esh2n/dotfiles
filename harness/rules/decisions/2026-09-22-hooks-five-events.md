@@ -3,6 +3,7 @@
 Status: accepted — 監査と予算はベンダー標準が手製より上位互換、固定の注入は事故の記録があり効果の測定が無い、圧縮は公式が推奨する形だけが安全（2026-09-22）
 
 rule: Register exactly one hook per event, five total: PreToolUse (jig guard), SessionStart (session model record), UserPromptSubmit (skill selection), PostToolUse (silent format of edited files), Stop (type-check/lint gate). Do not add separate hooks for auditing, budgets, fixed context injection, or output compression — use native harness features instead.
+scope: repo
 
 ## Problem
 

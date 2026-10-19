@@ -22,9 +22,9 @@
 #             optional "observerHost" (where the cost ledger lives); null when
 #             absent.
 #   linuxModelHost the tailnet name of the machine whose llama-server
-#             serves the deterministic tier (the Omarchy desktop), from the
+#             serves the executor tier (the Omarchy desktop), from the
 #             same file's optional "linuxModelHost"; null when absent.
-#   macModelHost the Mac's tailnet name, where deterministic falls back
+#   macModelHost the Mac's tailnet name, where executor falls back
 #             while the desktop is off, from the same file's optional
 #             "macModelHost"; null when absent (the Mac itself needs none).
 let

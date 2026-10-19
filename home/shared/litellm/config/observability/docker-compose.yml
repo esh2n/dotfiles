@@ -109,7 +109,7 @@ services:
     environment:
       # OpenAI-compatible backend = the LiteLLM gateway on this Mac, reached
       # the same way Prometheus reaches it above — never the LAN. The phone
-      # gets the same three tiers (main / complex / deterministic) as every
+      # gets the same three tiers (main / complex / executor) as every
       # non-vendor harness and its usage is measured like theirs (owner's
       # ruling 2026-09-23, rules/decisions/2026-09-23-model-routing-per-
       # harness.md). Until 2026-09-23 this pointed at LM Studio (:1234), so

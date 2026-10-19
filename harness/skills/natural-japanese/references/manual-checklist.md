@@ -1,69 +1,72 @@
-# 手動チェックリスト（スクリプト不可環境向け）
+# Manual checklist (for environments where lint cannot run)
 
-`uv` が使えず `scripts/lint.py` を実行できない環境（Claude.ai など）では、このチェックリストを目視で当てる。`lint.py` の各検出器を、判断の手順に置き換えたものなので、対応関係は `references/revision-guide.md` の対応表と同じカテゴリ名で読める。
+A procedure for checking by eye in place of lint in environments where `uv` is unavailable and `scripts/lint.py` cannot run (Claude.ai, etc.). The approach to fixing is the same as in SKILL.md: for each spot found, record whether you fixed it or, if kept, why (SKILL.md §4).
 
-## 1. 禁止語・LLM常套句
+You do not need to check everything strictly every time. Look at 1–3 first, and go on to 4–9 if the document seems worth it.
 
-`references/forbidden-patterns.md` に挙がっている表現（「と言えるでしょう」「重要なのは」「このように」「〜することができる」「正面から扱う」「多角的」「深掘りする」など）を文書全体からざっと探す。1文書に3個以上見つかったら要注意。
+## 1. Wording common in AI-written text
 
-## 2. 翻訳調
+Search for the following wording. Most of it can be deleted without changing the meaning. Only when deleting breaks the connection with what surrounds it, rephrase using the original document's content. Keep it if it is part of a proper noun or a quotation.
 
-「〜することができる」「〜という点で」「〜にとって重要」のような言い回しを探す。見つけたら、より直接的な日本語に言い換えられないか試す。`references/translationese.md` の対応表を使う。
+- Pushing a conclusion: と言えるでしょう、と言えるだろう、と言えます、ということになるでしょう、のではないでしょうか、結論から言うと、結論として、まとめると、総じて、いかがでしたか、いかがでしょうか
+- Emphasis: 非常に重要、極めて重要、重要なのは、大切なのは、ポイントは、言うまでもなく、言うまでもありません、まさしく
+- Preambles and bridges: さて、それでは、このように、このような中、ここで注目したいのは、見ていきましょう、紹介していきます、解説していきます、深掘りしていきます、について見ていく、を探求する
+- Hedging: 一概には言えません、個人差がありますが、あくまで一例ですが
+- Words that state a stance instead of content: 正面から扱う(見る・書く・立てる・回収する)、不可欠、核心的、鍵となる、根本的な、多角的、包括的、総合的、掘り下げる、深掘りする、言語化する
 
-## 3. 否定→肯定の対比
+「重要なのは」「このように」「不可欠」「ポイントは」「さて」 also appear often in human documents, so one or two need not concern you.
 
-「〜ではなく、〜」「〜だけでなく〜も」という構文が文書内に何回出てくるか数える。3回以上あれば、最も重要な1箇所以外は素直な言い方に変える。
+## 2. Translationese
 
-## 4. 文の長さのリズム
+Turn wording that traces English syntax into the way it is ordinarily said in Japanese. Do not change the degree of certainty.
 
-各段落の文を1文ずつ数えて、だいたい同じ長さ(文字数)ばかりが並んでいないか確認する。目安として、短い文（20字前後）と長い文（60字以上）が両方あるか、どちらも見当たらず全部が30〜40字あたりに収まっているなら単調な疑いがある。
+- 「〜という点で」「〜という観点から」 become 「〜では」「〜で見ると」
+- 「〜にとって重要」「〜にとって不可欠」 become 「〜には〜が要る」
+- 「〜を持つ」 with an abstract object becomes 「〜がある」
+- 「〜することによって」 becomes 「〜して」「〜すると」
+- 「〜であることは間違いない」「〜に他ならない」 are stated as 「〜だ」. If the original document gives grounds, put them first. Do not add grounds
+- Sentences that make a thing the subject and end in 「もたらす」「示す」「意味する」「証明する」 get a person or situation as the subject, or become 「〜から分かる」「〜を見ると」
+- 「それは〜である。なぜなら〜だ」: write the reason first, or merge into one sentence with 「〜だからだ」
+- 「〜することができる」 becomes 「〜できる」 or the verb's potential form
 
-## 5. 体言止め
+## 3. Negation and contrast
 
-文末が名詞で終わる文（見出しやリストではなく地の文）を数える。5文に1文以上の頻度で出てくるなら多すぎる。
+If 「〜ではなく〜」「〜だけでなく〜も」 appear 3 or more times in the whole document, or 4 or more sentences end in 「〜ではない。」「〜ではありません。」「〜わけではない。」, suspect overuse (do not count questions such as 「〜ではないでしょうか」). Handle them separately as follows (SKILL.md §3).
 
-## 6. 段落頭の接続詞
+- A sentence that preemptively negates an assumption nobody stated (「〜するだけで自動的に〜わけではない」): delete the whole sentence
+- 「AはBではない。Cだ。」: delete the negation and join the subject to the affirmative sentence
+- Keep negations that narrow a meaning, easily misunderstood facts, cautions, and contrasts that explain a difference
 
-各段落の最初の一文が「しかし」「また」「そして」「そのため」「さらに」「一方」「このように」などで始まっていないか確認する。全段落の3割以上がこれらで始まっていたら要注意。
+## 4. Sentence length
 
-## 7. 段落の均質さ
+Check whether the sentences in each paragraph are nearly all the same length. If a newly written document is too uniform, split or join sentences to fit the units of content. When revising an existing document, do not change sentences for this reason alone. Do not insert short sentences just for rhythm. Split any sentence that carries two or more claims (SKILL.md §3).
 
-各段落が何文でできているか数えてみる。ほぼすべての段落が同じ文数（例: どの段落も3文ぴったり）なら、テンプレート的な構成の疑いがある。
+## 5. Paragraphs
 
-## 8. 文頭・構文の使い回し
+Check whether every paragraph has the same number of sentences (say, three each). Match paragraph length to the weight of the content. If many paragraphs start with a conjunction such as 「しかし」「また」「そして」, remove the conjunctions where the content already connects.
 
-文の最初の2〜3語（「そして、」「これは、」など）が同じ形で3回以上繰り返されていないか確認する。また、複数の文が「〜は、〜のため、〜となる」のような同じ骨格を使い回していないかも見る。
+## 6. Repeated openings and sentence construction
 
-## 9. 語彙の使い回し
+Check whether the same opening (「そして、」「これは、」 etc.) or the same sentence construction occurs 3 or more times in a row. If so, swap the order of sentences or the subject, or merge two sentences into one. Do not insert questions or noun-ending sentences as a device to break the pattern.
 
-同じ内容語（名詞・動詞・形容詞）が文書中で何度も繰り返されていないか確認する。特に、抽象的で便利な語（「重要」「様々」「多様」「大きな」など）に頼って具体的な言葉を避けていないかを見る。
+## 7. Noun-ending sentences
 
-## 10. 英語統語
+A document over roughly 2,000 characters with not a single noun-ending sentence (体言止め) is a feature often seen in AI-written text. This is for reference only; you need not force any in.
 
-- 無生物（「これ」「それ」「この事実」「〜こと」）が主語になり、「もたらす」「示す」「証明する」のような他動詞で結ばれていないか
-- 1文の中に「〜する〜という〜な〜」のように名詞を修飾する節が3つ以上重なっていないか
-- 「それは〜である。なぜなら〜だ」という2文構成になっていないか
+## 8. Paragraphs of generalities only
 
-いずれも `references/translationese.md` の該当パターンと before/after を参照する。
+Look for paragraphs with no proper nouns, numbers or real examples. When writing new, gather material again. When revising an existing document, do not add examples or numbers yourself; tell the user what material would make it concrete (SKILL.md §3).
 
-`scripts/outline.py` が使えない環境では、見出しと各段落の先頭文を手で拾って並べる「スケルトン通読」（SKILL.md §4「構造レビュー」参照）も同様に手動で代替する。
+## 9. Readability
 
-## 使い方
+Check by eye the items in SKILL.md §5 "Readability check". In particular look at double negatives (after folding, confirm the truth value has not flipped), long sentences carrying two or more claims, runs of 7 or more kanji, 3 or more 「の」 in a row, and lists of 3 or more items buried in a sentence.
 
-上から順に全部を毎回厳密にやる必要はない。まず1〜3(表層の禁止語・翻訳調・対比)を素早く流し読みで確認し、気になる文章であれば4〜10（リズム・構造・統語）に進む、という順で十分実用になる。
+## Structure check
 
-## 気になり箇所を直す前に
+`scripts/outline.py` is unavailable too, so extract the headings and the first sentence of each paragraph by hand, line them up, and check the items in SKILL.md §5 "Structure check".
 
-1〜10のどれかで気になる箇所を見つけたら、直す前に `references/revision-guide.md` の該当節（対応する finding カテゴリの対応方針）を読み直す。一度目を通した記憶だけで直すと、周回を重ねるうちに基準が緩んでいく。読み直してから直すことで、判断がそのつど元の基準に立ち返る。
+## Convergence and finishing
 
-## 一般論止まりの段落に気づいたら
+Finish by state, not by number of passes. When every spot found is sorted into "fixed" or "kept (reason)" and the fixes have created no new spots, finish. If the same spot reverts after being fixed twice, rewrite the whole sentence or paragraph construction, or keep it with a reason.
 
-チェックのどれにも引っかからないのに、段落を読み返すと固有名詞も数値も実例もなく、一般論だけで済んでいることがある。これは文体の問題でなく、素材が足りていないサインになる。この種の空疎さは今のところ機械的なチェックでは見つからない。気づいたら言い回しを直すのをやめ、`references/revision-guide.md` の「素材不足の分岐」「素材集め（再帰的推論リサーチ）」に沿って、固有名詞・数値・一次情報を集め直してから書き直す。
-
-## 判断台帳と収束
-
-スクリプトが使えない環境でも、進め方は `lint.py` を使う場合と同じで、回数でなく状態でループを終える。見つけた気になり箇所ひとつごとに「直した」か「残す（理由）」かをその場でメモしながら進め、理由なしで見送らない。理由は固有名詞由来・文脈上必要・技術用語・ジャンル上自然、といった一言で十分。
-
-見送ったすべての箇所に理由がつき、かつ直した箇所が新しい気になり点を生んでいない状態になったら、1〜10のチェックは終わりでよい。同じ箇所を2回直しても元の形に戻ってしまう、あるいは似た問題が再発するようなら、それ以上その1文をいじり回さず、理由をつけて残すか、文・段落の構造ごと書き直す方向に切り替える。
-
-チェックが収束したら、最後に必ず初見のつもりで通読し、声に出して読むリズムで違和感がないか確かめる。ここで気になる箇所が出たら、それも新しい気になり点として台帳に加え、該当するチェック項目に戻って確認し直す。
+Finally, put the revised document side by side with the original and check that no facts, numbers, evaluations or policies absent from the original have entered (the top rule in SKILL.md: add nothing that is not in the original).

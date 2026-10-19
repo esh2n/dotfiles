@@ -39,7 +39,7 @@
  */
 
 import type { JsonObject } from "../compose/merge";
-import { applyTemplate, type TemplateVars } from "../compose/template";
+import { type TemplateVars, applyTemplate } from "../compose/template";
 import {
   type McpJsonEntry,
   type McpJsonPlan,

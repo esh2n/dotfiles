@@ -1,7 +1,7 @@
 # Input from Markdown (`--from <md> --kind <kind>`)
 
-Used for turning a workflow's Markdown report (research / design-review /
-acceptance / deliberate) — or any Markdown the user hands over — into a
+Used for turning a Markdown report (a research record, a `change-review`
+report) — or any Markdown the user hands over — into a
 writeup page. Read the file, map it with the table below, then continue
 at `SKILL.md` step 3 (write the body into the copied template, render
 figures, lint, self-check, save, commit). This is the mirror image of
@@ -19,7 +19,7 @@ the kit's own `to-md.mjs` mapping (`$KIT/references/page-contract.md`
 | `> [!IMPORTANT]` blockquote | `.wu-callout` `data-tone="decision"`, or `.wu-decision` if it has the decision/trade-off/basis shape below |
 | A plain `>` blockquote with a source line | `.wu-quote` (original / translation / source) |
 | `##` / `###` / `####` | `.wu-section > h2` / `h3` / `h4` |
-| `- **name** — definition` list (3+ items) | `.wu-terms` (`<dl>`) |
+| `- **name** — definition` list (a glossary) | No component: move each definition into the body, in the sentence where the term first appears or the next one (`writing.md` §5); drop the list |
 | `- **決定**: … / 重視したトレードオフ: … / 根拠: …` block | `.wu-decision` |
 | GFM table, ≤4 columns, rows = options judged on the same axes | `.wu-compare` |
 | GFM table, otherwise (≤5 columns) | `.wu-table` |

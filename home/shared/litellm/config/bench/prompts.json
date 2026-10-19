@@ -1,5 +1,5 @@
 {
-  "system": "You are a precise local model for deterministic tasks. Follow the output format exactly. When asked to output only JSON, emit compact JSON with no prose and no markdown fences.",
+  "system": "You are a precise local model for executor tasks. Follow the output format exactly. When asked to output only JSON, emit compact JSON with no prose and no markdown fences.",
   "prompts": [
     {
       "id": "json-extract",

@@ -11,6 +11,8 @@ metadata:
 
 Idiomatic Go patterns and best practices for building robust, efficient, and maintainable applications.
 
+Writing or reviewing Go: read `references/review-standard.md` first — the single Go review standard (items with sources, version gates, concurrency rules, linter mapping) shared by the writer and `code-reviewer`.
+
 ## When to Activate
 
 - Writing new Go code
@@ -178,9 +180,10 @@ _ = writer.Close() // Best-effort cleanup, error logged elsewhere
 
 Concurrency patterns, decision tables (channel vs mutex vs atomic), and
 pitfalls now live in `skill: go-concurrency` — see its SKILL.md and
-`references/patterns.md` / `references/pitfalls.md`. go-reviewer reviews
-concurrency correctness against that skill; go-perf-reviewer handles lock
-contention and mutex-vs-atomic tradeoffs.
+`references/patterns.md` / `references/pitfalls.md`. `code-reviewer` reviews
+concurrency against [references/review-standard.md](references/review-standard.md):
+correctness in section 4.3, lock contention and mutex-vs-atomic tradeoffs in
+section 4.4.
 
 ## Interface Design
 
@@ -382,9 +385,10 @@ s.Log("Starting...") // Calls embedded Logger.Log
 
 Allocation, GC, benchmarking methodology, and the evidence-chain for
 performance claims now live in `skill: go-performance` — see its SKILL.md
-and `references/`. Performance review for Go diffs runs through
-`agent: go-perf-reviewer` (static mode in `/review`, measured mode in
-`go-optimize`), not this section.
+and `references/`. Performance review for Go diffs is section 4.4 of
+[references/review-standard.md](references/review-standard.md), applied by
+`code-reviewer`; the measured loop of an optimization run is in
+`go-performance`, not this section.
 
 ## Go Tooling Integration
 

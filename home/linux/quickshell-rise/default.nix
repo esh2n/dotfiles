@@ -19,8 +19,8 @@ let
   ];
 in
 {
-  home.file = lib.genAttrs (map (f: ".cache/${f}") files) (
-    name: { source = config.lib.dotfiles.link "home/linux/quickshell-rise/cache/${baseNameOf name}"; }
-  );
+  home.file = lib.genAttrs (map (f: ".cache/${f}") files) (name: {
+    source = config.lib.dotfiles.link "home/linux/quickshell-rise/cache/${baseNameOf name}";
+  });
   dotfiles.setup.quickshell-rise.command = config.lib.dotfiles.setupStep "quickshell-rise";
 }

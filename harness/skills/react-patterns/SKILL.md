@@ -10,6 +10,8 @@ metadata:
 
 Idiomatic React 18/19 patterns for building robust, accessible, performant component trees.
 
+Review standard (what to check in a `.tsx`/`.jsx` diff, with sources; read with the TypeScript standard): [references/review-standard.md](references/review-standard.md).
+
 ## When to Activate
 
 - Writing or modifying React function components, custom hooks, or component trees
@@ -266,7 +268,7 @@ This skill is router-agnostic. The patterns above work with React Router, TanSta
 ## Related
 
 - Skills: [react-performance](../react-performance/SKILL.md) for the Vercel-derived performance ruleset
-- Agents: `react-reviewer` for code review, `react-build-resolver` for build/bundler errors
+- Review: `code-reviewer` reads [references/review-standard.md](references/review-standard.md); agent `react-build-resolver` handles build and bundler errors
 
 ## Examples
 

@@ -24,11 +24,11 @@ describe("toOmpProxyBlock", () => {
     );
   });
 
-  test("every tier carries contextWindow and maxTokens from tiers.json, in main/complex/deterministic order", () => {
+  test("every tier carries contextWindow and maxTokens from tiers.json, in main/complex/executor order", () => {
     const ids = [...content.matchAll(/^ {6}- id: (\w+)$/gm)].map((m) => m[1]);
-    expect(ids).toEqual(["main", "complex", "deterministic"]);
+    expect(ids).toEqual(["main", "complex", "executor"]);
     for (const id of ids) {
-      const tier = policy.tiers[id as "main" | "complex" | "deterministic"];
+      const tier = policy.tiers[id as "main" | "complex" | "executor"];
       expect(content).toContain(`      - id: ${id}\n`);
       expect(content).toContain(`        contextWindow: ${tier.contextWindow}\n`);
       expect(content).toContain(`        maxTokens: ${tier.maxTokens}\n`);
@@ -46,7 +46,7 @@ describe("toOmpProxyBlock", () => {
     );
     expect(content).toContain("      - id: complex\n");
     // the local tier has no extended window
-    const det = content.slice(content.indexOf("- id: deterministic"));
+    const det = content.slice(content.indexOf("- id: executor"));
     expect(det).not.toContain("maxContextWindow");
   });
 

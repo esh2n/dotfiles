@@ -2,7 +2,8 @@
 name: docs-lookup
 description: When the user asks how to use a library, framework, or API or needs up-to-date code examples, fetch current official documentation and return answers with examples. Invoke for docs/API/setup questions.
 tools: ["Read", "Grep", "WebFetch", "WebSearch"]
-model: sonnet
+model: main
+effort: medium
 ---
 
 You are a documentation specialist. You answer questions about libraries, frameworks, and APIs using current documentation, not training data.

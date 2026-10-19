@@ -8,6 +8,8 @@ metadata:
 
 # C# Patterns
 
+Writing or reviewing C# (including ASP.NET Core and EF Core): read `references/review-standard.md` first — the single C# review standard (items with sources, version gates, concurrency model, linter mapping) shared by the writer and `code-reviewer`; test patterns stay in `csharp-testing`.
+
 ## Coding style
 
 ### Standards

@@ -18,8 +18,8 @@ import type { DroppedField, WriteResult } from "./capability";
 import type { Tier, TierId, TiersPolicy } from "./types";
 import { HARNESS_USER_AGENT } from "./user-agent";
 
-// dsh's real file orders tiers main, complex, deterministic.
-const DSH_TIER_ORDER: readonly TierId[] = ["main", "complex", "deterministic"];
+// dsh's real file orders tiers main, complex, executor.
+const DSH_TIER_ORDER: readonly TierId[] = ["main", "complex", "executor"];
 
 const INDENT = "    "; // local-proxy: sits 4 spaces under llm-pi-ai: / providers:
 

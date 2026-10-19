@@ -330,10 +330,23 @@ left, that reads: `CLAUDE.md` backup-then-create; `skills`, `agents` and
 `create`; `commands` remove.
 
 The skill router (`hooks user-prompt-submit`, `serve`, `skills hide|show`)
-reads its default root from `~/.claude/skills`, the directory Claude Code
-itself loads from — before the first `--write` yoki-switch's symlink to the
-same content, after it the managed directory above. `JIG_SKILL_ROOT` still
-overrides it.
+reads its default root from `<config dir>/skills`, the directory Claude Code
+itself loads from (`~/.claude/skills`, or under `CLAUDE_CONFIG_DIR` when that
+is set). `JIG_SKILL_ROOT` still overrides it. Each router log row carries the
+session id and the prompt's leading slash command, if any, and no other part
+of the prompt.
+
+External skill packs (`../plugins/<name>/source.json`,
+`src/domain/plugins/`, `src/app/apply/plugins.ts`) join the skills and agents
+directories: `~/.claude/skills`, `~/.agents/skills`, `~/.claude/agents` and
+omp's agents directory link the pack's entries from its checkout under
+`resolvePluginsDir` (`JIG_PLUGINS_DIR`, else `$XDG_DATA_HOME/jig/plugins`,
+else `~/.local/share/jig/plugins`) beside the house's own. A house entry of
+the same name wins and the pack's shows under "not linked"; a pack not
+fetched yet links nothing and its leftover links go as stale. jig never
+fetches: `dotctl setup plugins` does, before the apply in `make up`. When the
+pack names an `adapter`, the apply warns about any of its Cursor-side names
+missing from `translated`.
 
 Not touched in milestone 2: `~/.claude/{hooks,scripts,workflows}` and every
 `.<x>-merged` staging directory stayed with `yoki-switch` until milestone 4
@@ -416,30 +429,33 @@ Destinations, one source tree:
   produces are not jig's.
 - **`~/.codex/config.toml`** — `[mcp_servers.<id>]` for every server with
   `targets.codex: true` (`targetOverrides.codex` applied, `{{HOME}}`
-  substituted; stdio: `command`, `args`, `env`; HTTP: `url`), inside jig's
-  own `# jig:begin mcp` … `# jig:end mcp` block, beside the
-  `# jig:begin hooks` block `jig codex register` keeps
-  (`domain/codex/config.ts`). Each command rewrites only its own block;
-  every other table — `[projects.*]` that Codex writes when a directory is
-  trusted, `[features]`, `[sandbox_workspace_write]`, yoki's block — is
-  carried through byte for byte. Hand-edit detection compares the block,
-  not the file, so a directory Codex trusts after jig wrote is not a
-  conflict. A `[mcp_servers.<id>]` outside the block for a server jig also
-  writes is a conflict that names the table and its line and stops the write:
-  a duplicate table stops Codex from loading its configuration at all, and
-  reconciling a setting that exists in two places is the one-time manual
-  step the config-layout decision keeps out of the generator, exactly as
-  with `~/.claude.json`. On the machine yoki-switch left, that is five
-  servers (three in yoki's block, two at the top level). `[permissions.yoki]`
-  and `[permissions.yoki.filesystem]`, and yoki's block as a whole, are
-  reported as leftovers for milestone 4.
+  substituted; stdio: `command`, `args`, `env`; HTTP: `url`), and the
+  status line as `[tui].status_line` (`domain/codex/config.ts`). Codex
+  rewrites this file itself — trusting a project or a hook, counting a model
+  notice, `codex mcp add` — and regroups its tables by parent key on every
+  write, which leaves comment markers enclosing the wrong lines (reproduced
+  with codex-cli 0.160.0). So jig finds what it owns by table name
+  (`domain/codex/toml-sections.ts`): every `[mcp_servers.<id>]` it writes now
+  or wrote last time (the names are in the manifest) goes wherever it
+  stands, the status line joins the file's own `[tui]` when it has one, and
+  the tables are appended between `# jig:begin mcp` … `# jig:end mcp`
+  markers that are a courtesy to the reader, never relied on.
+  `jig codex register` does the same for its `[hooks.state."<key>"]` trust
+  entry. Every other table is carried through byte for byte. The hand-edit
+  check compares jig's tables by value (`ownedView`: Codex drops `args = []`
+  and moves tables, neither of which is an edit) against the by-value hash
+  the manifest keeps; a value someone changed is a conflict that stops the
+  write. Tables under jig's names that jig never wrote (yoki's, or written by
+  hand) are a conflict too, not taken over. `[permissions.yoki]` and
+  `[permissions.yoki.filesystem]`, and yoki's block as a whole, are reported
+  as leftovers for milestone 4.
 - **`~/.codex/hooks.json`** — `jig codex register`'s. The dry-run says so and
   nothing touches it here.
 
 `--write` writes all of it in one run — the generated files, the block, the
 manifest and provenance, then the two directories — and any conflict
-anywhere (a hand-edited generated file, the block, a server declared outside
-it) returns `wrote: false` with nothing written.
+anywhere (a hand-edited generated file, a changed or foreign table under
+jig's names) returns `wrote: false` with nothing written.
 
 ### Milestone 3b: omp
 
@@ -824,12 +840,11 @@ same mechanism as `skills/`, `agents/` and `rules/`
   for `lib/` when it is a directory (`domain/claude/workflows-dir.ts`). The
   scripts are the ones the
   [subagents decision](../rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md)
-  keeps: review, research, code-study, stocktake, design-review; preflight
-  and the yoki-graph engine go. As of 2026-09-23 none of them imports
-  `./lib/…` — `review.js`, `research.js` and `design-review.js` carry the
-  provider-lane helpers inline, `lib/lanes.js` being the canonical copy
-  (review.js:75) — so the `lib` link is there for the day one does, and
-  resolves the same whichever way the Workflow tool loads the file.
+  keeps, minus the review and design-review scripts that the
+  [review redesign](../rules/decisions/2026-10-19-review-redesign.md) retired
+  in favour of the `change-review` skill and reviewer agents: research and implement
+  today. Neither imports `./lib/…` and the source tree has no `lib/` now; the
+  `lib` link is there for the day a script does.
 
 Today both destinations are yoki-switch's symlinks to `.scripts-merged` and
 `.workflows-merged`: `replace`, exactly as `skills` was. A source directory

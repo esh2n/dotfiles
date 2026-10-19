@@ -111,7 +111,7 @@ groups:
           summary: '最初の文字が出るまでの時間（TTFT）が普段の2倍を超えています（現在 {{ $value | printf "%.2f" }} 秒）'
           action: >-
             ./status.sh でモデル別の TTFT を見る。1つのモデルだけ遅いなら
-            プロバイダ側、deterministic だけ遅いなら LM Studio の
+            プロバイダ側、executor だけ遅いなら LM Studio の
             モデルロードが疑わしい。
           caveat: >-
             24時間分のデータが溜まるまではベースラインが出ないため、このルールは

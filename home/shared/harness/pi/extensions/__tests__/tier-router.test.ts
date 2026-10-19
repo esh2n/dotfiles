@@ -5,7 +5,7 @@ describe("isTier", () => {
   test("accepts the three LiteLLM tiers and nothing else", () => {
     expect(isTier("main")).toBe(true);
     expect(isTier("complex")).toBe(true);
-    expect(isTier("deterministic")).toBe(true);
+    expect(isTier("executor")).toBe(true);
     expect(isTier("auto")).toBe(false);
     expect(isTier("")).toBe(false);
     expect(isTier(undefined)).toBe(false);
@@ -16,7 +16,7 @@ describe("initialMode (the session's tier at launch)", () => {
   test("main unless PI_TIER names another tier", () => {
     expect(initialMode({})).toBe("main");
     expect(initialMode({ PI_TIER: "complex" })).toBe("complex");
-    expect(initialMode({ PI_TIER: "deterministic" })).toBe("deterministic");
+    expect(initialMode({ PI_TIER: "executor" })).toBe("executor");
   });
   test("off stops enforcing; an unknown value falls back to main, never to automatic routing", () => {
     expect(initialMode({ PI_TIER: "off" })).toBe("off");

@@ -118,6 +118,17 @@ describe("reachesElsewhere", () => {
     );
   });
 
+  test("gh -R / --repo names another repository", () => {
+    expect(reachesElsewhere(shell("gh pr create -R acme/service -t x"), prefixes)).toBe(true);
+    expect(reachesElsewhere(shell("gh pr create --repo acme/service"), prefixes)).toBe(true);
+    expect(reachesElsewhere(shell("gh pr create --repo=acme/service"), prefixes)).toBe(true);
+    expect(reachesElsewhere(shell("gh pr create -Racme/service"), prefixes)).toBe(true);
+    expect(reachesElsewhere(shell("gh pr create -fR acme/service"), prefixes)).toBe(true);
+    expect(reachesElsewhere(shell("gh pr create -wR acme/service"), prefixes)).toBe(true);
+    expect(reachesElsewhere(shell("gh pr -R acme/service create --fill"), prefixes)).toBe(true);
+    expect(reachesElsewhere(shell("gh pr create -t x -b y"), prefixes)).toBe(false);
+  });
+
   test("a cd or pushd on the same line leaves the cwd", () => {
     expect(reachesElsewhere(shell("cd /work/repo && git push origin main"), prefixes)).toBe(true);
     expect(reachesElsewhere(shell("pushd /work/repo; git push origin main"), prefixes)).toBe(true);

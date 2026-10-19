@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import {
+  CODEX_STATUS_LINE,
   MCP_BLOCK_BEGIN,
   MCP_BLOCK_END,
   buildCodexMcpTables,
   currentMcpBlock,
-  mcpServersDeclaredOutside,
+  ownedView,
   planMcpBlock,
   renderMcpBlock,
+  serversDeclaredAsKeys,
   yokiLeftovers,
 } from "../../../src/domain/codex/config";
 import type { McpServer } from "../../../src/domain/mcp/types";
@@ -76,63 +78,92 @@ describe("buildCodexMcpTables", () => {
 });
 
 describe("planMcpBlock", () => {
-  const block = renderMcpBlock(buildCodexMcpTables(SERVERS, { HOME: "/h" }));
+  const tables = buildCodexMcpTables(SERVERS, { HOME: "/h" });
+  const block = renderMcpBlock(tables);
+  const names = tables.map((table) => table.name);
 
   test("appends the block to a file that has none, after a blank line", () => {
-    const plan = planMcpBlock("[features]\nhooks = true\n", block);
+    const plan = planMcpBlock("[features]\nhooks = true\n", tables);
     expect(plan.changed).toBe(true);
     expect(plan.currentBlock).toBeUndefined();
     expect(plan.configToml).toBe(`[features]\nhooks = true\n\n${block}`);
-    expect(plan.configToml.endsWith(`${MCP_BLOCK_END}\n`)).toBe(true);
   });
 
-  test("replaces its own block wholesale and leaves every other table and the hooks block alone", () => {
+  test("an empty file gets just the block, and reads back as that block", () => {
+    expect(planMcpBlock(undefined, tables).configToml).toBe(block);
+    expect(currentMcpBlock(block, names)).toBe(block);
+  });
+
+  test("finds its tables by name after Codex has regrouped the file, and the result loads", () => {
+    const first = planMcpBlock('[projects."/x"]\ntrust_level = "trusted"\n', tables).configToml;
+    // What codex-cli 0.160 does on its next write: tables regrouped by parent,
+    // jig's markers left where they were, a [tui] sub-table of its own.
+    const lines = first.split("\n");
+    const serverStart = lines.findIndex((line) => line.startsWith("[mcp_servers."));
+    const regrouped = [
+      '[projects."/x"]',
+      'trust_level = "trusted"',
+      "",
+      "[tui.model_availability_nux]",
+      '"gpt-5.5" = 2',
+      MCP_BLOCK_END,
+      "",
+      MCP_BLOCK_BEGIN,
+      ...lines
+        .slice(serverStart)
+        .filter(
+          (line) =>
+            !line.startsWith("#") && !line.startsWith("[tui]") && !line.startsWith("status_line"),
+        ),
+      "[mcp_servers.probe]",
+      'command = "echo"',
+      "",
+    ].join("\n");
+    expect(currentMcpBlock(regrouped, names)).not.toBe(block); // the status line went missing
+    const plan = planMcpBlock(regrouped, tables);
+    const parsed = Bun.TOML.parse(plan.configToml) as {
+      mcp_servers: Record<string, unknown>;
+      tui: { status_line: string[]; model_availability_nux: Record<string, number> };
+      projects: Record<string, unknown>;
+    };
+    expect(Object.keys(parsed.mcp_servers).sort()).toEqual([...names, "probe"].sort());
+    expect(parsed.tui.status_line).toEqual([...CODEX_STATUS_LINE]);
+    expect(parsed.tui.model_availability_nux).toEqual({ "gpt-5.5": 2 });
+    expect(plan.configToml.match(/# jig:begin mcp/g)).toHaveLength(1);
+    expect(plan.configToml.match(/# jig:end mcp/g)).toHaveLength(1);
+    expect(planMcpBlock(plan.configToml, tables).changed).toBe(false);
+  });
+
+  test("the status line joins a [tui] table the file already has instead of declaring a second one", () => {
+    const before = '[tui]\nanimations = false\nstatus_line = ["model"]\n';
+    const plan = planMcpBlock(before, tables);
+    const parsed = Bun.TOML.parse(plan.configToml) as {
+      tui: { status_line: string[]; animations: boolean };
+    };
+    expect(parsed.tui).toEqual({ animations: false, status_line: [...CODEX_STATUS_LINE] });
+    expect(plan.configToml.match(/^\[tui\]$/gm)).toHaveLength(1);
+    // unedited, the file still reads back as exactly jig's canonical block
+    expect(currentMcpBlock(plan.configToml, names)).toBe(block);
+  });
+
+  test("a server jig wrote last time and no longer writes is removed; other servers stay", () => {
+    const before = `${MCP_BLOCK_BEGIN}\n[mcp_servers.gone]\ncommand = "old"\n${MCP_BLOCK_END}\n\n[mcp_servers.mine]\ncommand = "x"\n`;
+    const plan = planMcpBlock(before, tables, ["gone"]);
+    expect(plan.configToml).not.toContain("mcp_servers.gone");
+    expect(plan.configToml).toContain('[mcp_servers.mine]\ncommand = "x"');
+  });
+
+  test("every table jig does not own survives, yoki's block and the hooks block included", () => {
     const before = [
       '# yoki:begin\n[permissions.yoki]\nextends = ":workspace"\n# yoki:end\n\n',
-      `${MCP_BLOCK_BEGIN}\n[mcp_servers.gone]\ncommand = "old"\n${MCP_BLOCK_END}\n\n`,
       '[projects."/x"]\ntrust_level = "trusted"\n\n# jig:begin hooks\n[hooks.state."k"]\nenabled = true\n# jig:end hooks\n',
     ].join("");
-    const plan = planMcpBlock(before, block);
-    expect(plan.currentBlock).toBe(
-      `${MCP_BLOCK_BEGIN}\n[mcp_servers.gone]\ncommand = "old"\n${MCP_BLOCK_END}\n`,
-    );
-    expect(plan.configToml).not.toContain("mcp_servers.gone");
-    expect(plan.configToml).toContain('[projects."/x"]\ntrust_level = "trusted"');
+    const plan = planMcpBlock(before, tables);
+    expect(plan.configToml).toContain('[permissions.yoki]\nextends = ":workspace"');
     expect(plan.configToml).toContain(
       '# jig:begin hooks\n[hooks.state."k"]\nenabled = true\n# jig:end hooks',
     );
-    expect(plan.configToml).toContain('[permissions.yoki]\nextends = ":workspace"');
     expect(plan.configToml.endsWith(block)).toBe(true);
-    // Idempotent.
-    expect(planMcpBlock(plan.configToml, block)).toMatchObject({ changed: false });
-  });
-
-  test("an empty file gets just the block", () => {
-    expect(planMcpBlock(undefined, block).configToml).toBe(block);
-    expect(currentMcpBlock(block)).toBe(block);
-  });
-});
-
-describe("mcpServersDeclaredOutside", () => {
-  test("names each server jig would write that some other table already declares, with its line", () => {
-    const toml = [
-      '[mcp_servers.context7]\ncommand = "npx"\n\n',
-      '[mcp_servers."notion-mcp"]\nurl = "u"\n\n',
-      '[mcp_servers.serena.env]\nX = "1"\n\n',
-      '[mcp_servers.unrelated]\ncommand = "x"\n\n',
-      `${MCP_BLOCK_BEGIN}\n[mcp_servers.figma-remote]\nurl = "f"\n${MCP_BLOCK_END}\n`,
-    ].join("");
-    expect(
-      mcpServersDeclaredOutside(toml, ["context7", "notion-mcp", "serena", "figma-remote"]),
-    ).toEqual([
-      { name: "context7", line: 1 },
-      { name: "notion-mcp", line: 4 },
-      { name: "serena", line: 7 },
-    ]);
-  });
-
-  test("nothing outside: nothing to refuse over", () => {
-    expect(mcpServersDeclaredOutside("[features]\nhooks = true\n", ["serena"])).toEqual([]);
   });
 });
 
@@ -168,5 +199,68 @@ describe("the status line", () => {
     };
     expect(Object.keys(parsed.mcp_servers ?? {}).length).toBeGreaterThan(0);
     expect(parsed.tui).toBeDefined();
+  });
+});
+
+describe("ownedView", () => {
+  const tables = buildCodexMcpTables(SERVERS, { HOME: "/h" });
+  const names = tables.map((table) => table.name);
+
+  test("is the same after Codex drops an empty args array and moves the tables", () => {
+    const written = Bun.TOML.parse(planMcpBlock("", tables).configToml);
+    const rewritten = Bun.TOML.parse(
+      planMcpBlock("", tables).configToml.replace(/\nargs = \[\]/g, ""),
+    );
+    expect(ownedView(rewritten, names)).toBe(ownedView(written, names));
+  });
+
+  test("changes when an owned value changes, not when another table does", () => {
+    const text = planMcpBlock("", tables).configToml;
+    const base = ownedView(Bun.TOML.parse(text), names);
+    expect(ownedView(Bun.TOML.parse(`${text}\n[features]\nhooks = true\n`), names)).toBe(base);
+    const edited = text.replace('command = "uvx"', 'command = "pipx"');
+    expect(ownedView(Bun.TOML.parse(edited), names)).not.toBe(base);
+  });
+
+  test("nothing owned in the file reads as nothing", () => {
+    expect(ownedView(Bun.TOML.parse("[features]\nhooks = true\n"), names)).toBeUndefined();
+  });
+});
+
+describe("what Codex and the user keep beside jig's tables", () => {
+  const tables = buildCodexMcpTables(SERVERS, { HOME: "/h" });
+  const names = tables.map((table) => table.name);
+
+  test("a tool approval Codex records under a jig server is kept and is not drift", () => {
+    const written = planMcpBlock("", tables).configToml;
+    const approved = `${written}\n[mcp_servers.serena.tools.find_symbol]\napproval_mode = "approve"\n`;
+    expect(ownedView(Bun.TOML.parse(approved), names)).toBe(
+      ownedView(Bun.TOML.parse(written), names),
+    );
+    const again = planMcpBlock(approved, tables).configToml;
+    expect(again).toContain('[mcp_servers.serena.tools.find_symbol]\napproval_mode = "approve"');
+    expect(() => Bun.TOML.parse(again)).not.toThrow();
+  });
+
+  test("a multi-line status_line the user wrote is replaced whole, and the result loads", () => {
+    const before = '[tui]\nstatus_line = [\n  "model",\n  "current-dir",\n]\nanimations = false\n';
+    const plan = planMcpBlock(before, tables);
+    const parsed = Bun.TOML.parse(plan.configToml) as {
+      tui: { status_line: string[]; animations: boolean };
+    };
+    expect(parsed.tui).toEqual({ status_line: [...CODEX_STATUS_LINE], animations: false });
+  });
+
+  test("a string holding a line like a jig table is left alone", () => {
+    const before =
+      '[agents.x]\ndeveloper_instructions = """\n[mcp_servers.serena]\ncommand = "fake"\n"""\n';
+    const plan = planMcpBlock(before, tables);
+    expect(plan.configToml).toContain('"""\n[mcp_servers.serena]\ncommand = "fake"\n"""');
+    expect(() => Bun.TOML.parse(plan.configToml)).not.toThrow();
+  });
+
+  test("a server written as a key of a bare [mcp_servers] table is named", () => {
+    const toml = '[mcp_servers]\nserena = { command = "uvx" }\nother.command = "x"\n';
+    expect(serversDeclaredAsKeys(toml, names)).toEqual(["serena"]);
   });
 });

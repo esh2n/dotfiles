@@ -1,0 +1,40 @@
+# Metaphor and analogy vocabulary for scripts/check_metaphor.py.
+# Columns: kind<TAB>pattern (Python re)<TAB>note (Japanese, shown to the writer)<TAB>source.
+# Rows whose source starts with nanaism/yomiyasu are taken from that project (MIT); see ../NOTICE.md.
+# Lines starting with # and blank lines are ignored. A per-project file can add rows (see SKILL.md).
+kind	pattern	note	source
+metaphor_verb	(地味に|よく|じわじわ)効[かきくけいた]	比喩動詞「効く」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	(データ|仕様|設計|環境|ビルド|システム|秩序)が(静かに)?壊れ	比喩動詞「壊れる」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	静かに(壊れ|落ち|失敗|沈黙)	英語の直訳「静かに壊れる (silently fail)」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	黙って(無視|捨て|スキップ|破棄)	英語の直訳「黙って無視される」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	側に倒[すしせ]	判断を方向で言う「〜側に倒す」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	時間[をに]溶か[さしすせそ]	比喩動詞「時間を溶かす」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	(1つずつ|一つずつ)潰[していく]	比喩動詞「潰す」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	(実装|詳細|コード|設計|内部|仕組み|領域|本質)(に|まで|へ)踏み込[んむみま]	比喩動詞「踏み込む」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	動かしながら引き返[すし]	比喩動詞「引き返す」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	代わりに添え[るた]	比喩動詞「添える」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	(議論|意見|結論|方向性|価格|話題|検討)が[^。！？!?]*?収斂	比喩動詞「収斂する」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	した瞬間に?	英語の直訳「〜した瞬間 (the moment ...)」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	(前提|基盤)が崩れ[るた]	抽象的な比喩「前提が崩れる」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	文化が醸成	物を主語にした「文化が醸成される」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	プロセスが定着	物を主語にした「プロセスが定着する」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+metaphor_verb	事例が残した	物を主語にした「事例が残した」	nanaism/yomiyasu@79d15a6 scripts/yomiyasu_lint.py METAPHOR_VERB_PATTERNS
+figure	土台(?:づくり|作り)?|(?<!基)礎(?!石)|基盤づくり|第一歩|大きな一歩|一歩前進|連鎖を断ち切|断ち切り|道を(?:開|拓|ひら)(?!け)|扉を(?:開|ひら)(?!け)|(?:鍵|カギ)を握|武器(?:に|と)な|強力な武器|景色が(?:変わ|一変)|新たな(?:地平|ステージ|次元)|次の(?:ステージ|次元)|底上げ|盤石|追い風|起爆剤|羅針盤|架け橋|屋台骨|息を吹き込|命を吹き込|静かに(?:壊れ|失敗|落ち)|黙って(?:無視|捨て|スキップ|破棄|止ま)	比喩で中身が見えない語	nanaism/yomiyasu@79d15a6 references/lists/fact-gaps.txt (figure)
+metaphor_verb	(例外|エラー|処理|負荷|責務)を[^。]{0,10}逃が[さしすせそ]	比喩動詞「逃がす」。何をどこへ移すかを書く	nanaism/yomiyasu@79d15a6 references/slop-catalog.md §1
+metaphor_verb	(?<![一-龥])沈黙[しすさ]	比喩動詞「沈黙する」。応答しない、何も出力しない、など実際の動作を書く	nanaism/yomiyasu@79d15a6 references/slop-catalog.md §1
+vague_noun	手触り|肌感覚?|温度感|熱量|血の通った|泥臭い	質感を装う語	nanaism/yomiyasu@79d15a6 references/slop-catalog.md §5
+vague_noun	解像度(?:を上げ|が上が|が高|が低)|腹落ち	理解を曖昧に言う語	nanaism/yomiyasu@79d15a6 references/slop-catalog.md §5
+vague_noun	落とし込[まみむめん]|紐解[かきくけい]	作業を曖昧に言う動詞。何をどうするかを書く	nanaism/yomiyasu@79d15a6 references/slop-catalog.md §5
+vague_noun	地に足のついた|等身大の|これは強い	評価を装う語	nanaism/yomiyasu@79d15a6 references/slop-catalog.md §5
+vague_noun	(思考|意思決定|仕事|人生|組織|チーム|学習|経営)の?OS(?![A-Za-z])	定義のない比喩の名前（〜の OS）	nanaism/yomiyasu@79d15a6 references/slop-catalog.md §5
+analogy	のようなもの|みたいなもの	説明のためのたとえ。仕組みそのものを書く	plain-japanese
+analogy	(?:例|たと|喩)えると|(?:例|たと|喩)えるなら|(?:例|たと|喩)えて言えば	説明のためのたとえ	plain-japanese
+analogy	いわば|言わば|まるで|さながら|比喩的に言えば|イメージとしては|と考えると分かりやすい|と考えるとわかりやすい	説明のためのたとえ	plain-japanese
+metaphor_verb	重心を(?:移|ずら|置)	中身の見えない比喩「重心を移す」。何を優先するかを書く	plain-japanese (natural-japanese v1.6.0 の例文)
+metaphor_verb	(?:問題|課題|箇所|穴|懸念|リスク|バグ|不具合)を?[^。、]{0,6}潰[さしすせそ]	比喩動詞「潰す」。直す、取り除く、など実際の動作を書く	plain-japanese
+metaphor_verb	(?<!キャッシュが)(?<!インデックスが)(?<!ブレーキが)(?<!薬が)(?<!設定が)効(?:[かきくけ](?![率果用力能])|い[てた])	比喩動詞「効く」。何がどう変わるかを書く。キャッシュや設定が効く、のような字義どおりの用法は残す	plain-japanese
+metaphor_verb	地味に	評価だけの副詞「地味に」。何がどう変わるかを書く	plain-japanese
+personification	(コード|設定ファイル|設定|テスト|ログ|データ|数字|履歴|設計|仕様)が(?:語[るらりっれ]|育[つちっ]|叫[ぶびん]|嫌が|教えてくれ|物語)	擬人化。誰が何をするかを書く	plain-japanese (natural-japanese v1.6.0 の型3)
+slang	を吐[いくかけ]	話し言葉「ログを吐く」。出力する、書き出す	plain-japanese (natural-japanese v1.6.0 の型6)
+slang	(サーバー?|プロセス|ジョブ|コンテナ|DB|ビルド|ワーカー)が死[なにぬねんだ]	話し言葉「サーバーが死ぬ」。停止する、異常終了する	plain-japanese (natural-japanese v1.6.0 の型6)
+slang	(?:に|へ)刺さ[らりるっ]	話し言葉「刺さる」。何が誰の役に立つかを書く	plain-japanese

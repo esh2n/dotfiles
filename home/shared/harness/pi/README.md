@@ -7,7 +7,7 @@ resident-context budget:
 |---|---|---|
 | `main` | DeepSeek Flash | LiteLLM proxy, `localhost:4000` |
 | `complex` | DeepSeek V4 Pro | same proxy — design decisions, ambiguous bugs, large reviews |
-| `deterministic` | Qwen3.8-27B | same proxy → LM Studio (free, offline, reproducible) |
+| `executor` | Qwen3.8-27B | same proxy → LM Studio (free, offline, reproducible) |
 
 Started as the local-only driver for Qwen3.8-27B; the proxy tiers were added
 later. Claude Code and omp keep their roles — pi exists to squeeze the most
@@ -20,7 +20,7 @@ Decision record: writeup store `local-llm/2026-09-13-local-llm-yoki-integration-
 
 Every tier goes through the proxy, including the local one. `models.json` has no
 `lmstudio/*` provider, and that is deliberate. The same Qwen3.8 27B used to be
-reachable two ways — the proxy alias `deterministic`, and a direct
+reachable two ways — the proxy alias `executor`, and a direct
 `localhost:1234` entry — and traffic through the direct entry is invisible to the
 dashboard: no TTFT, no tokens, no cost, and no way afterwards to tell which door
 a session used. Because the point of this lane is measuring which model to use,
@@ -29,7 +29,7 @@ the proxy (Docker) down, the local model is not selectable at all.
 
 The local tier's wire settings moved with the removal. `qwen-chat-template`
 thinking, `supportsReasoningEffort: false` and the official Qwen sampling params
-(`temperature 1.0`, `top_p 0.95`, `top_k 20`) now sit on the `deterministic`
+(`temperature 1.0`, `top_p 0.95`, `top_k 20`) now sit on the `executor`
 alias, so closing the direct door did not silently change how the local model is
 called. None of that has been exercised through the proxy yet (0 requests at the
 time of writing) — the first measured local request is what confirms it.
@@ -54,7 +54,7 @@ decides how much a session may carry; the model does not.
 |---|---|---|---|
 | `main` | 1,000,000 | 200,000 | proxy `/v1/models`: `max_input_tokens: 1000000` |
 | `complex` | 1,000,000 | 500,000 | same |
-| `deterministic` | 131,072 | 80% = 104,857 | the proxy reports LM Studio's loaded context |
+| `executor` | 131,072 | 80% = 104,857 | the proxy reports LM Studio's loaded context |
 
 Why the split: Codex CLI ships `model_context_window` and
 `model_auto_compact_token_limit` as two keys, and Claude Code has an
@@ -74,14 +74,14 @@ backstop (window − reserve); the extension fires far earlier.
 
 | File | Role |
 |---|---|
-| `models.json` | all three tiers as proxy aliases: `main` (Flash), `complex` (V4 Pro), `deterministic` (Qwen3.8-27B via LM Studio), each declaring the window the proxy reports. The local alias also carries `qwen-chat-template` thinking, `thinkingLevelMap` pinning medium (upstream #8567 otherwise always picks xhigh) and the official Qwen sampling params. No direct provider — see "One door per model" |
+| `models.json` | all three tiers as proxy aliases: `main` (Flash), `complex` (V4 Pro), `executor` (Qwen3.8-27B via LM Studio), each declaring the window the proxy reports. The local alias also carries `qwen-chat-template` thinking, `thinkingLevelMap` pinning medium (upstream #8567 otherwise always picks xhigh) and the official Qwen sampling params. No direct provider — see "One door per model" |
 | `settings.json` | proxy-first default (`main`), `enabledModels` limited to the proxy tiers, compaction reserve 16k |
 | `AGENTS.md` | ~1.6KB resident instructions shared by all tiers (align-before-executing, stale-edit, tool-call, output discipline, git rules) |
 | `extensions/freshness.ts` | Blocks stale-file edits, failed-edit retries without re-read, 3x identical-call loops. Resident cost 0 |
 | `extensions/compactor.ts` | Caps tool results at 30k chars (spill to `~/.local/state/pi/spill/`), proactive compaction at a per-model limit (main 200k, complex 500k, otherwise 80% of the declared window). Resident cost 0 |
 | `extensions/guard.ts` | pi's own blast-radius guard: hard-blocks push-to-main / force-push / --no-verify / second-model loads; confirms rm -rf etc. Resident cost 0 |
 | `extensions/gate.ts` | `/goal` + `/gate` + `goal_complete` — completion refused until gates pass, gates not rerun on unchanged workspace. Resident cost: 1 tool schema |
-| `extensions/tier-router.ts` | `/tier [main\|complex\|deterministic\|off]` — the session runs on ONE tier (`main` unless `PI_TIER` or `/tier` picked another) and the extension only holds it there, putting the model back when pi's startup race or a `/model` pick lands elsewhere. Never automatic: a stronger model is a subagent's `model:` (`agents/models.json`), per `rules/decisions/2026-09-23-tier-fixed-main-subagent-escalation.md`. Resident cost 0 |
+| `extensions/tier-router.ts` | `/tier [main\|complex\|executor\|off]` — the session runs on ONE tier (`main` unless `PI_TIER` or `/tier` picked another) and the extension only holds it there, putting the model back when pi's startup race or a `/model` pick lands elsewhere. Never automatic: a stronger model is a subagent's `model:` (`agents/models.json`), per `rules/decisions/2026-09-23-tier-fixed-main-subagent-escalation.md`. Resident cost 0 |
 | `extensions/compaction-judgment.ts` | `/compact-judgment [on\|off]`; asks the judgment service (`POST /compact`) which items a compaction is about to summarize are reproducible and can go, and gives only the kept ones to the summarizer (`ctx.model`, its own `complete()` call). Notices what it dropped; every failure falls back to pi's own compaction. **ON by default**, opt out with `PI_COMPACT_JUDGMENT=off` or `/compact-judgment off`. Resident cost 0 |
 
 Extensions adapted from [earlyaidopters/marks-pi-harness](https://github.com/earlyaidopters/marks-pi-harness)

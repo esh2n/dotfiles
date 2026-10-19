@@ -11,7 +11,7 @@
  *   (`planAgentsSkillsMount`, `./delivery.ts`). omp reads it natively (its
  *   `agents` provider), so skills need no omp-specific delivery.
  * - `~/.omp/agent/agents/<name>.md` — one generated file per `agents/*.md`
- *   (`domain/omp/agents.ts`): frontmatter translated, body verbatim. Each is
+ *   and per skill pack agent (`domain/omp/agents.ts`, `./plugins.ts`): frontmatter translated, body verbatim. Each is
  *   tracked in the manifest so a hand edit is a conflict; the files yoki
  *   generated there today are backed up before the first generated ones
  *   land; a file no source produces is not jig's.
@@ -48,10 +48,10 @@
 import {
   type ModelChoice,
   type ModelMapping,
+  checkAgentVocabulary,
   modelChoiceFor,
   parseAgentDefinition,
 } from "../../domain/claude/agent-definition";
-import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
 import { type PathState, backupPath, planLink } from "../../domain/claude/links";
 import { describePathState } from "../../domain/claude/managed-dir";
 import { parseMcpLayer } from "../../domain/mcp/parse";
@@ -77,6 +77,14 @@ import {
   readJson,
   withBackup,
 } from "./delivery";
+import {
+  type StaleAgentFile,
+  fromPack,
+  reasonOf,
+  removeStale,
+  sortLeftovers,
+} from "./generated-agents";
+import { agentPlan, loadPlugins } from "./plugins";
 import type { OmpApplyPorts } from "./ports";
 
 /** The link's name under `extensions/`: omp derives the extension id `extension-module:jig` from it. */
@@ -85,6 +93,8 @@ export const OMP_EXTENSION_LINK_NAME = "jig.ts";
 export interface OmpApplyPaths {
   /** `llm/harness/`, absolute. `skills/` and `agents/` are under it. */
   readonly harnessRoot: string;
+  /** Where external skill packs are checked out (`resolvePluginsDir`). Absent: none. */
+  readonly pluginsDir?: string;
   /** `llm/harness/mcp/servers.json`. */
   readonly mcpServers: string;
   /** The trees yoki-switch linked skills from: a link under one of them is stale, not somebody's. */
@@ -127,7 +137,9 @@ export interface OmpAgentsDirReport {
   readonly files: readonly OmpAgentFileReport[];
   /** Source entries that produce no file, with why. */
   readonly excluded: readonly { readonly name: string; readonly reason: string }[];
-  /** Entries of the destination that no source produces: not jig's, left alone. */
+  /** Files jig wrote whose source is gone, unchanged since: removed on `--write`. */
+  readonly stale: readonly StaleAgentFile[];
+  /** Entries of the destination that no source produces: not jig's, or edited since jig wrote them. Left alone. */
   readonly foreign: readonly { readonly name: string; readonly what: string }[];
   /** Source tiers with no omp model, and how many agents name each. */
   readonly unmappedTiers: readonly { readonly tier: string; readonly count: number }[];
@@ -225,36 +237,47 @@ async function planAgents(
   now: Date,
 ): Promise<OmpAgentsDirReport> {
   const sourceDir = `${paths.harnessRoot}/agents`;
-  const candidates: readonly AgentCandidate[] = await listEntries(ports, sourceDir);
-  const selection = selectAgentFiles(candidates);
+  const plugins = await loadPlugins(ports, paths.harnessRoot, paths.pluginsDir);
+  const { selection, targetOf } = await agentPlan(ports, sourceDir, plugins);
 
   const files: OmpAgentFileReport[] = [];
+  const excluded = [...selection.excluded];
   const produced = new Set<string>();
   const unmappedTiers = new Map<string, number>();
   const unmappedTools = new Map<string, number>();
   for (const sourceFile of selection.linked) {
-    const text = await ports.readFile(`${sourceDir}/${sourceFile}`);
+    const sourcePath = targetOf(sourceFile);
+    const text = await ports.readFile(sourcePath);
     if (text === undefined) continue;
     const stem = sourceFile.replace(/\.md$/, "");
-    const { definition, model } = decide(sourceFile, () => {
-      const parsed = parseAgentDefinition(text, stem);
-      return {
-        definition: parsed,
-        model: modelChoiceFor(parsed.model, options.ompModels, parsed.models?.omp),
-      };
-    });
+    let built: {
+      model: ModelChoice;
+      tools: ReturnType<typeof translateTools>;
+      content: string;
+    };
+    try {
+      const { definition, model } = decide(sourceFile, () => {
+        const parsed = parseAgentDefinition(text, stem);
+        if (!fromPack(sourcePath, sourceDir)) checkAgentVocabulary(parsed);
+        return {
+          definition: parsed,
+          model: modelChoiceFor(parsed.model, options.ompModels, parsed.models?.omp),
+        };
+      });
+      const tools = translateTools(definition.tools);
+      const content = renderOmpAgent({ definition, model, tools, sourcePath });
+      options.validateFrontmatter?.(ompAgentFrontmatter(content));
+      built = { model, tools, content };
+    } catch (error) {
+      if (!fromPack(sourcePath, sourceDir)) throw error;
+      excluded.push({ name: sourceFile, reason: reasonOf(error) });
+      continue;
+    }
+    const { model, tools, content } = built;
     if (model.kind === "unmapped") {
       unmappedTiers.set(model.tier, (unmappedTiers.get(model.tier) ?? 0) + 1);
     }
-    const tools = translateTools(definition.tools);
     for (const tool of tools.unmapped) unmappedTools.set(tool, (unmappedTools.get(tool) ?? 0) + 1);
-    const content = renderOmpAgent({
-      definition,
-      model,
-      tools,
-      sourcePath: `${sourceDir}/${sourceFile}`,
-    });
-    options.validateFrontmatter?.(ompAgentFrontmatter(content));
     const name = ompAgentFileName(sourceFile);
     const path = `${paths.agentsDir}/${name}`;
     produced.add(name);
@@ -280,10 +303,7 @@ async function planAgents(
     });
   }
 
-  const foreign = (await listEntries(ports, paths.agentsDir))
-    .filter((entry) => !produced.has(entry.name))
-    .map((entry) => ({ name: entry.name, what: describePathState(entry.state) }))
-    .sort((a, b) => compare(a.name, b.name));
+  const { stale, foreign } = await sortLeftovers(ports, paths.agentsDir, produced, manifest);
 
   const counted = (map: Map<string, number>) =>
     [...map.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count);
@@ -291,7 +311,8 @@ async function planAgents(
   return {
     path: paths.agentsDir,
     files,
-    excluded: selection.excluded,
+    excluded,
+    stale,
     foreign,
     unmappedTiers: counted(unmappedTiers).map(({ key, count }) => ({ tier: key, count })),
     unmappedTools: counted(unmappedTools).map(({ key, count }) => ({ tool: key, count })),
@@ -456,6 +477,7 @@ function needsWrite(report: Omit<OmpApplyReport, "outcome" | "wrote" | "message"
   return (
     managedDirChanges(report.agentsSkillsDir) ||
     report.agents.files.some((file) => file.outcome === "write") ||
+    report.agents.stale.length > 0 ||
     report.mcpJson.outcome === "write" ||
     report.configYml.outcome === "write" ||
     report.extensions.link.state !== "ok"
@@ -509,7 +531,7 @@ export async function applyOmp(
         ]
       : configYml.report.outcome === "conflict"
         ? [
-            "config.yml's jig keys (modelRoles, tools.approvalMode, tools.approval.eval, statusLine) differ from both jig's last write and the newly generated ones",
+            "config.yml's jig keys (modelRoles, tools.approvalMode, tools.approval.eval, statusLine, retry) differ from both jig's last write and the newly generated ones",
           ]
         : []),
     ...(base.extensions.dirState.kind === "file"
@@ -533,6 +555,7 @@ export async function applyOmp(
       await ports.writeAtomic(file.path, file.content);
       manifest[file.path] = ports.sha256(file.content);
     }
+    await removeStale(ports, agents.stale, manifest);
     if (mcp.report.outcome === "write") {
       await ports.writeAtomic(paths.mcpJson, mcp.generated);
       manifest[paths.mcpJson] = ports.sha256(mcp.report.block);

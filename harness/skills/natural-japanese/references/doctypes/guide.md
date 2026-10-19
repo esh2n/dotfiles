@@ -1,79 +1,141 @@
-# 社内ガイド・マニュアル: 読者は迷ったときだけ開く
+# Internal guide / manual (社内ガイド・マニュアル): readers open it only when they are stuck
 
-社内ガイドが答えるべき問いは「今この操作をどうやればいいか」であって、「この仕組み全体をどう理解すればいいか」ではない。読者の大半は通読しない。目次かブラウザ内検索から目当ての章に飛び、その章だけを読んで作業に戻る。だからガイドの成否は、通読したときの完成度より、拾い読みされたときに迷わせない設計で決まる。文レベルの読みやすさは `readability-principles.md`、ビジネス文書一般のPREP構成は `genre-notes.md` の business 節を参照し、ここでは章立てと導線に絞る。
+The question an internal guide answers is how to do this operation right now. Getting the reader to understand the whole system is not the main goal. Most readers do not read it through; they jump from the table of contents or a search to the chapter they want, read only that chapter, and go back to work. So a guide is judged less by how complete it is when read through than by whether it leaves the reader lost when only part of it is read. This file covers chapter structure and the paths between chapters. For how to write sentences, follow SKILL.md §2.
 
-## 必須要素
+## Required elements
 
-- 対象読者と前提知識(このガイドは誰のために書かれ、何を知っている前提か)
-- 通読部と参照部の区別(冒頭で「1〜3章は初回に通読、4章以降は必要なときに引く」のように宣言する)
-- 章と章の橋渡し(前章で何が済み、この章は何に答えるか)
-- 用語集(本文中で定義済みの用語も、末尾に一覧としてもう一度置く)
-- 問い合わせ導線(このガイドで解決しない疑問をどこに持ち込むか)
+- A 「まず覚えること」 (what to remember first) block at the top: the minimum actions to follow, numbered, 3–4 items
+- The intended reader (a title or one line at the top that makes it clear is enough. State prerequisite knowledge only when the reader needs it to judge whether the guide is for them)
+- Which part is read through and which part is looked up when needed (at the top, write something like 「1〜3章は初回に通読、4章以降は必要なときに引く」)
+- A glossary (terms explained in the body also appear again as a list at the end)
+- Where to ask (where to take questions this guide does not resolve)
 
-このうち抜けやすいのは通読部と参照部の宣言で、書き手は目次を見れば区別できるつもりでいるが、読者は目次だけでは判断できない。冒頭の数行で「どこまで読めば最低限の理解になるか」を明言しておかないと、読者は毎回全章に目を通すか、逆に必要な章まで読み飛ばすかのどちらかに振れる。
+The one most often missing is the split between the part to read through and the part to look up. The writer assumes the table of contents makes it obvious, but the reader cannot judge from the table of contents alone. If the top does not say how far to read for a minimum understanding, the reader either skims every chapter every time or skips chapters they actually need.
 
-## 構成の型は章の性質で変える
+## Vary the structure by the nature of the chapter
 
-すべての章を同じ骨格で書くと、読者は毎回「この章はどこまで丁寧に読めばいいか」を判断し直す羽目になる。章の性質ごとに型を使い分けたほうが、読者は型を見た瞬間に読み方を切り替えられる。
+When every chapter is written with the same structure, the reader has to re-judge, chapter by chapter, how carefully to read. When the structure matches the nature of each chapter, the reader can switch reading mode just by seeing the structure.
 
-- **物語型**: 入門章に向く。時系列や作業の流れに沿って説明し、読者を一歩ずつ連れていく
-- **逆引き型**: 「〜したい→この手段」の対応表に近い構成。目的が先に決まっている読者向け
-- **ハンズオン型**: 1操作1ステップで並べ、各ステップの直後に「なぜこの操作をするか」を一言添える。手順と理由を交互に置くことで、読者は暗記でなく理解で操作を追える
-- **リファレンス型**: パラメータや設定項目を表で並べる。地の文で説明する対象ではない
+- Narrative: suits introductory chapters. Explains in order, following the flow of the work
+- Reverse lookup: shows the means for each 「〜したい」 (I want to ...), close to a lookup table. Suits readers whose goal is already fixed
+- Hands-on: one operation per step, with one line right after each step saying why you do it. Steps and reasons alternate, so the reader follows the operation by understanding rather than memorizing
+- Reference: parameters and settings laid out in a table. Not something to explain in running prose
 
-難しい枝葉の話は本文に混ぜず、「深掘りノート」として章末や別区画に分離する。ただしノートへの導入文を毎回同じ言い回しでコピーすると、それ自体が単調な鋳型になる。章ごとに何を深掘りしているかが分かる一言に差し替える。
+Whatever the structure, use the following as the baseline. A guide is a document people look things up in, and readers search for the lines that concern them, so this takes priority over principle 3 in SKILL.md, 「箇条書きは本当に独立して並ぶときだけ」 (bullets only when items are truly independent).
 
-## 品質基準
+- The top may open with one line addressed to the reader (for newcomers, a line of welcome). Follow with 「まず覚えること」 as 3–4 numbered items (more cannot be remembered), then a note on what to read. Do not write preambles the reader will not use for their next action, such as who prepared the guide or what assumptions it is written under
+- Headings are short names that make it clear at once what the section is about (「VPN につながらないとき」「パスワードの再設定」). A structure that puts a conclusion sentence in the heading and the content in running prose gets skipped in a guide (this takes priority over the heading rule in SKILL.md §1). Give each item (a rule with a deadline, one operation, one exception) its own subheading. Do not merge items into one section joined by running prose. Write each item's content only as bullets and numbers, with no introductory sentence or paragraph of reasons in between. When a reason is needed, add it in a few words in parentheses at the end of that line
+- Steps are numbered, one action per step. Before the steps, say in one sentence what they do. Add the reason in a few words right after the step, and move long explanations to a separate section (do not start explaining the mechanism in the middle of the steps)
+- Rules (deadlines, conditions, exceptions) go in bullets
+- Do not use stiff wording such as 「該当の」「当該」「〜の際は」; write in everyday spoken words (「その節を開く」 rather than 「該当の節を開く」)
+- Put common mistakes in a two-column table of symptom and fix (「VPN につながらない|ルーターを再起動してから、もう一度つなぐ」). Readers search by symptom, so make the fix readable on the same row. Contacts (困りごと|連絡先) and terms (用語|意味) also go in tables
+- In sentences addressed to the reader, check that the reader is the subject. Do not mix the writer's circumstances (who distributes it, why this guide was made) into one sentence with an instruction to the reader. 「全体会議で共有し、迷ったときに参照してください」 has a twisted subject: the writer shares it, the reader refers to it
 
-- **目次の見出しだけを拾い読みして、目的の章にたどり着けるか。** 見出しが「概要」「利用方法」のようなラベルだと、読者は開いてみるまで中身を判断できない
-- **前章を読んでいない読者が、この章の冒頭2行だけで文脈に追いつけるか。** 追いつけないなら、章間の橋渡しが本文でなく目次構造に頼りすぎている
-- **同じ概念を複数章で説明するとき、後発の章は差分だけを書いているか。** 「詳細は3章を参照。ここでは4章特有の違いだけを述べる」のように書けているかを見る
-- **未完成の章が、完成章と同じ厚みのテンプレートで水増しされていないか。** 「準備中」に留めて質問の受け口だけ示せば十分な章を、無理に段落で埋めていないか確認する
-- **例外処理とやってはいけないことが、行動と結果のペアで書かれているか。** 「注意してください」で終わらず、「この操作をすると何が起きるか」まで書けているかを見る
+Keep involved supplements out of the body; separate them as a 「深掘りノート」 (deep-dive note), at the end of a chapter or similar. But if the line introducing the note is the same wording every time, that itself becomes a monotonous pattern. In each chapter, use a line that says what the note supplements.
 
-## AIがやりがちな失敗
+## Quality criteria
 
-全章を同じ骨格・同じ文の長さで書き、読者が章ごとの重さを判断できなくする失敗がもっとも多い。2行で済む議題も10行かける議題も同じ見出しレベル・同じ節構成で処理してしまうためで、直すには章を書く前に「この章はどれだけ語る価値があるか」を仮に割り振っておく(→ `revision-guide.md` の濃淡設計)。次に多いのが、章をまたぐ参照の定型句(「詳細は次章で解説します」)をコピーして貼るだけの橋渡しで、これは橋渡しがあるように見えて実際には何もつないでいない。もう一つ、検証していない画面操作や挙動を断定口調で書いてしまう失敗がある。試していない手順は「〜と表示される想定」のように確信度を書き分け、断定は自分で確認した範囲に限る。
+- The reader can reach the target chapter from the headings in the table of contents alone. Use names that say what the section is about, like 「VPN につながらないとき」, not names whose content is unclear, like 「概要」「利用方法」
+- A reader who has not read the earlier chapters can do the task from that section alone. Do not write bridging sentences between chapters such as 「ここまでで〜できました。ここからは〜です」 (in a lookup document they are not read and only lengthen the section). Only in a long narrative introductory chapter may you note its relation to the previous chapter in one line
+- When the same concept is explained in several chapters, the later chapters state only the differences. Write something like 「詳細は3章を参照。ここでは4章で違う点だけを述べる」
+- Chapters not yet written are not padded with boilerplate to the same thickness as the others. For some chapters, writing 「準備中」 and showing only where to send questions is enough
+- Operations that must not be done are written as a pair of operation and result. Do not stop at 「注意してください」; say what happens if you do it
 
-## 文体憲法の重点条項
+## Typical AI failures
 
-- **第2条(見出しはメッセージ)**: 逆引き型の章では見出し自体が「〜したい→手段」の対応になるため、この条がもっとも直接効く。物語型・ハンズオン型でも、見出しだけをスキャンして手順の勘所が伝わる状態を目指す
-- **第7条(濃淡をつける)**: 通読部は厚く、参照部は表と短い注釈で軽く。全章を均一に書くのは網羅を装うAIの癖であり、ガイドではとくに読者の時間を奪う
-- **第8条(同じ鋳型を3回繰り返さない)**: 章の書き出し・深掘りノートの導入文・クロスリファレンスの言い回しが3回続けて同じ形になっていないか確認する
-- **第10条(限界・未確定は明示ラベル)**: 未検証の手順、まだ書かれていない章は、断定でごまかさずに状態をラベルで示す
+The most common is writing every chapter with the same structure and the same sentence length, so the reader cannot judge each chapter's weight. A chapter that needs 2 lines and one that needs 10 get the same heading level and section structure. Deciding, before writing, how much each chapter is worth writing prevents this (SKILL.md §1 "Density").
 
-## 例: 経費精算システムの社内ガイド
+Next most common is pasting a stock bridge such as 「詳細は次章で解説します」 into every chapter: it looks like a bridge but connects nothing. Another is stating screen operations or behavior that have not been checked as certain. For unchecked steps, mark the certainty, as in 「〜と表示される想定」, and limit assertions to what the material or the user has confirmed.
 
-Before(ラベル見出し、断定過多)
+## Principles that matter most (SKILL.md §2)
+
+- Principle 2 (headings): in a guide, a heading is not a conclusion sentence but a short name that says what the section is about. In a reverse-lookup chapter, each line is a mapping of 「症状や目的 → 手段」 (symptom or goal → means)
+- Principle 7 (density): write the read-through part thick, and the lookup part light, with tables and short notes
+- Principle 8 (do not repeat a pattern): check whether chapter openings, the lines introducing 深掘りノート, and the wording of references to other chapters take the same form three times in a row
+- Principle 10 (degree of certainty): mark unchecked steps and chapters not yet written with a label showing their state
+
+## Template: the shape of one guide
+
+As an example, an internal VPN connection guide at a fictional company.
+
+```
+# 社内 VPN 接続ガイド(在宅勤務をする人向け)
+
+在宅勤務を始める方へ。自宅から社内のシステムを使うときは、このガイドの手順で VPN につないでください。
+
+## まず覚えること
+1. 社内のシステムを使う前に、VPN アプリで「接続」を押す
+2. パスワードは90日ごとに変わる。期限の7日前に通知が届く
+3. つながらないときは、下の「困ったとき」を見る
+
+初回は「はじめての接続」だけを読めば足ります。ほかの節は、必要になったときに開いてください。
+
+## はじめての接続
+1. 社内ポータルから VPN アプリをダウンロードする
+2. アプリを開き、社員番号とパスワードを入れる
+3. スマートフォンに届く確認コードを入れる
+
+## パスワードの更新
+- 90日ごとに更新が必要
+- 期限の7日前に、メールで通知が届く
+- 期限を過ぎると接続できなくなる(情報システム部で再発行が必要)
+
+## 困ったとき
+| 症状 | 直し方 |
+|---|---|
+| 「認証に失敗しました」と出る | パスワードの期限が切れていないか確かめる |
+| つながるがすぐ切れる | 自宅のルーターを再起動してから、もう一度つなぐ |
+| 確認コードが届かない | 情報システム部に連絡する |
+
+## 問い合わせ先
+| 困りごと | 連絡先 |
+|---|---|
+| 接続の操作 | 情報システム部(#it-help) |
+| 在宅勤務の申請 | 総務部 |
+
+最終更新日:2026年4月1日
+```
+
+In this template, the opening line is only an instruction with the reader as subject; it does not say who made the guide. Each item has its own subheading, and its content is only numbers and bullets, with no paragraphs of running prose. Symptoms and fixes, and contacts, are tables. Reasons are kept to a few words in parentheses at the end of the line, as in 「(情報システム部で再発行が必要)」.
+
+## Example: an internal guide to an expense reimbursement system
+
+Consider writing a chapter of the guide from the following material.
+
+素材:申請は領収書1枚につき1件。経理の突き合わせが領収書単位なので、まとめて申請すると差し戻しになる。承認後の振込は自動で、通常は3営業日。月末は遅れることがあるが、どのくらい遅れるかは経理チームに確認中。
+
+Example written with a heading whose content is unclear and running prose:
 
 > ## 概要
-> 経費精算システムの使い方を説明します。基本的にすべての申請はこのシステムから行います。
+> 経費精算システムの使い方を説明します。申請は領収書1枚につき1件です。経理の突き合わせが領収書単位で行われるため、まとめて申請すると差し戻しになりますので注意してください。承認後は自動で振り込まれます。
+
+Example written with headings that say what the section is and bullets:
+
+> ## 申請のしかた
+> - 領収書1枚につき1件で申請する。まとめて申請すると差し戻しになる(経理の突き合わせが領収書単位のため)
 >
-> ## 利用方法
-> 領収書をアップロードし、勘定科目を選択し、申請ボタンを押してください。承認されると自動的に振り込まれます。
+> ## 振込
+> - 承認後、自動で振り込まれる。通常は3営業日
+> - 月末は遅れることがある。どのくらい遅れるかは経理チームに確認中【要確認】
 
-After(メッセージ見出し、確信度の書き分け、深掘りノートの分離)
+Both examples use only the same material. With the second, the reader finds the heading, reads one bullet line, and is done. The reason is kept to a few words in parentheses, and the unconfirmed month-end delay is not asserted but marked 【要確認】.
 
-> ## 領収書1枚につき申請は1件、まとめ申請はできない
-> 出張精算のように複数領収書がまたがる場合も、システム上は領収書ごとに申請を分ける。理由は経理側の突合フローが領収書単位で組まれているためで、まとめて申請すると差し戻しになる(→深掘りノート「経理フローとの整合」)。
->
-> ## 申請から振込までは通常3営業日、月末は5営業日に伸びる想定
-> 承認後の振込タイミングは自動処理のため、通常は3営業日を見込んでよい。ただし月末は他部署の申請が集中するため、5営業日程度に伸びる想定で組んでおくと安全(未検証: 実際の遅延幅は経理チームへの確認待ち)。
+In a reverse-lookup chapter, the shape of the headings itself changes. Consider writing the same guide's 「困ったときは」 chapter from the following material.
 
-同じ「使い方」を説明していても、After は見出しを開いた瞬間に結論(申請単位のルール、振込までの目安)が伝わる。ラベル見出しは開くまで中身が分からないが、メッセージ見出しは開く前から答えが半分渡っている。
+素材:領収書をなくしたときは「紛失理由書」フォームから代わりに申請できる。差し戻しの理由は、通知メールの末尾に書いてある。海外出張の外貨の領収書は、申請日のシステム内レートで自動で換算される。
 
-もう一つ、逆引き型の章では見出しの形そのものを変える。同じ経費精算ガイドの「困ったときは」章なら、見出しを次のように並べる。
+Lay out the headings like this.
 
-> ## 領収書を紛失した → 「紛失理由書」フォームから代替申請できる
-> ## 申請が差し戻された → 差し戻し理由は通知メールの末尾に記載される。多くは科目の選び間違い
-> ## 海外出張の領収書が外貨表記 → 申請日時点のシステム内レートで自動換算される。手動計算は不要
+> ## 領収書をなくした → 「紛失理由書」フォームから代わりに申請できる
+> ## 申請が差し戻された → 差し戻しの理由は、通知メールの末尾に書いてある
+> ## 海外出張の領収書が外貨 → 申請日のシステム内レートで自動で換算される
 
-物語型の章がひとつの操作の流れを順に説明するのに対し、逆引き型の章は各行が独立した対応表になる。読者は自分の状況に近い行だけを拾い読みするので、行同士のつながりを気にする必要はない。同じガイドの中でも章によってこの型を切り替えてよい。
+Where a narrative chapter explains one flow of operations in order, in a reverse-lookup chapter each line is an independent mapping. Readers read only the line closest to their situation, so the connection between lines does not matter. Even within one guide, the structure may differ from chapter to chapter.
 
-## このガイドも育つ
+## A guide is fixed while it is in use
 
-社内ガイドは一度書いて終わりの成果物ではなく、読者からの質問がそのまま次の改訂の材料になる文書として扱う。末尾に最終更新日を置き、「この章で分からなかった点は問い合わせ導線から」の一言を添えておくと、ガイド自体が使われながら育っていく。
+An internal guide is a document where readers' questions become the material for the next revision as they are. Put the last-updated date at the end, and add where to ask about anything this chapter did not make clear.
 
-改訂のたびに全章を書き直す必要はない。質問が集中した章だけを厚くし、質問が出ない章はそのままでよい。ここでも濃淡の原則(第7条)が働く。育つ文書だからといって、すべての章を均等に更新し続けるのはむしろ本末転倒になる。
+There is no need to rewrite every chapter at each revision. Thicken only the chapters where questions concentrated, and leave chapters with no questions as they are. If every chapter keeps being updated the same way, readers cannot tell what changed.
 
-社内ガイドは議事録(→ `minutes.md`)や調査レポート(→ `report.md`)と違い、書いた時点の状態を保存する文書ではない。読者の行動を今この瞬間に変えることが目的なので、古い手順が残っていれば実害につながる。更新の遅れそのものがガイドの信頼性を損なうという前提で、最終更新日を隠さず出す。
+Unlike minutes or reports, an internal guide is not a document for preserving the state at the time of writing. It exists to change what the reader does now, so a leftover old procedure leads to an actually wrong operation. Do not hide the last-updated date; write it.

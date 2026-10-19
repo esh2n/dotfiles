@@ -56,7 +56,7 @@ Sources verified in `sources.md`. Each entry: symptom, why it happens, fix, dete
 - **Symptom**: throughput collapses under concurrent load even though the critical section looks small in code.
 - **Why**: the `Mutex` is held while waiting on a network call, disk I/O, or another lock — every other goroutine queues behind an operation with unbounded latency.
 - **Fix**: copy what you need out from under the lock, release it, then do I/O; re-acquire only to write results back.
-- **Detector**: `go-perf-reviewer` via mutex-contention profiling (`runtime.SetMutexProfileFraction` + pprof); not caught by `-race` or `vet`.
+- **Detector**: mutex-contention profiling (`runtime.SetMutexProfileFraction` + pprof); not caught by `-race` or `vet`.
 
 ## `defer` in a loop
 
@@ -91,13 +91,13 @@ Sources verified in `sources.md`. Each entry: symptom, why it happens, fix, dete
 - **Symptom**: throughput doesn't scale with added cores; per-core cache-miss counters (via `perf`) are elevated on a struct with independently-updated fields.
 - **Why**: unrelated fields updated by different goroutines land in the same CPU cache line, so every write invalidates the other goroutine's cached copy even though there's no logical data race.
 - **Fix**: pad hot fields to their own cache line, or restructure so each goroutine's counters live in separate allocations.
-- **Detector**: CPU profiling / hardware perf counters; `go-perf-reviewer`'s measured mode, not static analysis.
+- **Detector**: CPU profiling / hardware perf counters; the measured loop in `go-performance`, not static analysis.
 
 ## `sync.Pool` misuse
 
 - **Symptom**: memory footprint doesn't shrink under low load, or pooled objects carry stale/leaked state into their next use.
 - **Why**: `Pool` items can be evicted at any GC (no guarantee of retention) and are *not* zeroed between uses — putting an object back without resetting it leaks its old contents forward.
-- **Fix**: always reset (clear buffers, drop references) before `Put`; never assume an item survives until the next `Get`; only pool objects whose alloc cost is actually the bottleneck (measure first — `go-perf-reviewer`'s territory).
+- **Fix**: always reset (clear buffers, drop references) before `Put`; never assume an item survives until the next `Get`; only pool objects whose alloc cost is actually the bottleneck (measure first — see `go-performance`).
 - **Detector**: heap profiling before/after; code review for missing reset-before-`Put`.
 
 ## `sync.Map` misuse
@@ -105,7 +105,7 @@ Sources verified in `sources.md`. Each entry: symptom, why it happens, fix, dete
 - **Symptom**: `sync.Map` used as a general-purpose concurrent map is slower and uses more memory than `Mutex` + built-in `map`.
 - **Why**: `sync.Map` is optimized specifically for "written once, read many times" or "disjoint key sets per goroutine" access patterns (per the stdlib doc) — outside those, its internal bookkeeping costs more than a simple lock.
 - **Fix**: default to `Mutex`-guarded `map[K]V`; reach for `sync.Map` only when the access pattern matches its documented sweet spot, and measure.
-- **Detector**: code review against the decision table in `SKILL.md`; benchmark comparison (`go-perf-reviewer`).
+- **Detector**: code review against the decision table in `SKILL.md`; benchmark comparison (`go-performance`).
 
 ## `WaitGroup.Add` inside the counted goroutine
 

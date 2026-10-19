@@ -5,6 +5,10 @@ describe("omp's config.yml", () => {
   test("a new file gets jig's keys and omp's bootstrap values", () => {
     const { config, carried } = composeOmpConfig(undefined);
     expect(config.modelRoles).toMatchObject({ default: "proxy/main", slow: "proxy/complex" });
+    // rules/decisions/2026-10-19-model-assignment.md: design work on complex, task on main.
+    expect(config.modelRoles).toMatchObject({ designer: "proxy/complex", task: "proxy/main" });
+    // Never continue on a different model when one fails (2026-10-19-model-assignment.md).
+    expect(config.retry).toEqual({ modelFallback: false, maxRetries: 0 });
     expect(config.tools).toEqual({ approvalMode: "yolo", approval: { eval: "prompt" } });
     expect(config.statusLine).toMatchObject({
       preset: "custom",

@@ -59,7 +59,7 @@ sub add($self, $a, $b) {
 
 ## Test::More Fundamentals
 
-The standard Perl testing module — widely used, ships with core.
+The long-standing Perl testing module; it ships with core perl, so it needs no dependency on any interpreter, including macOS `/usr/bin/perl` (5.34.1 when checked).
 
 ### Basic Assertions
 
@@ -122,7 +122,7 @@ done_testing;
 
 ## Test2::V0 Modern Framework
 
-Test2::V0 is the modern replacement for Test::More — richer assertions, better diagnostics, and extensible.
+Test2::V0 is the successor bundle to Test::More — richer assertions, better diagnostics, and extensible. Test2::Suite (which provides Test2::V0) has been in core only since perl 5.40 ([perl5400delta](https://perldoc.perl.org/perl5400delta#New-Modules-and-Pragmata)); it now ships in the Test-Simple distribution on CPAN. A distribution whose minimum perl is below 5.40 must list `Test2::V0` under `on test => sub { requires ... }` in its `cpanfile`.
 
 ### Why Test2?
 
@@ -130,7 +130,7 @@ Test2::V0 is the modern replacement for Test::More — richer assertions, better
 - Better diagnostic output on failures
 - Subtests with cleaner scoping
 - Extensible via Test2::Tools::* plugins
-- Backward-compatible with Test::More tests
+- Not a drop-in replacement for Test::More: Test2's `is()` compares structures deeply, while Test::More's `is()` compares strings, so `is($ref, $ref)` no longer checks identity (use `ref_is`) ([Test2::Manual::Testing::Migrating](https://metacpan.org/pod/Test2::Manual::Testing::Migrating)). `use Test2::V0` also turns on `strict`, `warnings`, the `utf8` pragma for the test file and a fixed `srand` seed; opt out with `-no_utf8` / `-no_srand` ([Test2::V0](https://metacpan.org/pod/Test2::V0))
 
 ### Deep Comparison with Builders
 
@@ -404,7 +404,7 @@ done_testing;
 ### DO
 
 - **Follow TDD**: Write tests before implementation (red-green-refactor)
-- **Use Test2::V0**: Modern assertions, better diagnostics
+- **Use Test2::V0 where the floor allows**: on perl 5.40+ it is core; below that it is a CPAN test dependency
 - **Use subtests**: Group related assertions, isolate state
 - **Mock external dependencies**: Network, database, file system
 - **Use `prove -l`**: Always include lib/ in `@INC`
@@ -417,9 +417,9 @@ done_testing;
 
 - **Don't test implementation**: Test behavior and output, not internals
 - **Don't share state between subtests**: Each subtest should be independent
-- **Don't skip `done_testing`**: Ensures all planned tests ran
+- **Don't skip `done_testing` (or a plan)**: it declares the plan at the end, so the harness can tell a script that ran to completion from one that exited early ([Test::More](https://metacpan.org/pod/Test::More)); never call it in an `END` block
 - **Don't over-mock**: Mock boundaries only, not the code under test
-- **Don't use `Test::More` for new projects**: Prefer Test2::V0
+- **Don't mix the two by habit**: pick Test2::V0 or Test::More per project and follow what the existing tests use; when porting, re-check every `is()` on references
 - **Don't ignore test failures**: All tests must pass before merge
 - **Don't test CPAN modules**: Trust libraries to work correctly
 - **Don't write brittle tests**: Avoid over-specific string matching
@@ -445,10 +445,10 @@ done_testing;
 ### Forgetting `done_testing`
 
 ```perl
-# Bad: Test file runs but doesn't verify all tests executed
+# Bad: no plan, so the harness cannot tell whether the script ran to the end
 use Test2::V0;
 is(1, 1, 'works');
-# Missing done_testing — silent bugs if test code is skipped
+# Missing done_testing — an early exit can go unnoticed
 
 # Good: Always end with done_testing
 use Test2::V0;
@@ -475,4 +475,4 @@ Mock the *dependency*, not the code under test. If your test only verifies that 
 
 Use `my` variables inside subtests — never `our` — to prevent state leaking between tests.
 
-**Remember**: Tests are your safety net. Keep them fast, focused, and independent. Use Test2::V0 for new projects, prove for running, and Devel::Cover for accountability.
+**Remember**: Tests are your safety net. Keep them fast, focused, and independent. Use Test2::V0 where the perl floor allows (core from 5.40) or Test::More otherwise, prove for running, and Devel::Cover for accountability.

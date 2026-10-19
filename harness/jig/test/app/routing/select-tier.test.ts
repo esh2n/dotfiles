@@ -71,7 +71,7 @@ describe("selectTier", () => {
   });
 
   test("honors a custom threshold and fallback", async () => {
-    const provider = new StaticProvider({ choice: { value: "deterministic", confidence: 0.55 } });
+    const provider = new StaticProvider({ choice: { value: "executor", confidence: 0.55 } });
     const result = await selectTier(
       "format json",
       provider,
@@ -79,10 +79,10 @@ describe("selectTier", () => {
       { threshold: 0.5, fallback: "main" },
     );
     expect(result).toEqual({
-      value: "deterministic",
+      value: "executor",
       confidence: 0.55,
       source: "decided",
-      chosen: "deterministic",
+      chosen: "executor",
     });
   });
 });

@@ -1,14 +1,14 @@
 ## Quality
 
 - Write tests for new features and bug fixes
-- Use feature branches for all development
+- Use feature branches for all development outside a personal repository (Git Conventions)
 - Follow semantic versioning for releases
 - Document breaking changes
 - Before claiming completion, run the language's static checks the project does not already run in its hooks: Go `staticcheck ./...`, Rust `cargo clippy`, CSS `stylelint`, HTML `html-validate` — and show their output
 
 ## Testing
 
-- Minimum test coverage: 80%
+- Minimum test coverage: 80%, reached with tests of behaviour. Never pad coverage with a test that still passes when the behaviour breaks; no new test beats a bad one
 - All three test types are required: unit (functions, utilities, components), integration (API endpoints, database operations), E2E (critical user flows, framework chosen per language)
 - TDD: write tests first (RED), implement to pass (GREEN), refactor (IMPROVE), verify 80%+ coverage — see the tdd-workflow skill
 - Troubleshooting a failure: check test isolation, verify mocks are correct, fix the implementation rather than the test unless the test itself is wrong

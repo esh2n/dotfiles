@@ -15,11 +15,11 @@ import { toLitellmModelList } from "../../../src/domain/tiers/write-litellm";
 import { loadRealTiers } from "./fixtures";
 
 describe("toLitellmModelList", () => {
-  test("renders one entry per tier, in main/complex/deterministic order, with the real backend route", () => {
+  test("renders one entry per tier, in main/complex/executor order, with the real backend route", () => {
     const { content } = toLitellmModelList(loadRealTiers());
     const mainIdx = content.indexOf("model_name: main");
     const complexIdx = content.indexOf("model_name: complex");
-    const detIdx = content.indexOf("model_name: deterministic");
+    const detIdx = content.indexOf("model_name: executor");
 
     expect(mainIdx).toBeGreaterThan(-1);
     expect(complexIdx).toBeGreaterThan(mainIdx);
@@ -31,9 +31,9 @@ describe("toLitellmModelList", () => {
     expect(content).toContain("model: openai/Qwen3.8-27B-Q4_K_M");
   });
 
-  test("the deterministic entry reads the desktop llama-server's key (matches the real file)", () => {
+  test("the executor entry reads the desktop llama-server's key (matches the real file)", () => {
     const { content } = toLitellmModelList(loadRealTiers());
-    const detBlock = content.slice(content.indexOf("model_name: deterministic"));
+    const detBlock = content.slice(content.indexOf("model_name: executor"));
     expect(detBlock).toContain("api_key: os.environ/LINUX_MODEL_API_KEY");
   });
 
@@ -50,7 +50,7 @@ describe("toLitellmModelList", () => {
 
   test("a tier with several models gets one entry each, in order, with the catalog's params and model_info", () => {
     const { content } = toLitellmModelList(loadRealTiers());
-    const det = content.slice(content.indexOf("# deterministic ←"));
+    const det = content.slice(content.indexOf("# executor ←"));
     expect(det.indexOf("order: 1")).toBeLessThan(det.indexOf("order: 2"));
     expect(det).toContain("api_base: os.environ/LINUX_MODEL_API_BASE");
     expect(det).toContain("      extra_body:\n        ttl: 600");

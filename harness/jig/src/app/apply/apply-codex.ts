@@ -23,7 +23,8 @@
  *   destinations, no vocabulary substitution. yoki's file there is backed
  *   up before the first generated one lands, as the Claude target does.
  * - `~/.codex/agents/<name>.toml` — one generated file per `agents/*.md`
- *   (`domain/codex/agents.ts`), each tracked in the manifest so a hand edit
+ *   and per skill pack agent, the house keeping a shared name
+ *   (`domain/codex/agents.ts`, `./plugins.ts`), each tracked in the manifest so a hand edit
  *   is a conflict. `model` and `model_reasoning_effort` come from the
  *   `codex` table of `agents/models.json` (`domain/claude/agent-models.ts`,
  *   read at the composition root) or the agent's own `models.codex`
@@ -46,7 +47,7 @@
  */
 
 import type { ModelMapping } from "../../domain/claude/agent-definition";
-import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
+import { checkAgentVocabulary } from "../../domain/claude/agent-definition";
 import { type PathState, backupPath } from "../../domain/claude/links";
 import { describePathState } from "../../domain/claude/managed-dir";
 import {
@@ -57,11 +58,11 @@ import {
   renderCodexAgent,
 } from "../../domain/codex/agents";
 import {
-  type ForeignMcpTable,
   buildCodexMcpTables,
-  mcpServersDeclaredOutside,
+  ownedView,
   planMcpBlock,
   renderMcpBlock,
+  serversDeclaredAsKeys,
   yokiLeftovers,
 } from "../../domain/codex/config";
 import { parseMcpLayer } from "../../domain/mcp/parse";
@@ -80,11 +81,21 @@ import {
   planAgentsSkillsMount,
   readJson,
 } from "./delivery";
+import {
+  type StaleAgentFile,
+  fromPack,
+  reasonOf,
+  removeStale,
+  sortLeftovers,
+} from "./generated-agents";
+import { agentPlan, loadPlugins } from "./plugins";
 import type { CodexApplyPorts } from "./ports";
 
 export interface CodexApplyPaths {
   /** `llm/harness/`, absolute. `skills/`, `agents/` and `rules/` are under it. */
   readonly harnessRoot: string;
+  /** Where external skill packs are checked out (`resolvePluginsDir`). Absent: none. */
+  readonly pluginsDir?: string;
   /** `llm/harness/mcp/servers.json`. */
   readonly mcpServers: string;
   /** `llm/harness/rules/decisions/`. */
@@ -137,7 +148,9 @@ export interface AgentsDirReport {
   readonly files: readonly AgentFileReport[];
   /** Source entries that produce no file, with why. */
   readonly excluded: readonly { readonly name: string; readonly reason: string }[];
-  /** Entries of the destination that no source produces: not jig's, left alone. */
+  /** Files jig wrote whose source is gone, unchanged since: removed on `--write`. */
+  readonly stale: readonly StaleAgentFile[];
+  /** Entries of the destination that no source produces: not jig's, or edited since jig wrote them. Left alone. */
   readonly foreign: readonly { readonly name: string; readonly what: string }[];
   /** Where the tier table came from, when the caller said. */
   readonly mappingSource?: string;
@@ -170,8 +183,8 @@ export interface ConfigTomlReport {
   /** Servers the block carries, in source order. */
   readonly servers: readonly string[];
   readonly block: string;
-  /** `[mcp_servers.<name>]` tables outside jig's block for servers jig writes: each a conflict. */
-  readonly declaredOutside: readonly ForeignMcpTable[];
+  /** Servers jig writes that the file declares as keys of a bare `[mcp_servers]`: conflicts. */
+  readonly declaredAsKeys: readonly string[];
   /** What yoki left in the file, named for milestone 4. */
   readonly yokiLeftovers: readonly string[];
 }
@@ -204,6 +217,12 @@ export interface CodexApplyOptions {
   readonly modelsSource?: string;
   /** Called with each generated TOML text before writing; throw to refuse. */
   readonly validateToml?: (text: string) => void;
+  /**
+   * A TOML parser. Given, jig's part of config.toml is compared by value
+   * (`ownedView`), so Codex rewriting its tables (dropping `args = []`,
+   * regrouping) is not taken for a hand edit. Absent, the text is compared.
+   */
+  readonly parseToml?: (text: string) => unknown;
 }
 
 /** yoki's command→skill conversions: real `cmd-*` directories. */
@@ -258,24 +277,38 @@ async function planAgents(
   now: Date,
 ): Promise<AgentsDirReport> {
   const sourceDir = `${paths.harnessRoot}/agents`;
-  const candidates: readonly AgentCandidate[] = await listEntries(ports, sourceDir);
-  const selection = selectAgentFiles(candidates);
+  const plugins = await loadPlugins(ports, paths.harnessRoot, paths.pluginsDir);
+  const { selection, targetOf } = await agentPlan(ports, sourceDir, plugins);
 
   const files: AgentFileReport[] = [];
+  const excluded = [...selection.excluded];
   const produced = new Set<string>();
   const mapped = new Map<string, MappedTierReport>();
   const unmapped = new Map<string, number>();
   for (const sourceFile of selection.linked) {
-    const text = await ports.readFile(`${sourceDir}/${sourceFile}`);
+    const sourcePath = targetOf(sourceFile);
+    const text = await ports.readFile(sourcePath);
     if (text === undefined) continue;
     const stem = sourceFile.replace(/\.md$/, "");
-    const { definition, model } = decide(sourceFile, () => {
-      const parsed = parseAgentDefinition(text, stem);
-      return {
-        definition: parsed,
-        model: codexModelFor(parsed.model, options.codexModels, parsed.models?.codex),
-      };
-    });
+    let built: { model: CodexModelChoice; content: string };
+    try {
+      const { definition, model } = decide(sourceFile, () => {
+        const parsed = parseAgentDefinition(text, stem);
+        if (!fromPack(sourcePath, sourceDir)) checkAgentVocabulary(parsed);
+        return {
+          definition: parsed,
+          model: codexModelFor(parsed.model, options.codexModels, parsed.models?.codex),
+        };
+      });
+      const content = renderCodexAgent({ definition, model, sourcePath });
+      options.validateToml?.(content);
+      built = { model, content };
+    } catch (error) {
+      if (!fromPack(sourcePath, sourceDir)) throw error;
+      excluded.push({ name: sourceFile, reason: reasonOf(error) });
+      continue;
+    }
+    const { model, content } = built;
     if (model.kind === "unmapped") unmapped.set(model.tier, (unmapped.get(model.tier) ?? 0) + 1);
     if (model.kind === "mapped" && model.override === undefined && model.tier !== undefined) {
       const seen = mapped.get(model.tier);
@@ -286,12 +319,6 @@ async function planAgents(
         count: (seen?.count ?? 0) + 1,
       });
     }
-    const content = renderCodexAgent({
-      definition,
-      model,
-      sourcePath: `${sourceDir}/${sourceFile}`,
-    });
-    options.validateToml?.(content);
     const name = codexAgentFileName(sourceFile);
     const path = `${paths.agentsDir}/${name}`;
     produced.add(name);
@@ -316,15 +343,13 @@ async function planAgents(
     });
   }
 
-  const foreign = (await listEntries(ports, paths.agentsDir))
-    .filter((entry) => !produced.has(entry.name))
-    .map((entry) => ({ name: entry.name, what: describePathState(entry.state) }))
-    .sort((a, b) => compare(a.name, b.name));
+  const { stale, foreign } = await sortLeftovers(ports, paths.agentsDir, produced, manifest);
 
   return {
     path: paths.agentsDir,
     files,
-    excluded: selection.excluded,
+    excluded,
+    stale,
     foreign,
     ...(options.modelsSource === undefined ? {} : { mappingSource: options.modelsSource }),
     mappedTiers: [...mapped.values()].sort((a, b) => b.count - a.count),
@@ -349,7 +374,11 @@ async function planConfigToml(
   paths: CodexApplyPaths,
   options: CodexApplyOptions,
   manifest: Readonly<Record<string, string>>,
-): Promise<{ readonly report: ConfigTomlReport; readonly generated: string }> {
+): Promise<{
+  readonly report: ConfigTomlReport;
+  readonly generated: string;
+  readonly ownedHash: string | undefined;
+}> {
   const read = await readJson(ports, paths.mcpServers);
   if (read === undefined) {
     throw new Error(`jig apply --target codex: MCP source not found at ${paths.mcpServers}`);
@@ -359,31 +388,121 @@ async function planConfigToml(
   const block = renderMcpBlock(tables);
 
   const current = await ports.readFile(paths.configToml);
-  const plan = planMcpBlock(current, block);
   const names = tables.map((table) => table.name);
-  const declaredOutside = current === undefined ? [] : mcpServersDeclaredOutside(current, names);
-  // A table declared twice is exactly what the parser rejects, and it is
-  // reported as the conflict it is; the parser's own error would only hide
-  // the names. So the generated text is validated only once it could load.
-  if (declaredOutside.length === 0) options.validateToml?.(plan.configToml);
-  const blockPlan = planApply({
-    currentContent: plan.currentBlock,
-    generatedContent: block,
-    manifestHash: manifest[paths.configToml],
-    sha256: ports.sha256,
+  const asKeys = current === undefined ? [] : serversDeclaredAsKeys(current, names);
+  const plan = planMcpBlock(current, tables, previousMcpNames(manifest, paths));
+  // a server also declared as a key of [mcp_servers] would make the result
+  // a duplicate the parser rejects; that is reported as the conflict below
+  if (asKeys.length === 0) options.validateToml?.(plan.configToml);
+  const compared = comparedForms(ports, paths, options, manifest, {
+    current,
+    currentBlock: plan.currentBlock,
+    block,
+    owned: [...new Set([...names, ...previousMcpNames(manifest, paths)])],
   });
+  const applied = planApply({ ...compared, sha256: ports.sha256 });
+  // Tables under jig's names that jig has no record of writing (yoki's, or
+  // written by hand) are somebody's: they are not taken over silently.
+  const blockPlan =
+    compared.manifestHash === undefined &&
+    compared.currentContent !== undefined &&
+    compared.currentContent !== compared.generatedContent
+      ? { action: "conflict" as const }
+      : applied;
   return {
     generated: plan.configToml,
+    ownedHash: compared.byValue ? ports.sha256(compared.generatedContent) : undefined,
     report: {
       path: paths.configToml,
       outcome: blockPlan.action,
       diff: unifiedDiff(paths.configToml, current ?? "", "generated", plan.configToml),
       servers: names,
       block,
-      declaredOutside,
+      declaredAsKeys: asKeys,
       yokiLeftovers: current === undefined ? [] : yokiLeftovers(current),
     },
   };
+}
+
+/** Where the manifest keeps the hash of jig's part of config.toml, by value. */
+function ownedKey(paths: CodexApplyPaths): string {
+  return `${paths.configToml}#owned`;
+}
+
+/**
+ * What the hand-edit check compares. With a parser: jig's part of the file
+ * by value, against the value-hash jig recorded; before such a hash exists,
+ * the text-block hash an older apply recorded still vouches for the file
+ * when the text matches it. Without a parser, or when the file does not
+ * parse: the canonical text block, as before.
+ */
+function comparedForms(
+  ports: CodexApplyPorts,
+  paths: CodexApplyPaths,
+  options: CodexApplyOptions,
+  manifest: Readonly<Record<string, string>>,
+  input: {
+    readonly current: string | undefined;
+    readonly currentBlock: string | undefined;
+    readonly block: string;
+    readonly owned: readonly string[];
+  },
+): {
+  readonly currentContent: string | undefined;
+  readonly generatedContent: string;
+  readonly manifestHash: string | undefined;
+  readonly byValue: boolean;
+} {
+  const byText = {
+    currentContent: input.currentBlock,
+    generatedContent: input.block,
+    manifestHash: manifest[paths.configToml],
+    byValue: false,
+  };
+  const parse = options.parseToml;
+  if (parse === undefined) return byText;
+  let parsedCurrent: unknown;
+  try {
+    parsedCurrent = input.current === undefined ? {} : parse(input.current);
+  } catch {
+    return byText;
+  }
+  const currentView = ownedView(parsedCurrent, input.owned);
+  const generatedView = ownedView(parse(input.block), input.owned) ?? "";
+  const recorded = manifest[ownedKey(paths)];
+  const legacy = manifest[paths.configToml];
+  const vouched =
+    recorded === undefined &&
+    legacy !== undefined &&
+    input.currentBlock !== undefined &&
+    ports.sha256(input.currentBlock) === legacy &&
+    currentView !== undefined;
+  return {
+    currentContent: currentView,
+    generatedContent: generatedView,
+    manifestHash:
+      recorded ?? (vouched && currentView !== undefined ? ports.sha256(currentView) : legacy),
+    byValue: true,
+  };
+}
+
+/** Where the manifest keeps the server names jig wrote, so a server dropped from the source is removed. */
+function mcpNamesKey(paths: CodexApplyPaths): string {
+  return `${paths.configToml}#mcpServers`;
+}
+
+function previousMcpNames(
+  manifest: Readonly<Record<string, string>>,
+  paths: CodexApplyPaths,
+): readonly string[] {
+  const recorded = manifest[mcpNamesKey(paths)];
+  if (recorded === undefined) return [];
+  try {
+    const names: unknown = JSON.parse(recorded);
+    return Array.isArray(names) ? names.filter((n): n is string => typeof n === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 function needsWrite(report: Omit<CodexApplyReport, "outcome" | "wrote" | "message">): boolean {
@@ -391,6 +510,7 @@ function needsWrite(report: Omit<CodexApplyReport, "outcome" | "wrote" | "messag
     managedDirChanges(report.agentsSkillsDir) ||
     report.agentsMd.outcome === "write" ||
     report.agents.files.some((file) => file.outcome === "write") ||
+    report.agents.stale.length > 0 ||
     report.configToml.outcome === "write"
   );
 }
@@ -440,9 +560,9 @@ export async function applyCodex(
           "config.toml's jig MCP block differs from both jig's last write and the newly generated block",
         ]
       : []),
-    ...config.report.declaredOutside.map(
-      (table) =>
-        `config.toml declares [mcp_servers.${table.name}] outside jig's block (line ${table.line}); remove it by hand before --write`,
+    ...config.report.declaredAsKeys.map(
+      (name) =>
+        `config.toml declares ${name} as a key of [mcp_servers], not as [mcp_servers.${name}]; move or remove it by hand before --write`,
     ),
   ];
   if (conflicts.length > 0) {
@@ -463,9 +583,12 @@ export async function applyCodex(
       await ports.writeAtomic(file.path, file.content);
       manifest[file.path] = ports.sha256(file.content);
     }
+    await removeStale(ports, agents.stale, manifest);
     if (config.report.outcome === "write") {
       await ports.writeAtomic(paths.configToml, config.generated);
       manifest[paths.configToml] = ports.sha256(config.report.block);
+      manifest[mcpNamesKey(paths)] = JSON.stringify(config.report.servers);
+      if (config.ownedHash !== undefined) manifest[ownedKey(paths)] = config.ownedHash;
     }
     seedManifest(ports, manifest, base);
     await ports.writeManifest(manifest);
@@ -479,7 +602,11 @@ export async function applyCodex(
     return { ...base, outcome: "write", wrote: true };
   }
 
-  if (input.write && !changes && seedManifest(ports, manifest, base)) {
+  const seededConfig =
+    input.write && !changes && config.report.outcome === "noop"
+      ? seedConfigRecords(manifest, paths, config)
+      : false;
+  if (input.write && !changes && (seedManifest(ports, manifest, base) || seededConfig)) {
     // Nothing to deliver, but the generated files were already current: seed
     // their hashes so a LATER hand edit is detected as one. Out-of-repo
     // state only; no file content changes.
@@ -487,6 +614,28 @@ export async function applyCodex(
   }
 
   return { ...base, outcome: changes ? "write" : "noop", wrote: false };
+}
+
+/**
+ * When config.toml already holds exactly what jig would write, record the
+ * names and the by-value hash an older apply did not keep, so the next
+ * Codex rewrite is compared by value and not mistaken for a hand edit.
+ */
+function seedConfigRecords(
+  manifest: Record<string, string>,
+  paths: CodexApplyPaths,
+  config: { readonly report: ConfigTomlReport; readonly ownedHash: string | undefined },
+): boolean {
+  let added = false;
+  if (manifest[mcpNamesKey(paths)] === undefined) {
+    manifest[mcpNamesKey(paths)] = JSON.stringify(config.report.servers);
+    added = true;
+  }
+  if (config.ownedHash !== undefined && manifest[ownedKey(paths)] === undefined) {
+    manifest[ownedKey(paths)] = config.ownedHash;
+    added = true;
+  }
+  return added;
 }
 
 /** Record every generated file's hash that is not recorded yet. True when anything was added. */

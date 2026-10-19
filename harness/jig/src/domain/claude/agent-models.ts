@@ -1,7 +1,7 @@
 /**
- * `agents/models.json`: the ruled Claude-tier → model table every other
- * harness target reads. One object per target (`codex`, `omp`), each keyed
- * by tier name (`haiku`/`sonnet`/`opus`) with `{ model, reasoningEffort? }`
+ * `agents/models.json`: the ruled tier → model table every harness target
+ * reads. One object per target (`claude`, `codex`, `omp`), each keyed by
+ * house tier (`main`/`complex`/`executor`) with `{ model, reasoningEffort? }`
  * — the `ModelMapping` of `./agent-definition.ts`, so a per-agent override
  * in the frontmatter and a tier entry here are the same shape and the
  * target does not care which it got.
@@ -20,7 +20,7 @@ import type { ModelMapping } from "./agent-definition";
 export const AGENT_MODELS_SCHEMA_VERSION = "jig.agent-models.v1";
 
 /** The targets the file may carry a table for. A key outside this set (other than `_comment` and friends) is an error, so a typo cannot pass as "not ruled". */
-export const AGENT_MODELS_TARGETS = ["codex", "omp"] as const;
+export const AGENT_MODELS_TARGETS = ["claude", "codex", "omp"] as const;
 
 export type AgentModelsTarget = (typeof AGENT_MODELS_TARGETS)[number];
 
@@ -30,7 +30,7 @@ export type AgentModels = Readonly<
 >;
 
 /** What a file with no rulings at all resolves to. */
-export const EMPTY_AGENT_MODELS: AgentModels = { codex: {}, omp: {} };
+export const EMPTY_AGENT_MODELS: AgentModels = { claude: {}, codex: {}, omp: {} };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -6,9 +6,9 @@ import {
 } from "../../domain/decision/provider";
 import { boundedMaterial } from "../decision/material";
 
-export type Tier = "main" | "complex" | "deterministic";
+export type Tier = "main" | "complex" | "executor";
 
-export const TIERS: readonly Tier[] = ["main", "complex", "deterministic"];
+export const TIERS: readonly Tier[] = ["main", "complex", "executor"];
 
 /**
  * What each tier is for, in the words the decision model judges by. A bare tier
@@ -19,8 +19,7 @@ export const TIERS: readonly Tier[] = ["main", "complex", "deterministic"];
 export const TIER_CRITERIA: Readonly<Record<Tier, string>> = {
   main: "routine work: ordinary edits, searches, explanations, small fixes",
   complex: "hard work: design, architecture, subtle debugging, long-horizon planning",
-  deterministic:
-    "mechanical work: formatting, renames, boilerplate, restating what is already known",
+  executor: "mechanical work: formatting, renames, boilerplate, restating what is already known",
 };
 
 export interface SelectTierOptions {
@@ -31,7 +30,7 @@ export interface SelectTierOptions {
 /**
  * The gated answer plus what the model actually said: on a fallback `value`
  * is the safe tier while `chosen` is the tier the judgment preferred. The log
- * needs both, or "why was this never routed to deterministic?" has no data.
+ * needs both, or "why was this never routed to executor?" has no data.
  */
 export interface TierChoice extends Gated<Tier> {
   readonly chosen: Tier;

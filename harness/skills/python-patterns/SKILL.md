@@ -8,6 +8,8 @@ metadata:
 
 # Python Patterns
 
+Writing or reviewing Python: read `references/review-standard.md` first — the single Python review standard (items with sources, version gates, concurrency model, linter mapping) shared by the writer and `code-reviewer`; framework structure stays in `django-patterns` and `fastapi-patterns`.
+
 ## Coding style
 
 ### Standards

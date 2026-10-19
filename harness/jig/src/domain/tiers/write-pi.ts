@@ -6,8 +6,8 @@
  * which provider is behind it is opaque on purpose). Those are reported in
  * the returned capability report, never silently swallowed.
  *
- * `models[].id` order in the real file is main, deterministic, complex —
- * NOT the canonical main/complex/deterministic order — so that order is
+ * `models[].id` order in the real file is main, executor, complex —
+ * NOT the canonical main/complex/executor order — so that order is
  * pinned here explicitly rather than derived from object iteration.
  */
 
@@ -15,7 +15,7 @@ import type { DroppedField, WriteResult } from "./capability";
 import type { Tier, TierId, TiersPolicy } from "./types";
 import { HARNESS_USER_AGENT } from "./user-agent";
 
-const PI_TIER_ORDER: readonly TierId[] = ["main", "deterministic", "complex"];
+const PI_TIER_ORDER: readonly TierId[] = ["main", "executor", "complex"];
 
 /** JSON has no distinct "1.0" — a whole-number sampling temperature is written with one decimal place, matching the source file's style. */
 function formatNumberLiteral(n: number): string {

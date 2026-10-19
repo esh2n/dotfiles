@@ -3,6 +3,7 @@
 Status: accepted — 公開リポジトリの主流と各ハーネスの仕組みに合い、編集ごとの整形は文脈を消費しない（2026-09-22）
 
 rule: Format edited files silently on every edit (PostToolUse in Claude Code, tool_result in pi, tools/post-execute in DSH), never at Stop/session-end. Gate type-checking and lint at the response's end (Stop in Claude Code, agent_before_settle in pi, agent/turn-stopping in DSH with a self-imposed retry cap); Codex runs the formatter once via an AGENTS.md instruction.
+scope: repo
 
 ## Problem
 

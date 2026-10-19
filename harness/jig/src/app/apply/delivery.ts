@@ -19,6 +19,7 @@ import {
   decisionLines,
   isCommonRule,
   renderAgentsMd,
+  renderRepoAgentsMd,
 } from "../../domain/claude/agents-md";
 import {
   type LinkPlan,
@@ -33,9 +34,10 @@ import {
   type ManagedSelection,
   reconcileManagedDir,
 } from "../../domain/claude/managed-dir";
-import { type SkillCandidate, selectSkillDirs } from "../../domain/claude/skills-dir";
+import type { SkillCandidate } from "../../domain/claude/skills-dir";
 import { unifiedDiff } from "../../domain/tiers/diff";
 import { type PlanAction, planApply } from "../../domain/tiers/plan";
+import { type PluginCheckout, loadPlugins, skillPlan } from "./plugins";
 import type { ClaudeApplyPorts } from "./ports";
 
 export interface AgentsMdReport {
@@ -110,6 +112,8 @@ export async function buildAgentsMd(
   paths: { readonly harnessRoot: string; readonly decisions: string },
 ): Promise<{
   readonly content: string;
+  /** The dotfiles repository's own AGENTS.md: the repo-scoped decisions. */
+  readonly repoContent: string;
   readonly commonFiles: readonly string[];
   readonly skipped: readonly SkippedDecision[];
 }> {
@@ -118,6 +122,7 @@ export async function buildAgentsMd(
   const decisions = decisionLines(notes);
   return {
     content: renderAgentsMd({ harnessRoot: paths.harnessRoot, common, decisions }),
+    repoContent: renderRepoAgentsMd({ harnessRoot: paths.harnessRoot, decisions }),
     commonFiles: common.map((source) => source.file),
     skipped: decisions.skipped,
   };
@@ -132,7 +137,10 @@ export async function planAgentsMd(
   ports: ClaudeApplyPorts,
   input: {
     readonly path: string;
-    readonly generated: Awaited<ReturnType<typeof buildAgentsMd>>;
+    readonly generated: Pick<
+      Awaited<ReturnType<typeof buildAgentsMd>>,
+      "content" | "commonFiles" | "skipped"
+    >;
     readonly manifest: Readonly<Record<string, string>>;
     readonly now: Date;
   },
@@ -249,11 +257,14 @@ export interface AgentsSkillsMountPaths {
   readonly agentsSkills: string;
   /** The trees yoki-switch linked skills from: a link under one of them is stale, not somebody's. */
   readonly formerSkillRoots: readonly string[];
+  /** Where external skill packs are checked out; their skills join the mount. Absent: none. */
+  readonly pluginsDir?: string;
 }
 
-/** A `ManagedDirReport` that also says which target planned it. */
+/** A `ManagedDirReport` that also says which target planned it and which packs fed it. */
 export interface AgentsSkillsMountReport extends ManagedDirReport {
   readonly target: AgentsSkillsMountTarget;
+  readonly plugins: readonly PluginCheckout[];
 }
 
 /**
@@ -280,16 +291,17 @@ export async function planAgentsSkillsMount(
   now: Date,
 ): Promise<AgentsSkillsMountReport> {
   const sourceDir = `${paths.harnessRoot}/skills`;
-  const selection = selectSkillDirs(await listSkillCandidates(ports, sourceDir));
+  const plugins = await loadPlugins(ports, paths.harnessRoot, paths.pluginsDir);
+  const plan = await skillPlan(ports, sourceDir, plugins);
   const report = await planManagedDir(ports, {
     dir: paths.agentsSkills,
     sourceDir,
-    selection,
     now,
+    ...plan,
     formerSourceDirs: paths.formerSkillRoots,
     probeDangling: true,
   });
-  return { ...report, target };
+  return { ...report, target, plugins: plugins.packs };
 }
 
 export function withBackup(plan: LinkPlan, now: Date): LinkReport {
@@ -309,6 +321,8 @@ export interface ManagedDirInput {
   readonly formerSourceDirs?: readonly string[];
   /** Follow each existing link one hop, so a dangling one is stale rather than foreign. */
   readonly probeDangling?: boolean;
+  /** See `ReconcileManagedDirInput.otherSourceDirs`. */
+  readonly otherSourceDirs?: readonly string[];
 }
 
 /**
@@ -329,6 +343,7 @@ export async function planManagedDir(
     planned: input.selection.linked,
     ...(input.targetOf === undefined ? {} : { targetOf: input.targetOf }),
     ...(input.formerSourceDirs === undefined ? {} : { formerSourceDirs: input.formerSourceDirs }),
+    ...(input.otherSourceDirs === undefined ? {} : { otherSourceDirs: input.otherSourceDirs }),
     entries: input.probeDangling === true ? await probeDangling(ports, input.dir, found) : found,
   }).map((action) =>
     action.kind === "link" ? { ...action, plan: withBackup(action.plan, input.now) } : action,

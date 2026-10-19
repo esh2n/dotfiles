@@ -1,46 +1,56 @@
-# 議事録 — 決定と宿題を本文から独立させる
+# Minutes (議事録): write decisions and action items apart from the body
 
-## この型が答える問い
+## The question this document answers
 
-議事録が答えるべき問いは「何が決まり、誰が、いつまでに、何をやるか」である。発言録ではない。読み手の大半は会議に出ていなかった人か、出ていたが記憶があいまいな人であり、数十秒で決定事項と宿題を確認できれば用が足りる。発言を時系列でなぞっただけの記録は、決定事項を本文の中に埋没させ、読み手にもう一度全文を読ませることになる。議事録は発言録の要約ではなく、会議という出来事から意思決定だけを抽出した構造物である。
+Minutes answer what was decided, and who does what by when; recording what was said is not the goal in itself. Most readers either did not attend or attended but remember vaguely, and they only need to confirm the decisions and action items in a few tens of seconds. A record that just traces the remarks in chronological order buries the decisions in the body, and the reader ends up rereading everything.
 
-## 必須要素
+## Required elements
 
-次が揃って初めて議事録として成立する。会議名・日時・参加者、議題ごとの議論の要点、決定事項、宿題(担当者と期日つき)、継続議題。このうち決定事項・宿題・継続議題の3つは本文の議論から独立させ、末尾か冒頭にまとめて集約する。本文中に埋め込んだままにすると、読み手は「結局何が決まったのか」を自分で拾い集める羽目になる。宿題は担当者と期日がなければ機能しない。例外はない。「チーム全員で対応」「なるべく早く」は担当と期限を放棄した書き方であり、この型では禁止する。担当者が未定の宿題は「未定(次回までに決める)」と正直に書く。ただし既存議事録のリライトで、原文にない列や節(期日列・継続議題など)を足した結果、中身が「未定」「継続実施」ばかりで埋まるなら、その列・節は足さないほうがよい。形だけの網羅は欠落より機械的に見える。
+Meeting name, date and time, attendees; the gist of the discussion per agenda item; decisions (決定事項); action items (宿題) with owner and due date; open items (継続議題). Of these, the three — decisions, action items and open items — are separated from the discussion in the body and gathered at the top. Left buried in the body, the reader has to collect "so what was decided after all" on their own.
 
-## 構成の型
+Give every action item an owner and a due date. 「チーム全員で対応」 or 「なるべく早く」 does not settle who moves when. If no owner has been decided, write 「未定」.
 
-冒頭に会議メタ情報(会議名・日時・参加者)を置く。続けて記録の前提を一段落で開示する。理由は単純だ。文字起こしの精度、録音の有無、話者識別の確信度がどの程度かを最初に断っておくと、あとの本文をどこまで信じてよいかを読み手が自分で判断できる。訂正の連絡手段(コメント、Slackなど)もここに添える。長々と書く必要はない。本文は議題ごとに節を切る。見出しはその議題で何が起きたかを一言で表す。見出しレベルは議題の粒度に合わせ、2行で済む議題を10行の議題と同格にしない。末尾に決定事項・宿題・継続議題をまとめ、必要なら「次回に向けたメモ」を添える。このメモは本文の再掲でなく、次回何を変えるかの差分だけを書く。
+When revising existing minutes, do not fill in owners or due dates that are not in the original record by guessing. If adding a column or section that is not in the original (a due-date column, an open-items section, etc.) would leave it mostly 「未定」, do not add that column or section.
 
-文体は体言止めと「である」調が標準になる。記録調でよい。丁寧体を強制する必要はない。核心発言は発言者の口調のまま残す。「測ってるからやって」を「測っているからやってほしい」に整形すると、発言の生々しさと出典性が同時に消える。話し言葉の引用は整形の対象外とする。
+## Structure
 
-## 品質基準
+The structure in this section is for writing new minutes. When revising existing minutes, do not change the order or arrangement of sections (SKILL.md §3). If you think moving decisions or action items to the front would make them easier for the reader to find, propose doing so to the user.
 
-**決定は本文を読まなくても末尾だけで分かる**。決定事項の一覧を読んだだけで、何がどう変わったのかが伝わるかを基準にする。「引き続き検討する」は決定ではない。先送りだ。それは継続議題の欄に回す。
+At the top, put the meeting name, date and time, attendees and pre-read materials as bullets, one item per line. In Markdown, lines separated only by a line break render joined into one paragraph, and the miscellaneous information becomes one lump that discourages reading, so do not line up plain-prose lines. Then write one paragraph on the premises of the record: stating up front how accurate the transcription is, whether there is a recording, and how certain the speaker attributions are lets readers judge for themselves how far to trust the body. Put the contact for corrections (comments, Slack, etc.) here too.
 
-**宿題は担当者・期日・内容の3点セットである**。欠けたら宿題ではない。3点のどれかが欠けている行は、宿題として機能せず、単なるメモにとどまる。良い議事録は「田中: 在庫アラートの閾値案を7/18までに作成」のように読める。悪い議事録は「アラート閾値については検討していく」で終わる。
+Next, gather the decisions, action items and open items. This is what readers want to confirm first, so place it before the body. Decisions and open items are bullets; action items are a table or bullets with owner, task and due date.
 
-**発言の確信度は書き分けられている**。文字起こしから話者を推定した箇所と、明確に発言者が特定できた箇所を同じ調子で書かない。書き分けが要る。推定なら「(佐藤さんと推定)」のように書き添える。
+Split the body into one section per agenda item, and make each heading a summary of what was decided, what was not decided, or what was discussed on that item. Write the course of the discussion in the body as running prose. Do not treat an item that takes 2 lines with the same weight as one that takes 10. If needed, add a 「次回に向けたメモ」 at the end. This memo does not repeat the body; it states only what to change next time.
 
-**議論は地の文で、決定・宿題だけが箇条書きになっている**。議論の経緯や意見の応酬には因果と時系列がある。だから地の文で書く。並列でないものを並列に見せない。箇条書きにできるのは、決定事項や宿題のように本当に並列な項目だけである。ただし助言の一覧のように項目が真に並列で、後から特定の項目を探す走査性に価値があるものは、無理に地の文へ均さず箇条書きのまま残す。既存議事録のリライトで全箇所を一律に段落化すると実務価値が下がる（→ `revision-guide.md` の「改稿を一律に適用しない」）。
+Noun-ending sentences and the 「である」 style are fine; there is no need to unify on the polite style. Keep key remarks in the speaker's own tone. Tidying 「それ先に言ってよ」 into 「それを先に言ってほしい」 erases the force of the remark and the information of who said it how.
 
-**助言や指摘には相手の反応が最低一言添えられている**。レビュー会議や1on1のように片方が助言し片方が受ける形の会議では、助言だけを記録して相手がどう応じたかを省くと、一方向の講義録になってしまう。応答は「了承した」「持ち帰って検討する」の一言でよい。それでも残す。対話として成立していたことが後から分かるようにする。
+## Quality criteria
 
-## AIがやりがちな失敗
+- Reading only the list of decisions tells you what changed and how. 「引き続き検討する」 is not a decision, so move it to open items
+- Each action item has all three of owner, due date and task. A good example is 「田中: 在庫アラートのしきい値案を7/18までに作成」; a bad one is 「アラートのしきい値については検討していく」
+- The certainty of speaker attribution is differentiated. Where the speaker was inferred from a transcript, add something like 「(佐藤さんと推定)」
+- The course of the discussion is in running prose, and only the decisions and action items are bullets, because discussion has causality and chronology. But a list whose items are independent and searched later for a specific item, such as a list of advice, stays as bullets
+- Advice and comments carry a word on the other party's response. Recording only the advice in a review or 1on1 turns it into a record of a one-way lecture, and what was agreed becomes unclear. 「了承した」 or 「持ち帰って検討する」 is enough. If the original record has no response, do not write one by guessing
 
-議事録を生成させると、全発言を均等な熱量で要約してしまい、決定事項が他の意見と同じ重みで埋もれる失敗が最も多い。均等主義の弊害だ。5分で終わった確認事項と30分議論した論点が同じ行数で並ぶと、読み手はどこが重要だったのか本文から判断できなくなる。話者の確信度も平坦化しやすい。理由は同じだ。全員が言い切りになるか、逆に全員が「〜と思われる」になる。どちらかに寄り、実際に自信がある発言とない発言の区別が消える。もう一つの癖は、フィラー(「えーと」「まあ」)は几帳面に消すのに、話し言葉特有の冗長な言い回しはそのまま残すことだ。「その件についてはですね、まあ一旦持ち帰らせていただいて、社内で検討した上でまた改めてご相談させていただければと思うんですけれども」は、フィラーを抜いても「持ち帰って検討する」の一言で済む。
+## Typical AI failures
 
-## 文体憲法の重点条項
+The most common failure when an AI writes minutes is summarizing every remark with the same weight, so the decisions are buried at the same weight as other opinions. When a confirmation that took 5 minutes and a point debated for 30 minutes sit side by side with the same number of lines, readers cannot tell what mattered. Speaker certainty is not differentiated either; everyone tends to assert, or everyone becomes 「〜と思われる」.
 
-- 第10条(限界・確信度の明示ラベル): 記録の限界と話者確信度の書き分けが議事録の核心機能そのものにあたる
-- 第3条(説明は地の文で): 議論の経緯を箇条書きで薄く並べず、地の文で経緯を追う
-- 第2条(見出しはメッセージ): 議題見出しは「議題1」でなく、その議題で何が決まったかを表す
-- 第7条(濃淡をつける): 軽い議題は正直に一言で流し、重い議題だけ厚く書く
-- 第6条(太字は核1箇所): 核心発言を残すときも、太字にするのはその発言の核だけに絞る
+Writing 「合意した」 for something that was not decided is another common failure. When extracting decisions from a transcript, proposals and agreement are easily mistaken for decisions.
 
-## 雛形
+Another is removing fillers like 「えーと」「まあ」 but leaving the verbose wording of speech. 「その件についてはですね、まあ一旦持ち帰らせていただいて、社内で検討した上でまた改めてご相談させていただければと思うんですけれども」 is covered by 「持ち帰って検討する」.
 
-架空のSaaS企業ソラベース社が開発する在庫管理サービス「在庫すいすい」の開発定例を例にする。
+## Principles that matter most (SKILL.md §2)
+
+- Principle 10 (differentiate degrees of certainty): differentiating the limits of the record and the certainty of speaker attribution is the central job of minutes
+- Principle 3 (causality and course of events in running prose): follow the course of the discussion in running prose rather than lining it up as bullets
+- Principle 2 (put the conclusion in headings): an agenda heading states what was decided on that item, not 「議題1」
+- Principle 7 (density): settle light items in a word, and write only heavy items thickly
+- Principle 6 (bold): even when keeping a key remark, bold only the core of that remark
+
+## Template
+
+The example is the development standup of 「在庫すいすい」, an inventory management service developed by the fictional SaaS company ソラベース社.
 
 ```
 # 在庫すいすい開発定例(2026-07-10)
@@ -54,7 +64,7 @@
 現行のしきい値(在庫数10個未満で通知)は季節商品で誤検知が多いと
 佐藤が指摘した。鈴木は、店舗担当者からも同様の苦情が来ていると
 補足した(推定: どの店舗からかは未確認)。在庫回転率を基準にする
-案を田中が提案し、大筋で合意した。
+案を田中が提案し、合意した。
 
 ## 決定事項
 - しきい値の算出方法を在庫数から在庫回転率に変更する
@@ -67,14 +77,17 @@
 - 通知先をSlackに一本化するかは未定。次回、鈴木がUI観点の意見を持ち寄る
 ```
 
-## before/after: 発言録から決定の抽出へ
+## Example: turning a transcript-style record into minutes
 
-**Before**
+Original:
 
 > 田中さんから在庫アラートについて説明があり、現行のしきい値だと誤検知が多いという話になった。佐藤さんはそれに対して在庫回転率を使う案を出し、鈴木さんも賛成した。最終的にどう決まったかは次回また相談することになった。
 
-**After**
+Revised:
 
-> しきい値の算出方法を在庫数から在庫回転率に変更する方針で合意した。発端は、現行の「在庫数10個未満で通知」が季節商品で誤検知を頻発させているという佐藤の指摘だった。具体案は田中が7/18までに作成する。
+> 在庫アラートの件は結論が出ず、次回また相談することになった。田中さんから在庫アラートの説明があり、現行のしきい値では誤検知が多いという話になった。佐藤さんが在庫回転率を使う案を出し、鈴木さんも賛成した。
+>
+> 継続議題
+> - 在庫アラートの件(次回また相談)
 
-Beforeは経緯を時系列でなぞっているだけで、読んでも何が決まったのかが最後まで分からない。Afterは決定を先頭に置き、経緯は決定を裏づける根拠として後ろに回している。
+The original traces the course of events chronologically, so you do not learn that nothing was decided until the end. The revision puts the conclusion (carried over) first and moves the course of events after it. It adds no decision, owner or due date that is not in the original, and who said what stays as in the original.

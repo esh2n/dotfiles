@@ -84,8 +84,23 @@ describe('to-md: figure (SVG only, no mermaid)', () => {
     assert.doesNotMatch(md, /flowchart/)
   })
 
-  test('.wu-terms maps to a bulleted "name — what" list', () => {
-    assert.match(md, /- \*\*ワーカー\*\* — 再試行を専門に受け持つバックエンドの処理単位。/)
+  test('a term is explained inline at first use, with no term list', () => {
+    assert.match(md, /ワーカーは再試行を専門に受け持つバックエンドの処理単位である。/)
+    assert.doesNotMatch(md, /- \*\*ワーカー\*\* —/)
+  })
+
+  test('a legacy .wu-terms block still maps to a bulleted "name — what" list', () => {
+    // .wu-terms is retired for new pages (self-check warns `terms-block`), but
+    // pages written before 2026-10-19 still carry it and must still convert.
+    const legacy = `<!DOCTYPE html><html lang="ja"><head><title>t</title>
+<meta name="description" content="d"><meta name="kind" content="設計">
+<meta name="date" content="2026-08-05"></head><body><div class="wu-page"><main>
+<dl class="wu-terms"><dt>ワーカー</dt><dd>再試行を専門に受け持つバックエンドの処理単位。</dd></dl>
+</main></div></body></html>`
+    const out = convertToMarkdown(legacy, {
+      slug: 'p', figuresDir: mkdtempSync(join(tmpdir(), 'wu-tomd-terms-')), figuresDirRel: 'figs',
+    })
+    assert.match(out, /- \*\*ワーカー\*\* — 再試行を専門に受け持つバックエンドの処理単位。/)
   })
 })
 

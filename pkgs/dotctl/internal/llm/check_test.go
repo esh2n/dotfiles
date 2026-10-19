@@ -15,11 +15,11 @@ func healthy(w world) {
 	w.sys.have["omp"] = true
 	w.sys.outputs[w.env.litellm("proxy-key.sh")] = "k\n"
 	w.sys.outputs["tailscale serve status"] = "tcp://mac:1234\ntcp://mac:5432\nhttps://mac:3001\ntcp://mac:4001\ntcp://mac:8080\n"
-	w.sys.outputs["omp models ls --json"] = `{"models": [{"provider": "proxy", "id": "main"}, {"provider": "proxy", "id": "complex"}, {"nested": [{"provider": "proxy", "id": "deterministic"}]}, {"provider": "other", "id": "x"}]}`
+	w.sys.outputs["omp models ls --json"] = `{"models": [{"provider": "proxy", "id": "main"}, {"provider": "proxy", "id": "complex"}, {"nested": [{"provider": "proxy", "id": "executor"}]}, {"provider": "other", "id": "x"}]}`
 	w.svc.set("/lms/v1/models", `{"data": [{"id": "qwen"}, {"id": "nomic"}]}`)
 	fallbackIs(w, "qwen")
 	w.svc.set("/lms/api/v1/models", `{"models": [{"key": "qwen", "max_context_length": 262144, "loaded_instances": [{"id": "qwen", "config": {"context_length": 32768}}]}, {"key": "nomic", "loaded_instances": []}]}`)
-	w.svc.set("/litellm/v1/models", `{"data": [{"id": "main"}, {"id": "deterministic"}, {"id": "complex"}]}`)
+	w.svc.set("/litellm/v1/models", `{"data": [{"id": "main"}, {"id": "executor"}, {"id": "complex"}]}`)
 	w.svc.set("POST /litellm/v1/chat/completions", `{"model": "local-qwen", "choices": [{"message": {"content": " pong\n"}}]}`)
 	w.svc.set("/jig/health", "ok")
 	w.svc.set("/metrics-listener/health", `{"status": "healthy"}`)
@@ -48,10 +48,10 @@ func TestCheckAllPassOnAHealthyObserver(t *testing.T) {
 	for _, want := range []string{
 		"home-llm check (lmstudio console)",
 		"PASS LM Studio :1234 lists: qwen nomic",
-		"PASS deterministic falls back to LM Studio's qwen",
-		"PASS LiteLLM :4000 tiers: complex deterministic main",
-		`PASS tier deterministic: "pong  [local-qwen]"`,
-		"PASS omp lists the proxy tiers: complex deterministic main",
+		"PASS executor falls back to LM Studio's qwen",
+		"PASS LiteLLM :4000 tiers: complex executor main",
+		`PASS tier executor: "pong  [local-qwen]"`,
+		"PASS omp lists the proxy tiers: complex executor main",
 		"PASS LiteLLM :4001 metrics listener healthy (2 litellm_* series)",
 		"PASS Prometheus scrapes litellm: up http://host:4000/metrics/",
 		"PASS tailscale serve 5432 (cost ledger) → mac.example.ts.net:5432",
@@ -121,7 +121,7 @@ func TestCheckPartialAnswersFail(t *testing.T) {
 		"FAIL LiteLLM :4000 tiers incomplete: main",
 		`FAIL tier main: no completion — {"error": "no key"}`,
 		"FAIL Prometheus litellm target: down u",
-		"FAIL omp does not list proxy/{main,complex,deterministic} (models.yml provider, or key) — got: none",
+		"FAIL omp does not list proxy/{main,complex,executor} (models.yml provider, or key) — got: none",
 		"FAIL tailscale serve 5432 missing (the other machines cannot ship spend to the ledger)",
 		"FAIL no other device on the tailnet",
 		"open https://?:3001",
@@ -192,14 +192,14 @@ func TestCheckNamesTheDockerEngineFirst(t *testing.T) {
 	}
 }
 
-// fallbackIs writes a litellm/config.yaml whose deterministic falls back to
+// fallbackIs writes a litellm/config.yaml whose executor falls back to
 // LM Studio's model id.
 func fallbackIs(w world, id string) {
 	p := w.env.litellm("config.yaml")
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		panic(err)
 	}
-	if err := os.WriteFile(p, []byte("model_list:\n  - model_name: deterministic\n    litellm_params:\n      model: lm_studio/"+id+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte("model_list:\n  - model_name: executor\n    litellm_params:\n      model: lm_studio/"+id+"\n"), 0o644); err != nil {
 		panic(err)
 	}
 }
@@ -209,7 +209,7 @@ func TestCheckFailsWhenLMStudioLacksTheFallbackModel(t *testing.T) {
 	healthy(w)
 	fallbackIs(w, "lmstudio-community/Qwen3.8-27B-MLX-4bit")
 	_, out, _ := runCheck(w, false)
-	if !strings.Contains(out, "FAIL deterministic falls back to lmstudio-community/Qwen3.8-27B-MLX-4bit, which LM Studio does not list") {
+	if !strings.Contains(out, "FAIL executor falls back to lmstudio-community/Qwen3.8-27B-MLX-4bit, which LM Studio does not list") {
 		t.Fatalf("out:\n%s", out)
 	}
 }
@@ -219,7 +219,7 @@ func TestCheckAcceptsAVariantOfAListedModel(t *testing.T) {
 	healthy(w)
 	fallbackIs(w, "qwen@4bit")
 	_, out, _ := runCheck(w, false)
-	if !strings.Contains(out, "PASS deterministic falls back to LM Studio's qwen@4bit") {
+	if !strings.Contains(out, "PASS executor falls back to LM Studio's qwen@4bit") {
 		t.Fatalf("out:\n%s", out)
 	}
 }

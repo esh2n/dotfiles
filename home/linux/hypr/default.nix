@@ -4,5 +4,6 @@
 # link into the checkout: do not run it (git diff shows it if it happens).
 { config, ... }:
 {
-  xdg.configFile."hypr/looknfeel.lua".source = config.lib.dotfiles.link "home/linux/hypr/looknfeel.lua";
+  xdg.configFile."hypr/looknfeel.lua".source =
+    config.lib.dotfiles.link "home/linux/hypr/looknfeel.lua";
 }

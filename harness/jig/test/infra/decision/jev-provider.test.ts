@@ -137,9 +137,9 @@ describe("JevProvider.choice", () => {
         {
           prompt: "Which tier?",
           options: TIERS,
-          // "deterministic" is not one of TIERS: a caller bug, not something
+          // "executor" is not one of TIERS: a caller bug, not something
           // the model should ever be asked to pick from.
-          criteria: { main: "routine", complex: "hard", deterministic: "sneaky" } as Record<
+          criteria: { main: "routine", complex: "hard", executor: "sneaky" } as Record<
             (typeof TIERS)[number],
             string
           >,
@@ -155,7 +155,7 @@ describe("JevProvider.choice", () => {
       result({
         q: {
           type: "choice",
-          choice: "deterministic",
+          choice: "executor",
           probabilities: { main: 0.5, complex: 0.5 },
           confidence: 0.5,
         },

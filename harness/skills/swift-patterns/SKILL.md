@@ -8,6 +8,8 @@ metadata:
 
 # Swift Patterns
 
+Writing or reviewing Swift: read `references/review-standard.md` first — the single Swift review standard (items with sources, version gates, concurrency model, linter mapping) shared by the writer and `code-reviewer`.
+
 ## Coding style
 
 ### Formatting

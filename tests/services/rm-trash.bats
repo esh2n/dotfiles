@@ -11,7 +11,7 @@ setup() {
 	printf '#!/usr/bin/env bash\nprintf "%%s|" "$@" >>"%s"\n' "${LOG}" >"${DOTFILES_TRASH}"
 	chmod +x "${DOTFILES_TRASH}"
 	cd "${BATS_TEST_TMPDIR}"
-	mkdir dir && touch file "-name"
+	mkdir dir && touch -- file "-name"
 }
 
 in_shell() { # in_shell <bash|zsh> <rm arguments...>
@@ -23,6 +23,9 @@ in_shell() { # in_shell <bash|zsh> <rm arguments...>
 
 @test "rm: -rf and friends are dropped, the paths go to the trash" {
 	for sh in bash zsh; do
+		# skip inside `run` cannot skip the test; the Linux runner has no zsh,
+		# and the mac job covers it
+		command -v "$sh" >/dev/null || continue
 		: >"${LOG}"
 		run in_shell "$sh" -rf dir file
 		[ "$status" -eq 0 ]

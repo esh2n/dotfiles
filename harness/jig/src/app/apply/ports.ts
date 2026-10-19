@@ -38,6 +38,20 @@ export interface ApplyPorts {
  * has already classified (`domain/claude/links.ts` and friends); the adapter
  * does not decide anything.
  */
+/**
+ * A skill pack checkout's git history, for the precedence check
+ * (`./precedence-check.ts`): where the checkout is, and what changed since
+ * the commit the precedence quotes were verified at. Every answer is
+ * `undefined` when it cannot be had (not a git checkout, git missing, a
+ * commit not in a shallow checkout); the check then skips that part.
+ */
+export interface PackHistory {
+  /** The checkout's HEAD commit, when `dir` is the top of a git checkout. */
+  head(dir: string): Promise<string | undefined>;
+  /** Paths, relative to the checkout, that differ between two commits. */
+  changedFiles(dir: string, from: string, to: string): Promise<readonly string[] | undefined>;
+}
+
 export interface ClaudeApplyPorts extends ApplyPorts {
   /** File names only, unsorted. A missing or unreadable directory is `[]`, not a throw. */
   listDir(path: string): Promise<readonly string[]>;
@@ -50,6 +64,8 @@ export interface ClaudeApplyPorts extends ApplyPorts {
   remove(path: string): Promise<void>;
   /** Creates parents as needed; an existing directory is fine. */
   mkdir(path: string): Promise<void>;
+  /** A pack checkout's git history. Absent: the precedence check compares no commits. */
+  readonly packHistory?: PackHistory;
 }
 
 /**

@@ -79,9 +79,11 @@ setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
 	roles '"developer"'
 	run --separate-stderr setup_cmd darwin
 	[[ "$output" == *"dotctl llm setup --repo ${REPO_ROOT}\"" ]]
-	roles '"developer", "model-provider"'
+	# on Linux model-provider also needs the host's driver (home/linux/llama-server)
+	printf '{"roles": ["developer", "model-provider"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA=", "acceptLicense": true}}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
 	run --separate-stderr setup_cmd linux
-	[[ "$output" == *"dotctl llm setup --repo ${REPO_ROOT}\"" ]]
+	[[ "$output" == *"dotctl llm setup --repo ${REPO_ROOT} --gpu\"" ]]
 	roles ''
 	run --separate-stderr setup_cmd darwin
 	[ "$output" = null ]
@@ -143,7 +145,7 @@ gpu_linux() { # gpu_linux <attr under config>
 	[ "$(field "$output" llm-ledger-sync)" = "null" ]
 }
 
-@test "services: LiteLLM is told where deterministic's llama-server and its Mac fallback are" {
+@test "services: LiteLLM is told where executor's llama-server and its Mac fallback are" {
 	printf '{"roles": ["developer"], "linuxModelHost": "desktop.example.ts.net", "macModelHost": "mac.example.ts.net"}\n' >"${BATS_TEST_TMPDIR}/roles.json"
 	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
 	run --separate-stderr gpu_linux 'systemd.user.services.litellm-proxy.Service.Environment'

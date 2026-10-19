@@ -135,7 +135,7 @@ margins were used in the first place.
 
 - Components should own no outer margin — spacing is the parent/layout's
   responsibility, not the component's. This is the same spacing-ownership
-  rule `agent: web-platform-reviewer`'s methodology lane enforces for
+  rule section 4.3 of `css-modern/references/review-standard.md` enforces for
   projects whose `AGENTS.md` names the layout as the spacing owner; the stack pattern and `gap` are the two
   ways to honor it without hardcoding spacing into the component being
   built.
@@ -173,5 +173,5 @@ margins were used in the first place.
   pattern relies on
 - `css-units` — the units the resulting margin/gap values are expressed in
 - `defensive-css` — `gap` over margin as a content-risk mitigation
-- `web-platform-reviewer` — the agent that flags the flex/grid refactor trap
+- `code-reviewer`, reading `css-modern/references/review-standard.md` section 4.3, flags the flex/grid refactor trap
   in diffs

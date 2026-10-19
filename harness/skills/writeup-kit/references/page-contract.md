@@ -168,6 +168,7 @@ rows (listed under `infos` in `--json`) are suggestions.
 | Chrome matches the template | `.wu-header` / `.wu-footer` structure is a copy of the template | error |
 | Role-tagged structure | Body elements are limited to h2-h4 / p / ul / ol / table / pre / figure / blockquote / dl and `.wu-*` classes; `<img>` is allowed only inside `<figure class="wu-shot">` | error |
 | Kind's required sections | The section headings from the kind table (`kinds.md`) are present | warn |
+| Terms block (`terms-block`) | No `.wu-terms` list and no h2 that is only 用語 / 用語集 / 前提知識 (and their kin) — terms are explained inline at first use (`writing.md` §5) | warn |
 | Diagram pass marks | Every `.wu-figure` carries `data-checks="pass"` | error |
 | Diagram budget warnings | A `.wu-figure` carrying `data-warn` (rendered and passing, but over a budget — see below) is reported with the renderer's text, e.g. `budget:nodes=11` | warn |
 | Screenshot / photo (`shot`) | Every `.wu-shot` carries exactly one `<img>` with `alt`, whose `src` is page-relative (resolving under the page's own directory) or a `data:` URI; a page-relative `src` must exist on disk | error |
@@ -266,7 +267,7 @@ deterministic. Any element not in this table makes self-check emit a warn.
 | `<title>` + meta | `# title` plus frontmatter (`kind` / `date` / `updated` / `sources`) |
 | `.wu-lede` / `.wu-summary` | Opening paragraph / `> [!NOTE]` blockquote |
 | h2 / h3 / h4 | `##` / `###` / `####` |
-| `.wu-terms` (dl) | `- **name** — what it is` |
+| `.wu-terms` (dl, retired — older pages only) | `- **name** — what it is` |
 | `.wu-cells` | One list item per row (`- **label** — part / part / part`); the title a bold line, notes plain lines |
 | `.wu-callout` (note / warn / decision) | `> [!NOTE]` / `> [!WARNING]` / `> [!IMPORTANT]` |
 | `.wu-decision` | `- **decision** — trade-off prioritized. basis: …` |

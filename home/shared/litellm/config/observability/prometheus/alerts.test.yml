@@ -99,7 +99,7 @@ tests:
               layer: llm-gateway
             exp_annotations:
               summary: '最初の文字が出るまでの時間（TTFT）が普段の2倍を超えています（現在 4.00 秒）'
-              action: './status.sh でモデル別の TTFT を見る。1つのモデルだけ遅いなら プロバイダ側、deterministic だけ遅いなら LM Studio の モデルロードが疑わしい。'
+              action: './status.sh でモデル別の TTFT を見る。1つのモデルだけ遅いなら プロバイダ側、executor だけ遅いなら LM Studio の モデルロードが疑わしい。'
               caveat: '24時間分のデータが溜まるまではベースラインが出ないため、このルールは 発火しない（データ無し＝警告無しで安全側）。'
 
   # A steady 0.75s for 25 hours is stable: no baseline drift, so no alert. This

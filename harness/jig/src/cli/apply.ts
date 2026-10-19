@@ -87,7 +87,9 @@ import {
   type TargetResult,
   applyTiers,
 } from "../app/apply/apply-tiers";
+import type { ClaudeAgentsReport } from "../app/apply/claude-agents";
 import { AGENTS_SKILLS_MOUNT_TARGETS, type AgentsSkillsMountReport } from "../app/apply/delivery";
+import type { PluginCheckout } from "../app/apply/plugins";
 import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
 import { prepareTakeOver } from "../app/apply/take-over";
 import type { ModelChoice } from "../domain/claude/agent-definition";
@@ -96,6 +98,7 @@ import type { ClaudeHookPaths } from "../domain/claude/hooks";
 import type { PathState } from "../domain/claude/links";
 import { describePathState, describeStaleReason } from "../domain/claude/managed-dir";
 import { DEFAULT_PERMITS, defaultPermitPolicyFragment } from "../domain/claude/permits";
+import { precedenceLines } from "./precedence-lines";
 
 export interface ApplyCliResult {
   readonly stdout: string;
@@ -279,13 +282,9 @@ function formatClaude(report: ClaudeApplyReport, dest: string): string {
         ".bucket-<id> marker); that is why this is a directory of links and not one link.",
       ],
     }),
+    ...pluginLines(report.plugins),
     "",
-    ...managedDirLines("agents", report.agentsDir, {
-      noun: "agent definition",
-      plural: "s",
-      singular: "",
-      how: "*.md files",
-    }),
+    ...claudeAgentLines(report.agentsDir),
     "",
     ...managedDirLines("rules", report.rulesDir, {
       noun: "conditional-rule director",
@@ -367,6 +366,18 @@ function agentsMdLines(report: ClaudeApplyReport): readonly string[] {
     `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     "--- AGENTS.md (generated) ---",
     agentsMd.content.trimEnd(),
+    ...(report.repoAgentsMd === undefined
+      ? []
+      : [
+          "",
+          `repository AGENTS.md: ${report.repoAgentsMd.outcome}  ${report.repoAgentsMd.path}  (${report.repoAgentsMd.bytes} bytes; the decisions marked \`scope: repo\`, untracked)`,
+          ...(report.repoAgentsMd.outcome === "conflict"
+            ? [
+                "  CONFLICT: edited since jig wrote it; left as it is and skipped (the rest of the apply goes on).",
+                "  Its source is the notes marked `scope: repo`: edit those, then delete this file to regenerate it.",
+              ]
+            : []),
+        ]),
   ];
 
   const missingRule = agentsMd.skipped.filter((skipped) => skipped.missingRule);
@@ -556,7 +567,47 @@ function agentsSkillsMountLines(mount: AgentsSkillsMountReport): readonly string
       how: "each holds a SKILL.md; Codex, pi and omp read this directory",
     }),
     `  Delivered by ${targets} alike, from one plan (this run: --target ${mount.target}); the others find the same links ok.`,
+    ...pluginLines(mount.plugins),
   ];
+}
+
+/**
+ * The external packs a skills directory draws from (`harness/plugins/`):
+ * where each is checked out and what it follows, a pack not fetched yet
+ * (its skills are not linked until it is), adapter names the house
+ * translation rule does not cover, and the precedence check (`./precedence-lines.ts`).
+ */
+export function pluginLines(plugins: readonly PluginCheckout[]): readonly string[] {
+  if (plugins.length === 0) return [];
+  const lines = [`  external packs (${plugins.length}), from harness/plugins/:`];
+  const indent = `    ${"".padEnd(PAD - 4)}`;
+  for (const plugin of plugins) {
+    const head = `    ${plugin.name.padEnd(PAD - 4)}`;
+    const { source } = plugin;
+    if (source === undefined) {
+      lines.push(
+        `${head}CONFLICT: source.json is invalid (${plugin.invalid ?? "unreadable"}); nothing from this pack is linked`,
+      );
+      continue;
+    }
+    const follows =
+      source.commit === undefined
+        ? `follows ${source.ref}`
+        : `pinned at ${source.commit.slice(0, 12)}`;
+    lines.push(
+      plugin.present
+        ? `${head}${plugin.dir} (${follows})`
+        : `${head}not fetched at ${plugin.dir}; its entries are not linked until \`dotctl setup plugins\` (or make up) fetches it`,
+    );
+    if (plugin.untranslated.length > 0) {
+      lines.push(
+        `${indent}WARNING: its adapter names ${plugin.untranslated.length} tool(s) the house translation does not cover: ${plugin.untranslated.join(", ")}`,
+        `${indent}add them to skills/pstack-adapter and to source.json's "translated"`,
+      );
+    }
+    lines.push(...precedenceLines(plugin.name, plugin.dir, plugin.precedence, indent));
+  }
+  return lines;
 }
 
 /**
@@ -638,6 +689,51 @@ function describeModelChoice(model: ModelChoice, what: string): string {
   }
 }
 
+/** `~/.claude/agents/`: one line per generated file, then what goes and what stays. */
+function claudeAgentLines(agents: ClaudeAgentsReport): readonly string[] {
+  const width = Math.max(PAD, ...agents.files.map((file) => file.name.length + 3));
+  const lines = [
+    `agents (generated files): ${agents.path}${agents.dirState.kind === "dir" ? "" : `  (${describePathState(agents.dirState)} → a real directory)`}`,
+    `  ${agents.files.length} agent definition${agents.files.length === 1 ? "" : "s"} → <name>.md (the source, with its tier turned into a Claude model alias):`,
+  ];
+  if (agents.files.length === 0) lines.push("    (none)");
+  for (const file of agents.files) {
+    const model =
+      file.model.kind === "mapped"
+        ? `model: ${file.model.model}`
+        : file.model.kind === "inherit"
+          ? "model: (inherit)"
+          : `model: (none: no claude alias for "${file.model.tier}")`;
+    const note =
+      file.replacesLink !== undefined
+        ? "  (replaces jig's link)"
+        : file.backupPath !== undefined
+          ? `  (not jig's yet → kept as ${basename(file.backupPath)})`
+          : "";
+    lines.push(`    ${file.name.padEnd(width - 2)}${file.outcome.padEnd(10)}${model}${note}`);
+  }
+  if (agents.excluded.length > 0) {
+    lines.push(
+      `  not generated (${agents.excluded.length}):`,
+      ...agents.excluded.map((entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`),
+    );
+  }
+  const gone = [...agents.stale.map((e) => e.name), ...agents.staleLinks.map((e) => e.name)];
+  if (gone.length > 0) {
+    lines.push(
+      `  source gone, removed on --write (${gone.length}):`,
+      ...gone.map((n) => `    ${n}`),
+    );
+  }
+  if (agents.foreign.length > 0) {
+    lines.push(
+      `  not jig's (${agents.foreign.length}), left alone:`,
+      ...agents.foreign.map((entry) => `    ${entry.name.padEnd(width - 2)}${entry.what}`),
+    );
+  }
+  return lines;
+}
+
 /** One line per generated agent file, then what stands in the directory that no source produces. */
 function agentFileLines(report: CodexApplyReport): readonly string[] {
   const { agents } = report;
@@ -671,6 +767,12 @@ function agentFileLines(report: CodexApplyReport): readonly string[] {
       ...agents.excluded.map((entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`),
     );
   }
+  if (agents.stale.length > 0) {
+    lines.push(
+      `  source gone, removed on --write (${agents.stale.length}):`,
+      ...agents.stale.map((entry) => `    ${entry.name}`),
+    );
+  }
   if (agents.foreign.length > 0) {
     lines.push(
       `  not jig's (${agents.foreign.length}), left alone:`,
@@ -686,17 +788,15 @@ function configTomlLines(report: CodexApplyReport): readonly string[] {
   const lines = [
     `config.toml: ${configToml.outcome}  ${configToml.path}`,
     `  mcp servers in jig's block (${configToml.servers.length}): ${configToml.servers.length === 0 ? "(none)" : configToml.servers.join(", ")}`,
-    "  every other table in the file is carried through byte for byte.",
+    "  found by table name wherever Codex has moved them; every other table is carried through byte for byte.",
+    ...(configToml.outcome === "conflict"
+      ? [
+          "  CONFLICT: the file's tables under these names differ from jig's last write, or jig never wrote them;",
+          "  reconcile them by hand (the diff below shows what would replace them) before --write.",
+        ]
+      : []),
   ];
-  if (configToml.declaredOutside.length > 0) {
-    lines.push(
-      `  CONFLICT: ${configToml.declaredOutside.length} of them already declared outside jig's block — a duplicate table stops Codex`,
-      "  from loading its config, so nothing is written until these are removed by hand (a one-time cleanup):",
-      ...configToml.declaredOutside.map(
-        (table) => `    [mcp_servers.${table.name}]  line ${table.line}`,
-      ),
-    );
-  }
+
   if (configToml.yokiLeftovers.length > 0) {
     lines.push(
       `  yoki leftovers (${configToml.yokiLeftovers.length}), left alone until milestone 4:`,
@@ -790,6 +890,12 @@ function ompAgentFileLines(report: OmpApplyReport): readonly string[] {
       ...agents.excluded.map((entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`),
     );
   }
+  if (agents.stale.length > 0) {
+    lines.push(
+      `  source gone, removed on --write (${agents.stale.length}):`,
+      ...agents.stale.map((entry) => `    ${entry.name}`),
+    );
+  }
   if (agents.foreign.length > 0) {
     lines.push(
       `  not jig's (${agents.foreign.length}), left alone:`,
@@ -835,7 +941,7 @@ function configYmlLines(report: OmpApplyReport): readonly string[] {
   const { configYml } = report;
   const lines = [
     `config.yml: ${configYml.outcome}  ${configYml.path}`,
-    "  jig's keys: modelRoles, tools.approvalMode, tools.approval.eval, statusLine (domain/omp/config.ts);",
+    "  jig's keys: modelRoles, tools.approvalMode, tools.approval.eval, statusLine, retry (domain/omp/config.ts);",
     "  omp rewrites this file itself, so the rest is carried as omp wrote it and a hand edit is judged on jig's keys only.",
   ];
   if (configYml.invalid !== undefined) {

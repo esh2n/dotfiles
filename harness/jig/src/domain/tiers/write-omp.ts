@@ -31,7 +31,7 @@
  * window and `maxContextWindow` to the larger prompt window accepted by the
  * provider").
  *
- * Order pins omp's own: main, complex, deterministic (the canonical order).
+ * Order pins omp's own: main, complex, executor (the canonical order).
  */
 
 /** The `compat.thinkingFormat` values omp's models.yml schema accepts (its own error message, 2026-09-24). */
@@ -47,7 +47,7 @@ import type { DroppedField, WriteResult } from "./capability";
 import type { Tier, TierId, TiersPolicy } from "./types";
 import { HARNESS_USER_AGENT } from "./user-agent";
 
-const OMP_TIER_ORDER: readonly TierId[] = ["main", "complex", "deterministic"];
+const OMP_TIER_ORDER: readonly TierId[] = ["main", "complex", "executor"];
 const INDENT = "  "; // under `providers:`
 const P = `${INDENT}  `; // provider fields
 const M = `${P}  `; // `- id:` lines

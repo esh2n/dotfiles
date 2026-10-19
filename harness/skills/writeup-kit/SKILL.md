@@ -68,7 +68,7 @@ in `references/components.md`.
 | `wu-summary` | opening of a decision record, design, or research summary |
 | `wu-toc` | 5 or more h2 sections |
 | `wu-section` | always, one per h2 |
-| `wu-terms` | 3 or more terms introduced for the first time |
+| `wu-terms` | retired — explain each term inline at first use (`references/writing.md` §5) |
 | `wu-callout` | one point the reader must not skip |
 | `wu-decision` | one decision record entry |
 | `wu-compare` | 2-4 options judged on the same axes |

@@ -12,7 +12,13 @@ import type { PiApplyPaths } from "../app/apply/apply-pi";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import type { BoxPorts } from "../app/box/ports";
 import { reportCoverage } from "../app/coverage/report-coverage";
-import { resolveAuditPath, resolveSessionsPath, resolveStateDir } from "../app/hooks/environment";
+import {
+  resolveAuditPath,
+  resolvePluginsDir,
+  resolveSessionsPath,
+  resolveSkillRoot,
+  resolveStateDir,
+} from "../app/hooks/environment";
 import type { RetirePaths } from "../app/retire/retire-yoki";
 import { skillQuestionMode } from "../app/routing/select-skills";
 import { SETUP_TARGETS, isSetupTarget, setupHarness } from "../app/setup/setup-harness";
@@ -20,7 +26,7 @@ import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
 import { assignTier, describeTiers } from "../app/tiers/assign";
 import { type AgentModels, parseAgentModels } from "../domain/claude/agent-models";
-import type { ClaudeHookPaths } from "../domain/claude/hooks";
+import { type ClaudeHookPaths, SHARED_WRITE_MCP_MATCHER } from "../domain/claude/hooks";
 import { DSH_PROFILES_DIR, DSH_PROFILE_PATCH_FILENAME, resolveDshHome } from "../domain/dsh/home";
 import { resolveOmpAgentDir } from "../domain/omp/agent-dir";
 import { resolvePiAgentDir } from "../domain/pi/agent-dir";
@@ -47,6 +53,7 @@ import { recordJudgmentUsage } from "../infra/metrics/judgment-usage";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
 import { runCommand } from "../infra/proc/exec-file";
+import { packHistory } from "../infra/proc/pack-history";
 import { createSetupPorts } from "../infra/setup/setup-ports";
 import { readSkillCatalog } from "../infra/skills/catalog";
 import { detectRepoSignals } from "../infra/skills/repo-signals";
@@ -112,6 +119,9 @@ function resolveClaudeApplyPaths(): ClaudeApplyPaths {
   const claudeDir = process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
   return {
     harnessRoot: harness,
+    pluginsDir: resolvePluginsDir(process.env),
+    repoAgentsMd: join(resolveApplyRoot(), "AGENTS.md"),
+    repoClaudeMd: join(resolveApplyRoot(), "CLAUDE.md"),
     guardRules: join(harness, "policy", "guard-rules.json"),
     mcpServers: join(harness, "mcp", "servers.json"),
     decisions: join(harness, "rules", "decisions"),
@@ -151,6 +161,7 @@ function resolveCodexApplyPaths(): CodexApplyPaths {
   const codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex");
   return {
     harnessRoot: harness,
+    pluginsDir: resolvePluginsDir(process.env),
     mcpServers: join(harness, "mcp", "servers.json"),
     decisions: join(harness, "rules", "decisions"),
     formerSkillRoots: [join(resolveApplyRoot(), "domains", "dev", "config", "claude-profiles")],
@@ -197,6 +208,7 @@ function codexApplyOptions(
     validateToml: (text) => {
       Bun.TOML.parse(text);
     },
+    parseToml: (text) => Bun.TOML.parse(text),
   };
 }
 
@@ -216,6 +228,7 @@ function resolveOmpApplyPaths(): OmpApplyPaths {
   const agentDir = resolveOmpAgentDir(process.env, homedir()).dir;
   return {
     harnessRoot: harness,
+    pluginsDir: resolvePluginsDir(process.env),
     mcpServers: join(harness, "mcp", "servers.json"),
     formerSkillRoots: [join(resolveApplyRoot(), "domains", "dev", "config", "claude-profiles")],
     agentsSkills: join(homedir(), ".agents", "skills"),
@@ -268,6 +281,7 @@ function resolvePiApplyPaths(): PiApplyPaths {
   const repoPi = join(resolveApplyRoot(), "home", "shared", "harness", "pi");
   return {
     harnessRoot: harness,
+    pluginsDir: resolvePluginsDir(process.env),
     mcpServers: join(harness, "mcp", "servers.json"),
     decisions: join(harness, "rules", "decisions"),
     formerSkillRoots: [join(resolveApplyRoot(), "domains", "dev", "config", "claude-profiles")],
@@ -363,10 +377,6 @@ function claudeHookPaths(): ClaudeHookPaths {
  * harness; before it, yoki-switch's symlink to the same content. Overridable
  * for tests.
  */
-function resolveSkillRoot(env: Record<string, string | undefined> = process.env): string {
-  return env.JIG_SKILL_ROOT ?? join(homedir(), ".claude", "skills");
-}
-
 /**
  * Where the harnesses keep their session transcripts. Two directories, because the harnesses
  * are two programs; each honors its own override first (`PI_CODING_AGENT_SESSION_DIR`,
@@ -459,13 +469,15 @@ function codexRegistration(): {
     input: {
       command: `/usr/bin/env PATH=/usr/bin:/bin '${bun}' '${jig}' hooks pre-tool-use --harness codex`,
       // The MCP tails let jig see the destructive Terraform/container-use tool
-      // calls the ask-mcp-* rules judge; read-only MCP tools stay unmatched and
+      // calls and the Notion writes the ask-mcp-* rules judge; read-only MCP tools stay unmatched and
       // untaxed. (Whether codex fires PreToolUse for MCP at all is confirmed
       // per-deployment before this is relied on — see the codex MCP note.)
-      matcher:
-        "Bash|apply_patch|Write|Edit" +
-        "|mcp__terraform__(create_|delete_|update_|attach_|detach_|action_run|add_team_member|grant_team_access|force_unlock_workspace)" +
-        "|mcp__container-use__environment_(create|config|run_cmd|file_edit|file_write|file_delete|checkpoint|add_service)",
+      matcher: [
+        "Bash|apply_patch|Write|Edit",
+        "mcp__terraform__(create_|delete_|update_|attach_|detach_|action_run|add_team_member|grant_team_access|force_unlock_workspace)",
+        "mcp__container-use__environment_(create|config|run_cmd|file_edit|file_write|file_delete|checkpoint|add_service)",
+        SHARED_WRITE_MCP_MATCHER,
+      ].join("|"),
       timeoutSeconds: 10,
     },
   };
@@ -546,7 +558,8 @@ export async function main(argv: readonly string[]): Promise<number> {
               // `includeHidden` follows the fallback switch, which the hook decides: a
               // listing that is hidden and a catalog that skips hidden skills would leave
               // arm B' with no candidates at all.
-              catalog: (includeHidden) => readSkillCatalog(resolveSkillRoot(), { includeHidden }),
+              catalog: (includeHidden) =>
+                readSkillCatalog(resolveSkillRoot(process.env), { includeHidden }),
               record: (entry) =>
                 appendRouterLog(join(resolveStateDir(process.env), "skill-router.jsonl"), entry),
               // The cwd is the repository the prompt is about; the hook is started in it by
@@ -599,10 +612,10 @@ export async function main(argv: readonly string[]): Promise<number> {
       return result.code;
     }
     case "apply": {
-      const applyPorts = createNodeApplyFs({
-        stateDir: resolveStateDir(process.env),
-        jigVersion: VERSION,
-      });
+      const applyPorts = {
+        ...createNodeApplyFs({ stateDir: resolveStateDir(process.env), jigVersion: VERSION }),
+        packHistory,
+      };
       const agentModels = await readAgentModels();
       const result = await applyCli(
         argv.slice(1),
@@ -699,7 +712,11 @@ export async function main(argv: readonly string[]): Promise<number> {
       return result.code;
     }
     case "skills": {
-      const result = await skillsCli(argv.slice(1), skillRootPorts(), resolveSkillRoot());
+      const result = await skillsCli(
+        argv.slice(1),
+        skillRootPorts(),
+        resolveSkillRoot(process.env),
+      );
       process.stdout.write(result.stdout);
       return result.code;
     }
@@ -738,7 +755,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       const since = new Date(Date.now() - parsed.days * 24 * 60 * 60 * 1000);
       const files = await findTranscripts(resolveSessionRoots(), { since });
       const known = new Set(
-        (await readSkillCatalog(resolveSkillRoot())).map((skill) => skill.name),
+        (await readSkillCatalog(resolveSkillRoot(process.env))).map((skill) => skill.name),
       );
       const { report } = await reportSkillUsage({
         files,

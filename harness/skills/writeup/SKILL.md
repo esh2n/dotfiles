@@ -1,6 +1,6 @@
 ---
 name: writeup
-description: Use when the user wants a document that is kept and revisited rather than a one-off chat answer — a decision record (決定記録), design doc (設計), research summary (調査まとめ), reference roundup (参考資料まとめ), PBI doc (PBI 資料), picture explainer (絵解き), work note (作業メモ), or meeting minutes (議事録). Triggers include "まとめて", "設計書にして", "決定記録を残して", "資料にして", "writeup", "/writeup", and a research/design-review/acceptance/deliberate workflow that returned a Markdown report worth keeping. Not for a single in-chat visual answer (use show-me), a beginner picture explainer (use eli5), or a grilling interview round. Also not writeup when the text is headed somewhere else — Notion, a company wiki, Slack, slides, a PR description, or a repo README — even when the request says まとめて or 議事録.
+description: Use when the user wants a document that is kept and revisited rather than a one-off chat answer — a decision record (決定記録), design doc (設計), research summary (調査まとめ), reference roundup (参考資料まとめ), PBI doc (PBI 資料), picture explainer (絵解き), work note (作業メモ), or meeting minutes (議事録). Triggers include "まとめて", "設計書にして", "決定記録を残して", "資料にして", "writeup", "/writeup", and a Markdown report (a research record, a change-review report) worth keeping. Not for a single in-chat visual answer (use show-me), a beginner picture explainer (use eli5), or a grilling interview round. Also not writeup when the text is headed somewhere else — Notion, a company wiki, Slack, slides, a PR description, or a repo README — even when the request says まとめて or 議事録.
 metadata:
   namespaces: [doc]
 ---
@@ -53,8 +53,8 @@ into `private`.
 
 1. **Decide kind and audience.** Map the request to one of the 8 kinds
    (heuristics and kind table: `references/procedure.md`). A Markdown
-   report from a workflow (research / design-review / acceptance /
-   deliberate) becomes step 3's `--from` path ("Input from Markdown").
+   report (a research record, a `change-review` report) becomes step 3's
+   `--from` path ("Input from Markdown").
 2. **Read the contract for this kind.** The matching row of
    `$KIT/references/kinds.md` (required sections, use/avoid components,
    length, where a figure helps) and `$KIT/references/components.md`

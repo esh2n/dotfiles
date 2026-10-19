@@ -1,46 +1,64 @@
-# リサーチメモ・ディスカッションペーパー: 決めたいことを先に言う
+# Research memo / discussion paper (リサーチメモ・ディスカッションペーパー): state first what you want decided
 
-リサーチメモが答える問いは「この論点について、今どこまで分かっていて、何がまだ決まっていないか」であり、その先に「読んだ人に何を判断してほしいか」がある。議事録のように何が起きたかを記録する文書でも、報告書のように調査結果を確定情報として伝える文書でもない。まだ結論が固まっていない状態を前提に、たたき台として読者の判断や議論を引き出すために書く。結論は仮でよい。だから中心主張と未解決の論点をどちらも隠さず両方書く、という一見矛盾した要求に応える必要がある。
+The question a research memo answers is how much is known about this issue now, what is still undecided, and what the reader is asked to judge. It differs both from minutes, which record what happened, and from a report, which conveys findings as reliable information. It is written before the conclusion has firmed up, as a draft to draw out the reader's judgment and discussion. So it has to state both the provisional conclusion and the unresolved issues.
 
-## 必須要素
+## Required elements
 
-- タイトルまたは冒頭一文に中心主張を置く(「〜について」ではなく「〜すべきである」「〜が課題である」の形)
-- スコープと対象外(何を論じ、何をあえて論じないか)
-- 背景→問題設定→提案・論点→未解決の論点→結論、という流れ
-- 議論のたたき台としてのゴール(このメモで何を決めたいか)を冒頭に明示
+- The central claim in the title or the first sentence (in the form 「〜すべきである」「〜が課題である」, not 「〜について」)
+- Write the title and the first sentence in words that make sense before the body is read. Do not use names first explained in the body (「A案」「第2案」 etc.); say the content (「紙の申請書をやめて Web フォームにしたい」 rather than 「A案を採用したい」)
+- Scope and what is out of scope (what is discussed, and what is deliberately not). List as out of scope only what appears in the material or the user's words
+- The flow of background, problem statement, proposals or issues, unresolved issues, conclusion
+- What this memo wants decided (at the top)
 
-## 構成の型
+## Structure
 
-冒頭で中心主張とゴールを渡してから、背景・問題設定に移る。この順序は報告書のサマリーピラミッド(→ `report.md`)と同じ発想だが、リサーチメモでは結論がまだ確定していない場合もある。その場合は「暫定的な結論」「現時点での見立て」であることを明示したうえで、やはり先に渡す。読者が背景から順に読まないと主張にたどり着けない構成にすると、途中で離脱した読者は結局何が言いたいメモだったか分からないまま終わる。結論を待たせない。
+Show the central claim and what you want decided at the top, then move to background and problem statement. Even when the conclusion has not firmed up, show it first, stating that it is the 「現時点での見立て」 (current view). With a structure where the claim is reached only by reading from the background onward, a reader who stops partway never learns what the memo wanted to say.
 
-概念の定義は用語集として切り出さず、地の文に溶け込ませる。「Xとは〜である」という定義文が段落の先頭に3回続くと、それだけで機械的な鋳型に見える(→第8条)。型を変える。たとえば「起動率(アプリを開いてから災害情報を確認するまで進んだ利用者の割合)は〜」のように文の途中に括弧で挟む形、「この動線を、本メモでは便宜的に『平時導線』と呼ぶ」のように使ったあとで名づける形、を混在させると、3回連続で同じ型にはならない。
+Write definitions of concepts in the running prose, not split out as a glossary. When the definition sentence 「Xとは〜である」 starts a paragraph three times in a row, that alone looks mechanical (SKILL.md §2 principle 8). Mixing forms — a parenthetical in mid-sentence (「起動率(アプリを開いてから災害情報を確認するまで進んだ利用者の割合)は〜」) or naming after use (「この動線を、本メモでは平時導線と呼ぶ」) — keeps the same pattern from repeating.
 
-比較や選択肢を提示する場面では、単純なメリット・デメリットの並列より、軸を定めた比較表のほうが読者の判断を助ける。羅列は判断を助けない。「コストが低い/高い」「導入速度が速い/遅い」のように、選択肢をまたいで共通の軸で並べると、読者は自分の優先順位に応じて表を読み替えられる。
+When comparing options, a comparison table with fixed axes helps the reader's judgment more than listing pros and cons. Laid out on the same axes across options, such as 「コストが低い/高い」「導入が速い/遅い」, the table lets readers read it by their own priorities. Mark cells where an axis does not apply to an option with 「—」. Do not write the table's or the material's circumstances as they are, such as 「該当しない」「記載なし」.
 
-スコープと対象外は、書かないと読者が「なぜこの論点に触れていないのか」を疑い始める要素になる。線引きは意図的に見せる。あえて論じない理由(すでに他の場で決着している、今回は情報が足りない、など)を一言添えておくと、抜け漏れではなく意図的な線引きだと伝わる。
+Without scope and out-of-scope, readers wonder why this issue is not touched. Adding one line on why it is deliberately not discussed (settled elsewhere, not enough information this time, etc.) conveys that it was left out on purpose, not by oversight. But do not invent plausible out-of-scope items absent from the material (such as 「顧客からの問い合わせは含めない」).
 
-## 品質基準
+## About the writer's current view
 
-- **タイトルか冒頭一文だけで、このメモが何を主張しているか伝わるか。** 「〜についての検討」のような対象の提示だけで終わっていないか
-- **未解決の論点が、著者の暫定スタンスつきで書かれているか。** ただ列挙して「今後の検討課題」で締めていないか
-- **比較や選択肢の提示に、読者が使える軸があるか。** 「A案のメリットは〜、デメリットは〜」の羅列だけで終わっていないか
-- **一般論でなく、著者自身が触れた事例・数値が中心主張を支えているか。** 固有名詞・数値抜きでも成立する主張は、まだ素材が足りていない疑いがある(→ `revision-guide.md` の素材不足の分岐)
-- **このメモを読んだ人が、次に何を判断すればいいか分かるか。** 論点を並べるだけで終わり、著者の見解が最後まで出てこない状態になっていないか
+A memo's value lies in the writer's current view being attached to the unresolved issues (such as 「現時点では A 案に傾いている」). A list of questions alone is no starting point for discussion.
 
-## AIがやりがちな失敗
+But the view belongs to the writer. When you write a memo for the user, write only views that appear in the material or the user's words. If there are none, ask the user which way they lean. When revising an existing memo, do not add a view that is not in the original (the top rule in SKILL.md (add nothing that is not in the original)).
 
-概念モデルだけを組み立てて、著者自身の一次情報や実体験がまったく出てこない失敗がもっとも起きやすい。実感がない。「一般に〜と考えられる」「〜というアプローチが有効である」のような文だけで段落が埋まっていると、誰が書いても同じ内容になる。たたき台としての価値も下がる。これを避けるには、扱う論点のうち著者が実際に確かめた・触れた2〜3個に絞って濃く書き、残りは正直に薄く書く(→第7条)。全部は書かない。もう一つの失敗は、未解決の疑問を羅列して終わり、著者自身の見解がどこにもない状態で締めることだ。分からないことを分からないと書くのは誠実だが、著者の暫定スタンス(「自分は現時点でA案に傾いている」など)が一言もないと、メモは議論の起点にならず疑問集で終わる。
+Views are not the only thing you must not add. Conditional judgments such as 「〜と分かったら始めないほうがよい」, and plans such as evaluation metrics, schedules, criteria for continuing or stopping, or new contacts and procedures, are not written either unless they are in the material. Writing something the writer did not commit to as the writer's plan makes readers take it as part of the proposal. If you think the plan is lacking, tell the user instead of adding it to the body.
 
-## 文体憲法の重点条項
+A view is a view on the issue itself, not a ranking or tiering of issues such as 「最優先・次点・後回し」. In particular, when the core of the claim is that something applies equally to every target, write the targets in parallel without ranking them. For unresolved issues too, first consider whether they can be grouped by kind rather than by priority.
 
-- **第1条(結論から書く)**: タイトルと冒頭一文で中心主張を渡す。この型でもっとも直接効く条項で、「〜について検討する」という前置きは中心主張の代わりにならない
-- **第3条(説明は地の文で書く)**: 論点の背景や経緯は接続詞でつないだ地の文に書き、箇条書きは真に並列な項目(比較軸、選択肢の一覧)だけに使う
-- **第10条(限界・未確定は明示ラベル)**: 未解決の論点は「未解決」と明示したうえで、暫定スタンスを添える。隠さないことと、フラットに投げっぱなしにしないことは両立する。ただし暫定スタンスは論点そのものへの見立てであって、論点に「最優先・次点・後回し」の順位や段階を付け、メモ全体の主張をランキングや段階導入計画にすり替えることではない(→ `writing-constitution.md` 第7条)。とくに「どの対象にも等しく当てはまる」ことが主張の核なら、対象を格付けせず並列に保つ。未解決の論点も、優先順位でなく種類で束ねられないか先に考える
-- **第11条(事実と意見を分ける)**: 一次情報や調査結果と、著者の見立てを混同しない。「〜と考える」「〜と推定する」の書き分けを徹底する
+## Quality criteria
 
-## 例: 防災アプリのコンセプトメモ
+- The title or first sentence alone conveys what the memo claims. It does not stop at merely indicating the topic, like 「〜についての検討」
+- Unresolved issues carry the writer's view. They are not just listed and closed with 「今後の検討課題」
+- The comparison of options has axes the reader can use
+- The central claim is supported by cases and numbers the writer checked, not generalities. If the claim holds with the proper nouns and numbers removed, the material is insufficient
+- The reader knows what to judge next
+- No judgments or plans absent from the material (evaluation metrics, schedules, conditional judgments, etc.) have been added
 
-Before(タイトルが対象の提示だけ、疑問の羅列で終わる)
+## Typical AI failures
+
+The most likely is a memo that only organizes concepts, with no primary information or cases the writer checked. When paragraphs fill up with sentences like 「一般に〜と考えられる」「〜というアプローチが有効である」, anyone could have written the same content. Narrow down to the 2–3 issues that have material, write those thick, and keep the rest short (SKILL.md §2 principle 7).
+
+Another is ending with a list of unresolved questions and no writer's view anywhere. Conversely, the AI may plausibly add views or numbers not in the material. Get the view from the material or the user.
+
+## Principles that matter most (SKILL.md §2)
+
+- Principle 1 (conclusion first): show the central claim in the title and first sentence. A preamble like 「〜について検討する」 does not replace a claim
+- Principle 3 (cause and sequence in running prose): write the background and history of the issues in running prose; use bullets only for truly parallel items, such as comparison axes or a list of options
+- Principle 10 (degree of certainty): write 「未解決」 for unresolved issues, then add the view
+- Principle 11 (fact and opinion): do not mix primary information or findings with the writer's view. Distinguish 「〜と考える」 and 「〜と推定する」
+
+## Example: a concept memo for a disaster-preparedness app
+
+Consider writing a memo from the following material.
+
+素材(ユーザーから受け取ったもの):県内の自治体アプリの利用状況を調べた県の報告書では、ダウンロード数に比べて災害時の起動率が低い。原因は、平時に開く理由がないことだと自分は見ている。通知方式の候補は、プッシュ通知だけの案、サイレンと連動する案、両方を組み合わせる案の3つ。比べる軸は、届く速さ、電池の消費、誤報のときに取り消しやすいか。プッシュ通知だけの案は速いが、誤報のときに不信感を招きやすいので、いまは組み合わせる案に傾いている。高齢者向けの画面をどう検証するかは決まっておらず、社内にユーザーテストの経験がない。外部の使い勝手調査に予算をつけるかを決めたい。
+
+Example that only indicates the topic and ends with a list of questions:
 
 > # 地域防災アプリの検討について
 >
@@ -53,25 +71,20 @@ Before(タイトルが対象の提示だけ、疑問の羅列で終わる)
 >
 > これらについては今後さらなる検討が必要である。
 
-After(冒頭に中心主張、比較軸つきの論点整理、暫定スタンスあり)
+Example with the claim and view written first:
 
-> # 防災アプリは「平時に使われない設計」が最大の失敗要因になる
+> # 防災アプリが災害時に開かれない原因は、平時に開く理由がないことだと考える
 >
-> 自治体防災アプリの多くはダウンロード数のわりに災害時の起動率が低いと言われる。原因は通知機能の弱さより、平時に開く理由がないことにあると考える。本メモは「平時の利用動線」を軸に据えた設計を提案し、判断してほしい論点を3つ示す。
+> 県の報告書によると、県内の自治体アプリは、ダウンロード数に比べて災害時の起動率が低い。筆者は、原因は平時に開く理由がないことにあると考えている。このメモでは、通知方式と高齢者向けの画面について、判断してほしい論点を示す。
 >
-> 通知方式は主に3案があり、判断軸は「到達速度」「バッテリー消費」「誤報時の解除しやすさ」で比較できる(表は別紙)。このうちプッシュ通知単独案は到達速度で優れるが、誤報時に不信感を招きやすく、自分は現時点でプッシュ通知とサイレン連動のハイブリッド案に傾いている。
+> 通知方式の候補は、プッシュ通知だけ、サイレン連動、その組み合わせの3案で、届く速さ・電池の消費・誤報のときの取り消しやすさで比べられる。プッシュ通知だけの案は速いが、誤報のときに不信感を招きやすい。筆者は現時点では組み合わせる案に傾いている。
 >
-> 未解決なのは高齢者向けUIの検証方法で、社内にユーザーテストの知見が乏しい。次の判断として、外部の使い勝手調査に予算をつけるかどうかをこのメモの結論としたい。
+> 未解決なのは高齢者向けの画面の検証方法で、社内にユーザーテストの経験がない。外部の使い勝手調査に予算をつけるかどうかを、このメモで判断してほしい。
 
-Before は疑問を並べて終わっているため、読んだ人は「で、何を決めればいいのか」が分からないまま終わる。After は中心主張・比較軸・著者の暫定スタンス・次の判断が明示され、たたき台として機能する形になっている。
+The example with the claim and view first uses only the facts and views in the material, cites the source (the prefecture's report), and separates opinion from fact with 「考える」「傾いている」. The view on the cause is written with 「考える」 in the title too, not asserted as fact. No numbers, comparisons or proposals absent from the material were added.
 
-## 議事録・調査レポートとの違い
+## How it differs from minutes and reports
 
-同じ社内文書でも、リサーチメモは議事録(→ `minutes.md`)や調査レポート(→ `report.md`)と役割が異なる。前者は記録、後者は確定事実の伝達だ。リサーチメモはその手前にあり、まだ議論が起きる前に論点を投げかける文書になる。だから「決定事項」ではなく「判断してほしい論点」を末尾に置き、読んだ人が次に議論や検証を始められる状態を作る。この違いを意識しないと、まだ固まっていない論点まで確定事項のように断定してしまい、後で訂正が必要になる。
+A research memo comes before minutes, which are a record (→ `minutes.md`), and reports, which convey reliable facts (→ `report.md`): it lays out the issues before discussion starts. So it ends not with decisions but with the issues the reader is asked to judge. Without this awareness, issues that have not firmed up get written as if certain, and need correcting later.
 
-逆に、暫定スタンスを書くことに臆病になりすぎると、今度はメモ全体が疑問の羅列に戻ってしまう。未解決であることと、著者の見立てがないことは別の話だと分けて考える。別物である。「分からない」で止めず、「分からないが、今のところこちらに傾いている」まで書ければ、そのメモは次の議論の起点になる。
-
-## ディスカッションペーパーとしての読み方を想定する
-
-このメモは読者に賛成・反対を含めた反応を求める前提で書く。だから比較表の軸や未解決の論点は、読者が自分の意見を差し込める形にしておくとよい。「この軸で判断するなら、あなたはどちらに傾くか」を問いかける一文を論点の直後に置くだけでも、読者は受け取るだけでなく応答する読み方に切り替わる。一方通行になっていないか。応答を前提にしない一方的な報告文になっていないか、書き終えたあとに読み返す価値がある。
-
+Write a memo on the assumption that readers will reply with agreement or objection. Writing, for each issue, one sentence on what the reader is asked to judge makes it easier for readers not just to receive it but to respond.

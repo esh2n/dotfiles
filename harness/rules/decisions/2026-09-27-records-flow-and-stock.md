@@ -3,6 +3,7 @@
 Status: accepted — 持ち主の裁定（2026-09-27）。
 
 rule: Research records (`harness/rules/research/`) and plans (`plans/`) are flow: each lives 14 days from the date in its name (else its first commit), then its lasting facts are promoted into stock — `harness/rules/knowledge/` for reference facts, a decision note for a ruling — and the flow document is deleted with `dotctl records prune --yes`. Write a research record only when it feeds a decision or answers a question that will come back; answer a one-off lookup in the conversation. Promotion keeps the conclusion, its source URLs and its caveats, never the investigation's narrative. make up lists what is past its 14 days; the `records-triage` skill does the promoting.
+scope: repo
 
 ## Problem
 

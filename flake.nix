@@ -27,7 +27,7 @@
     };
     # zsh prompt daemon — installed via flake because the author's brew
     # formula points at the .sha256 asset instead of the tarball (v0.4.0)
-    # llama-server for the gpu role (Omarchy + RTX 3090 Ti), CUDA build from
+    # llama-server for the model-provider role on Linux with NVIDIA, CUDA build from
     # llama.cpp's own flake; the lock pins the commit
     # (rules/decisions/2026-09-24-home-llm-second-host-omarchy-llama-server.md).
     # Its own nixpkgs, not ours: its CUDA package names (cccl, ...) follow the

@@ -1,45 +1,45 @@
-# 診断モード（score）— 書き換えずに、AI臭さをスコアと理由で返す
+# Diagnosis mode (score): return the AI smell as a score and reasons, without rewriting
 
-診断モードは文書を一切書き換えない。返すのは3点だけ。スコアと、その根拠と、直すなら何からか。「この文章、AIっぽい？」「どれくらいAI臭いか採点して」という依頼に答えるためのモードで、リライトを求められたら通常の工程（SKILL.md §1〜7）へ切り替える。
+Diagnosis mode never rewrites the document; it returns only three things: the score, its grounds, and what to fix first if fixing. It answers requests such as 「この文章、AIっぽい？」「どれくらいAI臭いか採点して」. If a rewrite is asked for, switch to the normal process (SKILL.md §1–7).
 
-## 3段階の深さ
+## Three depths
 
-診断の quick / full は、実行モード（SKILL.md「実行モード」）と同じ思想の深さ指定である。書き換え工程がないぶん中身は次のように読み替える。矛盾したら実行モード側でなくこの節に従う。
+quick / full / exp in diagnosis specify how deep to look. Since there is no rewriting step, their content differs from SKILL.md's execution modes. Where they conflict, follow this section.
 
-- **quick（既定）**: `lint.py --json`（ジャンルが分かれば `--genre`）を1回と、スケルトンの一瞥。サブエージェントは使わない。30秒程度
-- **full**: quick に加えて `outline.py` / `terms.py` を実行し、構造レビュー・読みやすさレビュー・doctype照合（SKILL.md §4 と同じ三観点）を判断に織り込む。実行モードのフルと同様に並列サブエージェントへ委譲してよいが、診断では収束ループは回さない（1周の評価で完結する）。数分
-- **exp**: full に加えて `semantic.py --json` を実行する（EXPERIMENTAL。torch 依存・初回約1GBのモデルダウンロードを伴うため、初回は開始前にユーザーへその旨を伝える）。表層を磨いた文書に残る深層のAI臭（話題の平板さ）まで見る
+- quick (default): one run of `lint.py --json` (with `--genre` if the genre is known) and a glance at the headings and the first sentence of each paragraph. No subagents. About 30 seconds
+- full: in addition to quick, run `outline.py` and `terms.py`, and factor in the results of the structure check, the readability check and the doctype check (SKILL.md §5). Subagents may be used only when splitting the reading of a long document makes it faster. Diagnosis does not check convergence; finish with a single evaluation. A few minutes
+- exp: in addition to full, run `semantic.py --json` (an experimental detector; it downloads a model of about 1GB on first run, so on the first run tell the user before starting). It looks as far as the flatness of topic that remains even after the wording is tidied
 
-## スコアの算出 — 機械ベース + 判断調整の二層
+## Computing the score: a machine base and a judgment adjustment, in two layers
 
-スコアは0〜100の自然度で、**高いほど自然（AI臭が薄い）**。ユーザーへ返すときも向きを一言添える。二層で作り、内訳を必ず開示する。
+The score is a naturalness value from 0 to 100; higher is more natural (less AI smell). When returning it to the user, state the direction in a word too. Build it in two layers and always disclose the breakdown.
 
-**機械ベース（決定的）**: 100点から lint findings を文書長で正規化して減点する。
+Machine base (deterministic): from 100, deduct lint findings normalized by document length.
 
 ```
 減点 = (critical×8 + warn×4 + info×0.5) × (1000 / max(文書の文字数, 1000))
 機械ベース = max(100 − 減点, 20)
 ```
 
-文書の文字数は本文全体の文字数。改行・Markdown記法込みの len でよい（目安の正規化なので厳密さは要らない）。短い文書ほど1件の重みが大きく、長い文書は密度で効く設計になっている。exp で semantic_topic_flatness（warn）が出た場合も同じ式に含める。本文が空か実質空（100字未満）の場合はスコアを出さず「診断対象として短すぎる」と返す。
+文書の文字数 (document length) is the character count of the whole body; a plain len including line breaks and Markdown notation is fine (it is a rough normalization, so precision is not needed). The shorter the document, the more one finding weighs; long documents are penalized by density rather than count. The coefficients are a rough setting so that one critical finding equals 2 warn or 16 info findings. The floor of 20 keeps the score from dropping near 0 on machine findings alone. If exp produces semantic_topic_flatness (warn), include it in the same formula. If the body is empty or effectively empty (under 100 characters), do not produce a score; return 「診断対象として短すぎる」.
 
-**判断調整（±15点の範囲）**: full / exp では、構造レビュー・読みやすさレビューの所見で調整する。lint が拾えない構造のAI臭（全節同型、フラット列挙、確信度の平坦化、So What の空洞、順序・段階の押し付け）は減点し、lint が誤検知気味でも文脈上自然と判断した findings は減点を戻す。quick では調整せず機械ベースをそのまま使う（そのぶん「quick の精度は粗い」と明記して返す）。調整後の最終スコアは 0〜100 に切り詰める（min(max(スコア, 0), 100)。機械ベースが100で加点調整しても100を超えない）。
+Judgment adjustment (within ±15 points): in full / exp, adjust with the problems found in the structure and readability checks. Deduct for structural habits lint cannot detect (every section built the same way, bullet lists without grounds or relations, degrees of certainty not differentiated, a report that does not say what to do next, ranking items that are inherently parallel), and restore the deduction for findings where lint looks like a false positive and you judged the text natural in context. quick makes no adjustment and uses the machine base as is (and says explicitly that "quick's precision is coarse"). Clamp the final adjusted score to 0–100 (min(max(score, 0), 100); a machine base of 100 plus a positive adjustment does not exceed 100).
 
-スコアは判断を含む目安であり、同じ文書でも数点は揺れる。CI のゲートに使う数値ではない。この注意は結果に一言添える。
+The score is a rough guide that includes judgment, and the same document can swing by a few points. It is not a number for a CI gate. Add this caveat to the result in a word.
 
-## バンドと言い方
+## Bands and how to phrase them
 
-| スコア | バンド | 伝え方の例 |
+| Score | Band | Example phrasing |
 |---|---|---|
-| 90〜100 | 自然 | AI臭はほぼ見当たらない。指摘があっても好みの範囲 |
-| 70〜89 | 軽微 | 数カ所に癖が残るが、読者が「AIっぽい」と感じる可能性は低い |
-| 50〜69 | 要修正 | 表層か構造のどちらかに明確なAI臭がある。直す価値がある |
-| 0〜49 | 濃厚 | 複数のカテゴリで強く検出。リライト推奨 |
+| 90–100 | Natural (自然) | Almost no AI smell. Any findings are a matter of taste |
+| 70–89 | Minor (軽微) | A few habits remain, but readers are unlikely to feel it is "AI-like" |
+| 50–69 | Needs fixing (要修正) | Clear AI smell in either the surface or the structure. Worth fixing |
+| 0–49 | Heavy (濃厚) | Strongly detected in several categories. Rewrite recommended |
 
-## 出力の形式
+## Output format
 
-1. **スコアとバンド**（機械ベースと判断調整の内訳つき）
-2. **理由トップ3〜5**: カテゴリ名でなく中身で書く。「『〜ではなく』の対比が全文の4%で機械的なリズムになっている（L12ほか）」のように、代表箇所の行番号と、なぜそれがAI臭なのかを一言で
-3. **直すなら何から**: 効果の大きい順に2〜3個。ただし診断モードでは直さない。「リライトしますか（quick/full）」と添えて終える
+1. Score and band (with the breakdown of machine base and judgment adjustment)
+2. 3–5 main reasons: write them by content, not by category name — like 「『〜ではなく』の対比が全文の4%で機械的なリズムになっている（L12ほか）」, with the line numbers of representative spots and a word on why it reads as AI smell
+3. What to fix first, if fixing: 2–3 items, in order of impact. But do not fix in diagnosis mode. End by adding 「リライトしますか（quick/full）」
 
-理由は lint の detail の転記ではなく、文書の文脈に即して言い直す。findings が多い場合も全部は列挙せず、スコアを最も動かしたものに絞る（フラット列挙はここでも避ける）。
+Do not transcribe lint's detail as the reasons; restate them in terms of the document's context. Even when there are many findings, do not list them all; narrow down to those that moved the score most.

@@ -77,6 +77,8 @@ import type { PiApplyPorts } from "./ports";
 export interface PiApplyPaths {
   /** `llm/harness/`, absolute. `skills/` and `rules/` are under it. */
   readonly harnessRoot: string;
+  /** Where external skill packs are checked out (`resolvePluginsDir`). Absent: none. */
+  readonly pluginsDir?: string;
   /** `llm/harness/mcp/servers.json`. */
   readonly mcpServers: string;
   /** `llm/harness/rules/decisions/`. */

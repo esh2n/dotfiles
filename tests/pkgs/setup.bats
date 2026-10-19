@@ -34,9 +34,11 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 }
 
 @test "setup: a missing tool skips its step with a warning" {
-	run --separate-stderr step gh-extensions
+	# only the stand-ins on PATH: a runner image may ship gh in /usr/bin
+	run --separate-stderr env PATH="${BIN}" "${DOTCTL}" setup --repo "${ROOT}" gh-extensions
 	[ "$status" -eq 0 ]
-	[[ "$stderr" == *"gh"* ]]
+	# warnings go to stdout (b08e842b); stderr is for errors
+	[[ "$output" == *"gh is not installed"* ]] || { echo "stdout: $output"; false; }
 	[ ! -s "${LOG}" ]
 }
 
@@ -156,9 +158,9 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 }
 
 @test "setup git-identity: without values it says where to put them and writes nothing" {
-	run --separate-stderr step git-identity
+	run --separate-stderr env -u GIT_USER_NAME -u GIT_USER_EMAIL PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" git-identity
 	[ "$status" -eq 0 ]
-	[[ "$stderr" == *"GIT_USER_EMAIL"* ]]
+	[[ "$output" == *"GIT_USER_EMAIL"* ]] || { echo "stdout: $output"; false; }
 	[ ! -e "${HOME}/.config/git/config.local" ]
 }
 

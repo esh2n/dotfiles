@@ -29,6 +29,7 @@ load '../lib/nix.bash'
 }
 
 @test "browsers: nothing in next runs the old system or workspace installers" {
-	run grep -rn "domains/system/install.sh\|domains/workspace/install.sh" "${REPO_ROOT}/home" "${REPO_ROOT}/lib" "${REPO_ROOT}/system" "${REPO_ROOT}/pkgs"
+	# tracked files only: home/ also holds harnesses' untracked runtime data
+	run git -C "${REPO_ROOT}" grep -n "domains/system/install.sh\|domains/workspace/install.sh" -- home lib system pkgs
 	[ "$status" -eq 1 ]
 }

@@ -247,7 +247,7 @@ func setAsideEtc(s Sys, c Config) error {
 	return nil
 }
 
-// The gpu role's CUDA programs find the NVIDIA libraries through
+// On Linux, the model-provider role's CUDA programs find the NVIDIA libraries through
 // /run/opengl-driver, provided by a system service installed as root.
 func gpuDrivers(s Sys, c Config) {
 	setup := filepath.Join(c.Home, ".nix-profile", "bin", "non-nixos-gpu-setup")
@@ -287,7 +287,7 @@ func llamaFirewall(s Sys, c Config) {
 		return
 	}
 	if _, err := os.Stat(filepath.Join(c.Home, ".nix-profile", "bin", "non-nixos-gpu-setup")); err != nil {
-		return // no gpu role: no llama-server here
+		return // not a Linux model-provider: no llama-server here
 	}
 	marker := filepath.Join(c.Home, ".local", "state", "dotfiles", "ufw-llama-server")
 	if _, err := os.Stat(marker); err == nil {
@@ -295,7 +295,7 @@ func llamaFirewall(s Sys, c Config) {
 	}
 	c.log("letting LiteLLM's container reach llama-server through the firewall (root)")
 	if err := s.Run(nil, "sudo", "ufw", "allow", "from", "172.16.0.0/12", "to", "100.64.0.0/10", "port", "8080", "proto", "tcp", "comment", "litellm-to-llama-server"); err != nil {
-		c.warn("ufw rule not added; the deterministic tier cannot reach llama-server until: sudo ufw allow from 172.16.0.0/12 to 100.64.0.0/10 port 8080 proto tcp")
+		c.warn("ufw rule not added; the executor tier cannot reach llama-server until: sudo ufw allow from 172.16.0.0/12 to 100.64.0.0/10 port 8080 proto tcp")
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {

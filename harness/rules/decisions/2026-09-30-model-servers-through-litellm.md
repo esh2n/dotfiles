@@ -3,6 +3,7 @@
 Status: accepted — 持ち主の裁定（2026-09-30）
 
 rule: Reach every model server's own load, unload and list through the machine's own LiteLLM, as pass-through routes `/model-servers/<server>/models[/load|/unload]` that require the proxy key; `dotctl llm models|load|unload` is the one caller, the same on every machine. Relay only the model-list paths, never a server's chat endpoints, so no request bypasses LiteLLM's metering. What LiteLLM cannot do — starting and stopping a process to switch a GPU's use — is a separate small endpoint on that machine, reached through the same LiteLLM.
+scope: repo
 
 ## Problem
 
