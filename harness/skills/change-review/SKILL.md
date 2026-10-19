@@ -69,9 +69,9 @@ Spawn one `review-verifier` per finding, in parallel, with the finding, the diff
 - does not hold → removed; count it under Refuted with the one-line reason.
 - cannot verify → Findings, labelled `[unverified]`, with what would settle it.
 
-## 6. Heavy only: a second model family
+## 6. Heavy only: a second, independent review
 
-Run pstack's `interrogate` on the same diff and intent, mapped by the `pstack-adapter` skill's Review section (Reviewer B runs on a different model family). Pass the language standard and domain checklists as context files. Do not pass security-reviewer's findings to an outside provider. A finding both families raised independently is the strongest signal; a finding only the second family raised goes through step 5 like any other.
+Run pstack's `interrogate` on the same diff and intent, mapped by the `pstack-adapter` skill's Review section (Reviewer B runs on a model at least as strong as the session's: Codex's strongest model from Claude Code, omp, pi and DSH; a fresh session of the same model from Codex; never a weaker model). Pass the language standard and domain checklists as context files. Do not pass security-reviewer's findings to an outside provider. A finding both reviewers raised independently is a strong signal but not proof (agreement can be wrong); a finding only the second reviewer raised goes through step 5 like any other.
 
 ## 7. UI changes: capture before and after
 
