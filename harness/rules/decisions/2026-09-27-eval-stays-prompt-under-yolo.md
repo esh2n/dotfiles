@@ -1,6 +1,6 @@
 # omp の eval は `prompt` のまま。yolo の下で人が見る唯一のツールとして残す
 
-Status: accepted — 持ち主の裁定（2026-09-27）。選択肢は「(a) `prompt` 維持 / (b) `allow` / (c) `deny`」の三つで、(a) を採った。
+Status: accepted — 持ち主の裁定（2026-09-27）。選択肢は「(a) `prompt` 維持 / (b) `allow` / (c) `deny`」の三つで、(a) を採った。fb2503ac でテンプレートを消し、jig が omp の `config.yml` の `tools.approvalMode: yolo` と `tools.approval.eval: prompt` を書くようになった。決めた値は変わらない。Alternatives considered の「jig は `config.yml` を所有しない方針」と Consequences のテンプレートのコメントへの言及は、この変更の前の事情で、今は当てはまらない
 
 rule: Keep `tools.approval.eval: prompt` in omp's config alongside `tools.approvalMode: yolo`. It is the only layer that sees code the guard's static extraction cannot resolve, and it is omp's own documented lever for the gap `bash.patterns` cannot close — never remove it to reduce prompts, never raise it to `deny`, and never describe it as a boundary. Nothing in omp is a boundary: for untrusted input the boundary is running omp inside the sandbox (yomp/sbx).
 scope: repo
@@ -13,7 +13,7 @@ omp は `approvalMode: yolo`（読み・書き・実行すべて承認なし）�
 
 ## Decision
 
-- `home/shared/harness/omp/config.yml.template` の `tools: {approvalMode: yolo, approval: {eval: prompt}}` を**現状のまま維持**する。設定変更は無く、この決定は「変えない」ことの記録。
+- omp の `config.yml` の `tools: {approvalMode: yolo, approval: {eval: prompt}}` を**現状のまま維持**する（当時は `home/shared/harness/omp/config.yml.template` に書いていた。今は jig が `harness/jig/src/domain/omp/config.ts` の `OWNED_VALUES` で書く）。設定変更は無く、この決定は「変えない」ことの記録。
 - `allow` にも `deny` にもしない。
 - これは境界ではない。境界が必要な作業（信頼できないリポジトリ、プロンプトインジェクションの可能性がある入力）は sandbox（yomp/sbx）で走らせる、という別の決定に属する。
 

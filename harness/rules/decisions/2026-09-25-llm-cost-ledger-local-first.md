@@ -1,8 +1,8 @@
-# LiteLLM を通る AI 利用コストは一冊の台帳で持つ: 各機械は手元の Postgres に書き、llm-console の機械の台帳へあとから送る
+# LiteLLM を通る AI 利用コストは一冊の台帳で持つ: 各機械は手元の Postgres に書き、observer の機械の台帳へあとから送る
 
-Status: accepted — 持ち主の裁定（2026-09-25）。要件: AI の利用コストを一か所で管理する（機械ごとの LiteLLM を Grafana で足すだけでは足りない）。範囲は LiteLLM を通る分だけ（Claude Code・Codex の直接利用は、いまは対象外）。共有 DB に直接書く案には、機械が止まっているときの書き込みと再送、書き込みの遅延の問題があり、ソースまで読んだ調査の後、手元に書いてあとから送る形を採った。`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md` の「LiteLLM は各機械の loopback に一つ」は変えない。tailnet に出す口に台帳の Postgres を一つ足す
+Status: accepted — 持ち主の裁定（2026-09-25）。要件: AI の利用コストを一か所で管理する（機械ごとの LiteLLM を Grafana で足すだけでは足りない）。範囲は LiteLLM を通る分だけ（Claude Code・Codex の直接利用は、いまは対象外）。共有 DB に直接書く案には、機械が止まっているときの書き込みと再送、書き込みの遅延の問題があり、ソースまで読んだ調査の後、手元に書いてあとから送る形を採った。`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md` の「LiteLLM は各機械の loopback に一つ」は変えない。tailnet に出す口に台帳の Postgres を一つ足す。役割名 `llm-console` は `2026-09-25-roles-named-as-people.md` で `observer` に改めた（rule 行と本文の役割名もそれに合わせた）
 
-rule: Keep one LiteLLM per machine, loopback-only, but give each its own local Postgres on the same docker network (never a DB across the tailnet on the request path); the llm-console machine's Postgres is the single cost ledger, and every other machine ships its unsent LiteLLM_SpendLogs rows to it when reachable, idempotently by request_id (the table's primary key), recording which machine each row came from. Expose only the ledger's Postgres port on the tailnet from the llm-console machine. Budgets are per machine; the cross-machine total is read from the ledger. If the DB secret is unavailable, LiteLLM still serves without a DB rather than stopping.
+rule: Keep one LiteLLM per machine, loopback-only, but give each its own local Postgres on the same docker network (never a DB across the tailnet on the request path); the observer machine's Postgres is the single cost ledger, and every other machine ships its unsent LiteLLM_SpendLogs rows to it when reachable, idempotently by request_id (the table's primary key), recording which machine each row came from. Expose only the ledger's Postgres port on the tailnet from the observer machine. Budgets are per machine; the cross-machine total is read from the ledger. If the DB secret is unavailable, LiteLLM still serves without a DB rather than stopping.
 scope: repo
 
 ## Problem
@@ -12,9 +12,9 @@ LiteLLM を通る AI の利用コストを一元で管理したい（合計が�
 ## Decision
 
 - 各機械の LiteLLM は、同じ docker ネットワーク上の自分の Postgres に使用額を書く。書き込み先が常に手元なので、応答の遅れも、相手が止まっている間の取りこぼしも起きない。
-- llm-console の役割を持つ機械（Mac）の Postgres を台帳にする。Mac 自身の LiteLLM はそのまま台帳に書く。
+- observer の役割を持つ機械（Mac）の Postgres を台帳にする。Mac 自身の LiteLLM はそのまま台帳に書く。
 - それ以外の機械は、まだ送っていない行を台帳へ送る（届かなければ次の回に持ち越す）。`request_id` が主キーなので、同じ行を二度送っても一件のまま（`ON CONFLICT DO NOTHING`）。どの機械の行かは台帳側の表に記録する。
-- tailnet に出すのは台帳の Postgres の口だけ（llm-console の機械から）。LiteLLM の 4000 番は今まで通り外に出さない。
+- tailnet に出すのは台帳の Postgres の口だけ（observer の機械から）。LiteLLM の 4000 番は今まで通り外に出さない。
 - 予算（上限）は機械ごと。二台を合わせた上限は作らない（手元の DB が別々なので、その場では足せない）。合計は台帳で見る。
 - DB の鍵が取れないときは、LiteLLM は DB なしで動き続ける（使用額の記録だけが止まる）。
 

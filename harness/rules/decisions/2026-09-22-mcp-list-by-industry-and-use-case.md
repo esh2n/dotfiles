@@ -1,6 +1,6 @@
 # MCP の一覧は業界評価とユースケース適合で決め、使われていない物は案内の仕組みを直す
 
-Status: accepted — 要否の軸は業界評価とユースケース適合の二つ。使用回数は「使いこなせていない」検知にだけ使う。届け方は各ハーネスの読み込み方（遅延か eager か）で決め、使わせる仕組みは強制しない（2026-09-22）
+Status: accepted — 要否の軸は業界評価とユースケース適合の二つ。使用回数は「使いこなせていない」検知にだけ使う。届け方は各ハーネスの読み込み方（遅延か eager か）で決め、使わせる仕組みは強制しない（2026-09-22）。Consequences の「`~/.claude.json` には触らない」は superseded by `2026-09-25-jig-writes-claude-json-mcp.md`（jig が `~/.claude.json` の `mcpServers` に直接書く）
 
 rule: Keep serena, codebase-memory-mcp, context7, playwright-mcp, figma-remote and notion-mcp as MCP servers, but drop figma-desktop and claude-mem's mcp-search, and never add GitHub MCP (use gh instead) or DB/Linear/Jira MCP (lethal-trifecta risk). Do not force tool use via deny hooks; instead guide usage with rule lines and disable-model-invocation skills, and measure calls via jig's audit log.
 

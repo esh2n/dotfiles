@@ -5,6 +5,7 @@
 - Follow semantic versioning for releases
 - Document breaking changes
 - Before claiming completion, run the language's static checks the project does not already run in its hooks: Go `staticcheck ./...`, Rust `cargo clippy`, CSS `stylelint`, HTML `html-validate` — and show their output
+- In Codex, which has no edit-time format hook: when you finish a change, run the project's formatter once on the files you changed, and do not re-run the tests afterwards just for the formatting
 
 ## Testing
 

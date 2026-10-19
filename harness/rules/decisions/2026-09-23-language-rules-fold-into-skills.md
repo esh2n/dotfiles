@@ -1,8 +1,8 @@
 # 言語別ルールは言語 skill に畳み、`rules/<lang>/` と `paths:` 配布は使わない
 
-Status: accepted — 複数ハーネスに条件付きルールを届ける業界の型は「共通の器に畳む」で、フックによる自作注入は実地の唯一の報告が失敗（openai/codex #21675: 重複抑止が無く 200KB 超の再注入、#22861: ベンダー上限で切り詰め）。ユーザー全体の規則を常時読み込みの AGENTS.md に載せるのは条件付けの意図に反するので、五ハーネス全部に届く skill を器にする（2026-09-23）
+Status: accepted — 複数ハーネスに条件付きルールを届ける業界の型は「共通の器に畳む」で、フックによる自作注入は実地の唯一の報告が失敗（openai/codex #21675: 重複抑止が無く 200KB 超の再注入、#22861: ベンダー上限で切り詰め）。ユーザー全体の規則を常時読み込みの AGENTS.md に載せるのは条件付けの意図に反するので、五ハーネス全部に届く skill を器にする（2026-09-23）。`rules/` の下の一覧には、`2026-09-27-records-flow-and-stock.md` が足した `knowledge/`（調査から昇格させた確立済みの事実）を rule 行に加えた
 
-rule: Keep language-specific guidance in the language's skill (`skills/<lang>-*`), never in `rules/<lang>/` or any `paths:`-scoped file; `rules/` holds only `common/` (always-on, rendered into AGENTS.md), `decisions/` and `research/`. Do not build hook-based conditional injection for Codex, omp, pi or DSH, and do not use Claude Code's `paths:` for language rules; skills reach every harness through `~/.agents/skills` and `~/.claude/skills`, and fire through the skill router or the model's own choice.
+rule: Keep language-specific guidance in the language's skill (`skills/<lang>-*`), never in `rules/<lang>/` or any `paths:`-scoped file; `rules/` holds only `common/` (always-on, rendered into AGENTS.md), `decisions/`, `knowledge/` and `research/`. Do not build hook-based conditional injection for Codex, omp, pi or DSH, and do not use Claude Code's `paths:` for language rules; skills reach every harness through `~/.agents/skills` and `~/.claude/skills`, and fire through the skill router or the model's own choice.
 scope: repo
 
 ## Problem

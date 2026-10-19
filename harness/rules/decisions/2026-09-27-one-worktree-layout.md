@@ -24,7 +24,7 @@ rule: Work in the current checkout by default; parallel workers whose files over
 ## Consequences
 
 - スキル `using-git-worktrees` を書き直した（ネイティブの道具を優先する記述をやめ、一つの形と、持ち主が決める合流の手順を書いた）。
-- Swarm の隔離（`harness/jig/src/app/swarm/worktree.ts`）も同じ形で、Swarm 自身が作ったマージ済みのものだけを片付ける。
+- `implement` ワークフロー（`harness/workflows/implement.js`）も同じ形で worktree を作り、合流の行は持ち主に渡す（当時この形を使っていた Swarm の `harness/jig/src/app/swarm/worktree.ts` は、5c9cf118 で自前の Swarm と一緒に消えた）。
 - Claude Code の `EnterWorktree` などネイティブの道具が別の名前を付ける場合は、使わずに普通の git で作る。
 
 ## Sources

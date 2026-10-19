@@ -1,6 +1,6 @@
 # 厚いレビューの 2 つ目は、主と同格以上のモデルにだけ頼む
 
-Status: accepted — 持ち主の裁定（2026-10-19）。2026-10-19-review-redesign.md の「2 つ目は違うモデルの系統で」の部分を、この記録で具体化する
+Status: accepted — 持ち主の裁定（2026-10-19）。2026-10-19-review-redesign.md の「2 つ目は違うモデルの系統で」の部分を、この記録で具体化する。そのうち Decision 2 の「omp・pi・DSH からは系列の違う tier を使い」は、この記録が置き換える（格下の別系列は使わず、Codex に 1 回委ねる）
 
 rule: In a heavy review, the second independent review runs on a model at least as strong as the session's own, never a weaker one: from Claude Code, omp, pi and DSH, one `codex exec` delegation to Codex's strongest model (the `complex` row of the `codex` table in `agents/models.json`, high effort); from Codex, a fresh session of the same model, because Claude is reachable only through `claude -p`, which is not used. When Codex's usage limit is near or the delegation fails, skip the second review and say so in the report; never fall back to a weaker model.
 

@@ -25,7 +25,7 @@ scope: repo
 
 ## Consequences
 
-- 人手: Mac の Orca でペアリングコードを出し、スマホの Orca アプリに貼る（一回）。`domains/dev/install.sh` の残作業に載せる。
+- 人手: Mac の Orca でペアリングコードを出し、スマホの Orca アプリに貼る（一回）。人手の残作業の一覧に載せる（当時は `domains/dev/install.sh`、今の入口は `make up`）。
 - 未確認: omp / pi / DSH のセッションが Orca の「Chat UI」に載るか（非対応なら生の端末で、承認は端末に打つ）。Orca Relay がトラフィックを保存するかは文書に無い（使わないので影響なし）。
 - Orca desktop を閉じると切れる（文書どおり）。常駐させるかは持ち主の運用。
 - 前例なし: Orca companion を Tailscale 直結で運用した公開報告、計測（レイテンシ・再接続）。

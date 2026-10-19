@@ -16,7 +16,7 @@ Mac（メモリ 64GB）の LM Studio のモデルを、三つのユースケー�
 - **LiteLLM は各機械に一つ、loopback のまま。** 外に向けない。バックエンドの LM Studio の場所は起動スクリプトが自動判定する — `127.0.0.1:1234` が応えれば local、応えなければ Mac の Tailscale 名。機械ごとの設定ファイルや hostname 分岐は持たない。jig の tiers は `localhost:4000` のまま一切変えず、計測もその機械で取れる。
 - **スマホは Open WebUI（PWA）** を Mac に常駐させ Tailscale 越しに開く。バックエンドは loopback の LM Studio（または local の LiteLLM）。
 - 前回記録が推した「LiteLLM を tailnet に出して二重認証」は取り下げる。前例ゼロの物を外に向ける理由が無く、LiteLLM を外に出さなければ二重認証の論点自体が消える。
-- **計測の集約は Mac の Prometheus が各機械の LiteLLM `/metrics` を tailnet 越しに pull する。他人との分離は op の鍵参照と tailnet の所属で足りる**（同日の裁定）。押す側（pusher）もアプリ層の認証も置かない — 身元は tailnet が持つ。同じ dotfiles を他人が使っても、リポジトリに秘密は無く `op://` 参照はその人の 1Password で解決され（自分の鍵か、何も無いか）、tailnet が違えば機械同士は到達できない。出し方は「chat API は loopback のまま、metrics だけ出す」: LiteLLM v1.101.0 以降の専用 metrics listener（`--prometheus_metrics_port 4001`、pin 中のイメージは 1.103.0）を `127.0.0.1:4001` に publish し、Mac 以外の機械で `tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001` を一度。`:4000` を `tailscale serve` に載せる案は chat API ごと tailnet に出るので却下。専用 listener は LiteLLM の鍵認証を持たない（vendor: "The dedicated listener does not use LiteLLM virtual-key authentication ... Permit access only from trusted Prometheus or collector networks"）ので、到達範囲は tailnet ACL（`domains/dev/config/tailscale/acl.hujson`、自分の機器同士の `tcp:4001` と `tcp:1234` だけ）で絞る。
+- **計測の集約は Mac の Prometheus が各機械の LiteLLM `/metrics` を tailnet 越しに pull する。他人との分離は op の鍵参照と tailnet の所属で足りる**（同日の裁定）。押す側（pusher）もアプリ層の認証も置かない — 身元は tailnet が持つ。同じ dotfiles を他人が使っても、リポジトリに秘密は無く `op://` 参照はその人の 1Password で解決され（自分の鍵か、何も無いか）、tailnet が違えば機械同士は到達できない。出し方は「chat API は loopback のまま、metrics だけ出す」: LiteLLM v1.101.0 以降の専用 metrics listener（`--prometheus_metrics_port 4001`、pin 中のイメージは 1.103.0）を `127.0.0.1:4001` に publish し、Mac 以外の機械で `tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001` を一度。`:4000` を `tailscale serve` に載せる案は chat API ごと tailnet に出るので却下。専用 listener は LiteLLM の鍵認証を持たない（vendor: "The dedicated listener does not use LiteLLM virtual-key authentication ... Permit access only from trusted Prometheus or collector networks"）ので、到達範囲は tailnet ACL（`home/shared/tailscale/config/acl.hujson`、自分の機器同士の `tcp:4001` と `tcp:1234` だけ）で絞る。
 
 ## Alternatives considered
 
@@ -33,15 +33,15 @@ Mac（メモリ 64GB）の LM Studio のモデルを、三つのユースケー�
 - Tailscale の導入（各機械、ユーザーのログイン）、Mac での `tailscale serve` 一回、Open WebUI の常駐は未実施。
 - 起動スクリプトと plist は macOS 前提（launchd、Docker Desktop/OrbStack）。Linux 機では systemd unit と `host.docker.internal` の代替が要る — flake の per-system 化の一部として扱う。
 - Mac のスリープ対策は `caffeinate -s -w <LM Studio の daemon の pid>` を launchd で daemon に紐づける（同日の裁定）。`pmset -a disablesleep 1` は機械全体を恒久に起こすので採らない — サーバーが動いている間だけ起きている、が正しい範囲。
-- Tailscale・LM Studio・LiteLLM・Open WebUI は手で入れず dotfiles が入れる（同日の指示）: GUI アプリは `domains/dev/packages/homebrew.nix` の cask、常駐は launchd の plist、Open WebUI は observability の docker-compose。
+- Tailscale・LM Studio・LiteLLM・Open WebUI は手で入れず dotfiles が入れる（同日の指示）: GUI アプリは `system/darwin/homebrew.nix` の cask、常駐は launchd の plist、Open WebUI は observability の docker-compose。
 - 前例なし: Open WebUI を LiteLLM の bearer key 構成に繋いだ公開例、LiteLLM 単体（1 コンテナ・Mac 常駐）のレイテンシ実測。
 - `litellm-up.sh` は全機械で `--prometheus_metrics_port 4001` を付け `127.0.0.1:4001` に publish する（loopback なので Mac でも無害）。tailnet に載せるのは Mac 以外の機械だけ、`tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001` を一度（LM Studio の 1234 と同じ手順、未実施）。
-- `observability/prometheus/prometheus.yml` の local target はそのまま。他機械の target は MagicDNS 名 `<machine>.<tailnet>.ts.net:4001` に `machine` ラベルを付けたコメントアウト済みブロックで持ち、機械が増えたときに外す。コンテナから MagicDNS 名が引けなければ Tailscale IP（100.x）に置き換える（未実測）。
+- `home/shared/litellm/config/observability/prometheus/prometheus.yml` の local target はそのまま。他機械の target は MagicDNS 名 `<machine>.<tailnet>.ts.net:4001` に `machine` ラベルを付けたコメントアウト済みブロックで持ち、機械が増えたときに外す。コンテナから MagicDNS 名が引けなければ Tailscale IP（100.x）に置き換える（未実測）。
 - `require_auth_for_metrics_endpoint: false` は据え置き。これは proxy port（4000）の `/metrics` にしか効かず、4000 は loopback から出ないため。専用 listener 側は設定に関係なく無認証で、境界は tailnet ACL のみ — tailnet の外に出す日が来たら、その時は専用 listener を止めて 4000 側を `true` にし Bearer で scrape する。
-- Tailscale の policy file は admin console に住む。`domains/dev/config/tailscale/acl.hujson` はそこへ貼る原本（または GitOps: `tailscale/gitops-acl-action` が `policy.hujson` を PR で test、main への push で apply）。貼ると既定の allow-all が消えるので、SSH 等ほかに要る許可は同じファイルに足す。
+- Tailscale の policy file は admin console に住む。`home/shared/tailscale/config/acl.hujson` はそこへ貼る原本（または GitOps: `tailscale/gitops-acl-action` が `policy.hujson` を PR で test、main への push で apply）。貼ると既定の allow-all が消えるので、SSH 等ほかに要る許可は同じファイルに足す。
 - 持ち主の裁定（2026-09-23）: Tailscale 越しに SSH・画面共有等も通すので、ACL は「自分の機械同士は全ポート、他人・タグ付き・共有ノードは無し」とする（ポート列挙の 3 本版はファイル内にコメントで保持）。4000 の「出さない」保証は ACL ではなく `tailscale serve` に載せないことで持つ。貼る操作は `make tailscale-acl`（実値を埋めてクリップボードへ）。
-- 持ち主の裁定（同夜）: 機械側の手順（launchd の bootstrap、`tailscale serve`、docker compose、`pi install`、`claude mcp add`）は独立スクリプトにせず `domains/dev/install.sh` に畳む — 新しい機械は `make install`、既存は `make update` の一発で揃え、人手の残作業は末尾に一覧で出す。
-- 持ち主の裁定（2026-09-23）: 手で入れてあった LM Studio は cask に置き換える（アプリを Trash → `make update`）。`brew --adopt` は版が一致しても通らなかった（アプリ内更新の bundle は DMG と同一でない）。
+- 持ち主の裁定（同夜）: 機械側の手順（launchd の bootstrap、`tailscale serve`、docker compose、`pi install`、`claude mcp add`）は独立スクリプトにせず一つの入口に畳む — 当時は `domains/dev/install.sh` と `make install` / `make update` だったが、`domains/` は 52411843 で消え、今は新しい機械も既存の機械も `make up` の一発で揃える。人手の残作業は末尾に一覧で出す。
+- 持ち主の裁定（2026-09-23）: 手で入れてあった LM Studio は cask に置き換える（アプリを Trash → `make up`）。`brew --adopt` は版が一致しても通らなかった（アプリ内更新の bundle は DMG と同一でない）。
 
 ## Sources
 

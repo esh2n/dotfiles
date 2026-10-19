@@ -1,6 +1,6 @@
 # 委譲はサブエージェントとワークフローを規模で使い分け、スクリプトは一本、実行系は各ハーネス、実行の分担は決定的な仕事に限る
 
-Status: accepted — ベンダーは制御をコードに置き規模で使い分け、読む並列と決定的な実行の分担には効いた測定があり、書く並列だけが負けている（2026-09-22）。`2026-09-22-workflow-research-only.md` の「ハーネス横断は考えない」を上書きする。Swarm の拡張だけは `2026-09-27-swarm-extension.md` が例外にした。review と design-review をスクリプトとして残す部分は superseded by `2026-10-19-review-redesign.md`（レビューは review skill とレビュアーのエージェントに移した）
+Status: accepted — ベンダーは制御をコードに置き規模で使い分け、読む並列と決定的な実行の分担には効いた測定があり、書く並列だけが負けている（2026-09-22）。`2026-09-22-workflow-research-only.md` の「ハーネス横断は考えない」を上書きする。Swarm の拡張を例外にした `2026-09-27-swarm-extension.md` は `2026-10-19-swarm-on-native-subagents.md` に置き換えられたので、例外はもう無い。review と design-review をスクリプトとして残す部分は superseded by `2026-10-19-review-redesign.md`（レビューは review skill とレビュアーのエージェントに移した）。code-study と stocktake のスクリプトは 632d2093 で skill に移し、残るワークフローは `harness/workflows/implement.js` と `research.js` だけ。Consequences の「pi 拡張は tintinweb 一択」は superseded by `2026-10-19-swarm-on-native-subagents.md`（nicobailon/pi-subagents に替える）、「部下のモデル階層は tiers.json が唯一の元」は superseded by `2026-10-19-model-assignment.md`（部下のモデルは `harness/agents/models.json` が tier から引く）
 
 rule: Choose a single subagent for one or two delegations, a workflow script for a fixed multi-step procedure; either way, only delegate read-and-report work or deterministic execution (tests, lint, build, schema checks) — never implementation needing shared design judgment or concurrent writes to one file. Write workflow scripts once in Claude Code's syntax; jig itself has no execution engine.
 

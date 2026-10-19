@@ -26,7 +26,7 @@ scope: repo
 ## Consequences
 
 - obra の二本は全文を読んでから `skills/` に置く。出所と pinned commit を記す（`natural-japanese/UPSTREAM.md` と同じ形）。
-- 資産の移し先は skill と同じリポジトリの外か、`domains/` の別の場所。skill からは相対パスで参照しない。
+- 資産の移し先は skill と同じリポジトリの外か、リポジトリ内の skill 以外の場所（当時は `domains/` の別の場所。`domains/` は 52411843 で消えた）。skill からは相対パスで参照しない。
 - 「本数が精度を下げる」数字は無い（Anthropic の「Too many tools or overlapping tools can also distract agents」は定性）。測れているのは追従率だけ。
 
 ## Sources

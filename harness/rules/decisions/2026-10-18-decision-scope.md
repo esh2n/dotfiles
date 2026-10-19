@@ -1,6 +1,6 @@
 # 決定は全体用とリポジトリ用に分けて描く
 
-Status: accepted — 持ち主の裁定（2026-10-18）。`2026-09-22-decision-records.md` の「`rule:` 行を AGENTS.md に写す」を、写す先を分ける形に細かくする
+Status: accepted — 持ち主の裁定（2026-10-18）。`2026-09-22-decision-records.md` の「`rule:` 行を AGENTS.md に写す」を、写す先を分ける形に細かくする。行の形（`- <rule> (<file>)`、太字にしない、メモへのリンクは付けず置き場所を節の頭で 1 回書く）は、`2026-09-22-decision-records.md` の「太字一行とメモへのリンク」と `2026-09-23-model-facing-english.md` の「AGENTS.md の太字一行に写す」を置き換える
 
 rule: A decision note that rules only how this dotfiles repository is built carries `scope: repo` under its `rule:` line; jig renders those into the checkout's own untracked `AGENTS.md` (with a `CLAUDE.md` link), and only the rest into every harness's AGENTS.md. Each rendered line is plain, ends with its note's file name, and the notes' directory is named once per section.
 scope: repo

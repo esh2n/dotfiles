@@ -1,21 +1,21 @@
-# deterministic は Omarchy 機が止まっている間だけ Mac の同じモデルへ落ちる
+# executor は Omarchy 機が止まっている間だけ Mac の同じモデルへ落ちる
 
-Status: accepted — 持ち主の裁定（2026-09-27）。要件: Omarchy 機が止まっていても deterministic の作業が失敗しないこと、普段は空いている Mac で別の大きいモデルを動かせること。`2026-09-26-deterministic-on-the-gpu.md` を置き換える。deterministic の定義（計画の実行役）、主の置き場所（Omarchy 機の llama-server、Qwen3.8-27B Q4_K_M、65,536 文脈、スロット 1、Qwen の推奨サンプリング）はそのまま引き継ぎ、「どこへも fallback しない」だけを変える
+Status: accepted — 持ち主の裁定（2026-09-27）。要件: Omarchy 機が止まっていても executor の作業が失敗しないこと、普段は空いている Mac で別の大きいモデルを動かせること。`2026-09-26-deterministic-on-the-gpu.md` を置き換える。executor の定義（計画の実行役）、主の置き場所（Omarchy 機の llama-server、Qwen3.8-27B Q4_K_M、65,536 文脈、スロット 1、Qwen の推奨サンプリング）はそのまま引き継ぎ、「どこへも fallback しない」だけを変える。tier 名は `2026-10-19-model-assignment.md` で `deterministic` から `executor` に改めた（本文の tier 名もそれに合わせた）
 
 rule: The `executor` tier is the executor: it carries out a plan that a frontier or higher-benchmark model (`complex`, Claude, Codex) already designed; it is not a tier for bit-identical output. It has two deployments of the same model, Qwen3.8-27B, under one LiteLLM `model_name`: `order: 1` is the Omarchy desktop's `llama-server` (24 GB GPU, 4-bit, one slot with a 65,536-token context, Qwen's recommended sampling), the only deployment LiteLLM health-checks in the background (`enable_health_check_routing`, every 60 s, `cooldown_time` 90); `order: 2` is the Mac's LM Studio (`qwen/qwen3.8-27b@4bit`, loaded just in time with a 600 s `ttl`, `disable_background_health_check: true`), used only while the desktop is out of the pool. Never fall back to a different model. The Mac's own larger model must be JIT-loaded too, so LM Studio's auto-evict swaps it out; whether a fallback happened is read from the `x-litellm-model-api-base` header and `litellm_deployment_success_responses` by `api_base`.
 scope: repo
 
 ## Problem
 
-09-26 の記録は、Omarchy 機が止まっている間 deterministic を「使えない」にした。Omarchy 機は止まっていることが多く、Mac で作業している間に deterministic の作業が失敗する。一方で、普段は空いている Mac では別の大きいモデルを動かす。
+09-26 の記録は、Omarchy 機が止まっている間 executor を「使えない」にした。Omarchy 機は止まっていることが多く、Mac で作業している間に executor の作業が失敗する。一方で、普段は空いている Mac では別の大きいモデルを動かす。
 
 ## Decision
 
 - **一つの名前に、同じモデルの行き先を二つ並べる。** LiteLLM の `order` で、1 が Omarchy 機の llama-server、2 が Mac の LM Studio。docs: "When a request to an `order=1` deployment fails (connection error, 404, 429, etc.), the router automatically tries `order=2` deployments"。
 - **落ちる先は同じ Qwen3.8-27B（MLX 4bit）。** 別のモデルへ黙って落ちると、ツール呼び出しの中身だけが壊れて気づけない（gke-labs/kube-agents #2023: "the silent degrade cost hours of diagnosis"）。同じモデルなら、遅くなるだけで振る舞いは変わらない。Mac の速さは 4bit で 15.0 tok/s、最初の応答まで約 1.5 秒（`home/shared/litellm/config/bench/report.md` の実測。8bit は約 9）。
-- **止まっている Omarchy 機は要求の前に外す。** LiteLLM の `enable_health_check_routing` で、裏の確認（60 秒ごと）が失敗した行き先を外す。`cooldown_time` は確認の間隔より長い 90 秒（docs が明記する条件）。確認するのは deterministic の Omarchy 機の行き先だけ（`background_health_check_model_groups` と `disable_background_health_check`）。確認は毎回本物の生成を走らせるので、Mac に当てると Qwen が常に読み込まれ、クラウドに当てると課金される。
+- **止まっている Omarchy 機は要求の前に外す。** LiteLLM の `enable_health_check_routing` で、裏の確認（60 秒ごと）が失敗した行き先を外す。`cooldown_time` は確認の間隔より長い 90 秒（docs が明記する条件）。確認するのは executor の Omarchy 機の行き先だけ（`background_health_check_model_groups` と `disable_background_health_check`）。確認は毎回本物の生成を走らせるので、Mac に当てると Qwen が常に読み込まれ、クラウドに当てると課金される。
 - **Mac は普段、別の大きいモデルを動かしてよい。** LM Studio は JIT で読み込んだモデルを同時に一つしか置かない（Auto-Evict）。落ちてきた要求で Qwen が読み込まれると大きいモデルは下ろされ、Qwen は 600 秒使われなければ下ろされる。そのため大きいモデルも JIT で読み込む（`lms load` で常駐させると両方が載ってメモリが足りなくなる）。
-- **落ちたことを見えるようにする。** 応答ヘッダ `x-litellm-model-api-base` と、Grafana の「deterministic の行き先の状態」「deterministic: どちらが答えたか」（`litellm_deployment_state` と、`api_base` ごとの `litellm_deployment_success_responses`。同じ名前の中の `order` の切り替えは、別の名前へ回す `fallbacks` 用の `litellm_deployment_successful_fallbacks` では数えられない恐れがある）。
+- **落ちたことを見えるようにする。** 応答ヘッダ `x-litellm-model-api-base` と、Grafana の「executor の行き先の状態」「executor: どちらが答えたか」（`litellm_deployment_state` と、`api_base` ごとの `litellm_deployment_success_responses`。同じ名前の中の `order` の切り替えは、別の名前へ回す `fallbacks` 用の `litellm_deployment_successful_fallbacks` では数えられない恐れがある）。
 
 ## Alternatives considered
 
