@@ -34,21 +34,21 @@ export type ClaudeHookEvent = (typeof CLAUDE_HOOK_EVENTS)[number];
  * The MCP tools on a shared place others see, which the guard's
  * `ask-mcp-shared-write` rule judges (`rules/decisions/2026-10-19-pstack-precedence-table.md`):
  * every Notion tool, from the house `notion-mcp` server and from Claude
- * Code's claude.ai connector, except the reads. Fail-safe: a tool Notion adds
- * later is matched (and asked) until it is named a read here and in the rule.
- * A hook only judges what its matcher names, so without this tail the rule
- * would never be asked. The rule's read list and this one are pinned
- * together by `test/domain/policy/real-policy.test.ts`.
+ * Code's claude.ai connector. A hook only judges what its matcher names, so
+ * without this tail the rule would never be asked. The matcher routes every
+ * Notion tool and the rule tells reads from writes: Codex compiles matchers
+ * with Rust's `regex` crate, which has no lookaround, so the read exclusion
+ * cannot live here. Fail-safe either way: a tool Notion adds later reaches
+ * the guard and asks until the rule names it a read.
  */
-const NOTION_READS = "fetch|search|get-|list-|query-|calendar-list-|download-|read-|memory-search";
 
-export const SHARED_WRITE_MCP_MATCHER = `mcp__(?:claude_ai_Notion|notion-mcp)__notion-(?!(?:${NOTION_READS}))[a-z-]+`;
+export const SHARED_WRITE_MCP_MATCHER = "mcp__(?:claude_ai_Notion|notion-mcp)__notion-[a-z-]+";
 
 /**
  * The tools the guard is asked about. Read/Write/Edit/MultiEdit and Bash are
  * the harness's own; the serena tails are the MCP calls that *write* — a
  * symbol replacement is an edit that would otherwise reach disk unjudged;
- * the Notion tail is every non-read Notion tool (above). Read-only MCP tools
+ * the Notion tail is every Notion tool (above). Read-only MCP tools
  * stay unmatched and untaxed.
  */
 const GUARD_MATCHER = [

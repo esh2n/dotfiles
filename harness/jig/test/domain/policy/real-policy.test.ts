@@ -975,6 +975,10 @@ function shellRows(rule: string, rows: readonly ShellRow[]): (Case & { rule: str
 }
 
 /** Every Notion tool name either server exposes today (claude.ai connector naming). */
+// The reads ask-mcp-shared-write lets through; every other Notion tool asks.
+const NOTION_READ =
+  /^notion-(?:fetch|search|get-|list-|query-|calendar-list-|download-|read-|memory-search)/;
+
 const NOTION_TOOLS = [
   "notion-calendar-cancel-events",
   "notion-calendar-create-events",
@@ -1181,11 +1185,7 @@ const PRECEDENCE_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
     label: `Notion ${tool} (claude.ai connector)`,
     call: { tool: `mcp__claude_ai_Notion__${tool}`, input: {} },
     profile: "standard" as const,
-    expected: (new RegExp(`^(?:${SHARED_WRITE_MCP_MATCHER})$`).test(
-      `mcp__claude_ai_Notion__${tool}`,
-    )
-      ? "ask"
-      : "allow") as Outcome,
+    expected: (NOTION_READ.test(tool) ? "allow" : "ask") as Outcome,
   })),
   {
     rule: "ask-mcp-shared-write",
@@ -1212,15 +1212,11 @@ describe("the real guard-rules.json — pstack precedence and GitHub comment rul
     expect([0, PRECEDENCE_RULE_IDS.length]).toContain(count);
   });
 
-  test("the Notion read list is the same in the hook matcher and the rule", () => {
-    // Pinned both ways over every known tool: a read the matcher skips must be a
-    // read the rule allows, and every tool the matcher fires for must ask.
-    const writes = NOTION_TOOLS.filter((tool) =>
+  test("the hook matcher routes every Notion tool to the guard, so the rule's read list decides", () => {
+    const routed = NOTION_TOOLS.filter((tool) =>
       new RegExp(`^(?:${SHARED_WRITE_MCP_MATCHER})$`).test(`mcp__claude_ai_Notion__${tool}`),
     );
-    expect(writes).toContain("notion-create-pages");
-    expect(writes).not.toContain("notion-fetch");
-    expect(writes).not.toContain("notion-calendar-list-events");
+    expect(routed).toEqual([...NOTION_TOOLS]);
   });
 
   for (const { rule, label, call, profile, expected } of PRECEDENCE_RULE_CASES) {
