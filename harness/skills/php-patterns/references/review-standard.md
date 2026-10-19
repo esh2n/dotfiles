@@ -101,7 +101,7 @@ Laravel security pages. Treat any claim resting on them as unverified.
 | Habit | Do instead | Source |
 |---|---|---|
 | `==`, `!=`, `switch`, `in_array`/`array_search` without `strict`, `empty()` (old PHP, JS) | `===`, `match`, `strict: true`; explicit checks instead of `empty()` | CMP, INARR, MATCH, PSSR |
-| Assuming pre-8.0 `0 == "a"` behaviour, or relying on it | Since 8.0 a number and a non-numeric string compare as strings; never depend on either | CMP `#language.operators.comparison` warning |
+| Assuming pre-8.0 `0 == "a"` behaviour, or relying on it | Since 8.0 a number and a non-numeric string compare as strings; never depend on either | CMP (warning on the pre-8.0 rule) |
 | Associative arrays as records passed between layers | Readonly class or DTO with typed properties; array shapes in docblocks only at edges | REL81 "Readonly Properties", `php-patterns` |
 | Class constants as an enum | Backed enum | REL81 "Enumerations" |
 | Return `false`/`null`/`-1` on failure, check `mysqli_error()` | Throw; PDO throws by default since 8.0 and mysqli since 8.1 | PDOERR, REL81 deprecations list |
@@ -142,7 +142,7 @@ unsafe" is not a finding.
 | php-float-int | Float or numeric string cast to `int` where precision matters (money, IDs) | Integers in minor units, `BcMath\Number` (8.4) | Implicit lossy float→int deprecated 8.1; 8.5 warns on unrepresentable casts | REL81, REL84, REL85 |
 | php-null-offset | `$a[null]`, `array_key_exists(null, …)` | Use `''` or fix the key | Deprecated 8.5 | REL85 |
 | php-override | Method meant to override a parent or interface method without `#[\Override]` (floor 8.3+) | Add it | A renamed parent method then fails loudly | REL83 |
-| php-psr4 | New class whose namespace does not match its path under the `composer.json` `autoload.psr-4` prefix, or case differs | Move or rename | The autoloader cannot find it; case-sensitive filesystems differ from macOS | PSR4 |
+| php-psr4 | New class whose namespace does not match its path under the `composer.json` `autoload.psr-4` prefix, or case differs | Move or rename | The autoloader cannot find it; class names are case-sensitive | PSR4 |
 
 ### 4.2 Errors and exceptions
 
@@ -156,7 +156,6 @@ unsafe" is not a finding.
 | php-error-suppress | `@` on a call | Check preconditions or handle the error explicitly | Suppresses every diagnostic of the expression | ERRCTL |
 | php-pdo-errmode | `PDO::ATTR_ERRMODE` set to silent/warning, or result checks of `execute()` with no exception mode | Leave `ERRMODE_EXCEPTION` (default since 8.0) | Silent failures | PDOERR |
 | php-display-errors | `ini_set('display_errors', '1')`, `APP_DEBUG=true` committed for production | Off in production; log instead | Leaks paths and internals | OWASP-PHP |
-| php-finally-return | `return` inside `finally` | Move it out | It discards the in-flight exception | EH (general knowledge; behaviour confirmed in the manual's try/finally rules — unverified in this run) |
 
 ### 4.3 Security specific to PHP
 
@@ -170,9 +169,9 @@ SSRF and supply-chain review belong to `security-reviewer`; hand those over.
 | php-unique-ignore | Laravel `Rule::unique(...)->ignore($request->input(...))` | Pass a model ID, never request input | SQL injection | LV-VAL `#rule-unique` |
 | php-xss-echo | `echo`/`print`/`<?=` of variables in templates without `htmlspecialchars`; Blade `{!! !!}` with user data | Escape (`{{ }}` in Blade); raw output only for sanitized HTML, with a reason | XSS | HSC, LV-BLADE `#displaying-unescaped-data` |
 | php-xss-flags | `htmlspecialchars($s)` with the floor below 8.1, or explicit `ENT_COMPAT` | `ENT_QUOTES \| ENT_SUBSTITUTE` and `'UTF-8'` | Pre-8.1 default leaves `'` unescaped, breaking single-quoted attributes | HSC changelog 8.1.0 |
-| php-xss-context | HTML-escaped value placed in `<script>`, an event-handler attribute, `style`, or an `href`/`src` | Encoder for that context (`json_encode` with `JSON_HEX_*` for JS data, URL encoding plus scheme allow-list) | HTML encoding does not protect JS, CSS or URL contexts | OWASP-XSS `#output-encoding-for-html-attribute-contexts`, `#output-encoding-for-url-contexts` |
-| php-upload-trust | `$_FILES[..]['type']`, `['name']` or `['full_path']` used to decide type or path; `copy`/`rename` of `tmp_name` | Detect type from content (`finfo`), allow-list extensions, generate the stored name, `move_uploaded_file`, store outside the web root | Client-supplied fields are not checked by PHP | UPL, FN `move_uploaded_file`, OWASP-UPL |
-| php-upload-ext | Extension check by regex or deny-list | Allow-list; reject double extensions, `.phtml`/`.phar`/`.php5`, and colons | Alternative extensions reach the PHP interpreter | OWASP-UPL `#extension-validation` |
+| php-xss-context | HTML-escaped value placed in `<script>`, an event-handler attribute, `style`, or an `href`/`src` | The maintained encoder for that context; URL encoding for URL parameters, quoted attributes | HTML encoding does not protect JS, CSS or URL contexts | OWASP-XSS `#output-encoding-for-html-attribute-contexts`, `#output-encoding-for-url-contexts` |
+| php-upload-trust | `$_FILES[..]['type']`, `['name']` or `['full_path']` used to decide type or path; `copy`/`rename` of `tmp_name` | Validate the content signature, allow-list extensions, generate the stored name, `move_uploaded_file`, store outside the web root | Client-supplied fields are not checked by PHP | UPL, FN `move_uploaded_file`, OWASP-UPL |
+| php-upload-ext | Extension check by regex or deny-list | Allow-list; reject double extensions, `.phtml`/`.php5`/`.pht`, null bytes and colons | Alternative extensions reach the PHP interpreter | OWASP-UPL `#extension-validation` |
 | php-unserialize | `unserialize` on data from a request, cookie, cache shared with clients, or queue payload from outside | JSON; HMAC-sign if serialized data must round-trip | Object instantiation and autoloading can execute code even with `allowed_classes` | UNSER, OWASP-DESER |
 | php-password | `md5`/`sha1`/`hash()` on passwords; `PASSWORD_BCRYPT` with long passphrases; column shorter than 255 | `password_hash(PASSWORD_DEFAULT)`, `password_verify`, `password_needs_rehash`; `VARCHAR(255)` | Fast hashes are brute-forceable; bcrypt cuts input at 72 bytes; default algorithm may change | PWH |
 | php-token-compare | `==`/`===` on tokens, HMACs, API keys | `hash_equals` | Timing attack | FN `hash_equals` |
@@ -180,7 +179,7 @@ SSRF and supply-chain review belong to `security-reviewer`; hand those over.
 | php-extract | `extract($_GET)`, `extract($_POST)`, `extract($request->all())` | Explicit assignment | Overwrites local variables from input | FN `extract` |
 | php-shell | `exec`/`system`/`shell_exec`/`passthru`/`proc_open`/backticks with input | `proc_open` with an argument array, or `escapeshellarg` per argument when a shell is unavoidable | Command injection | FN `escapeshellarg`, OWASP-PHP (`disable_functions`) |
 | php-eval-include | `eval`, `include`/`require` with a path built from input, `allow_url_include` | Dispatch table; fixed paths | Code execution | OWASP-PHP, https://cheatsheetseries.owasp.org/cheatsheets/Injection_Prevention_Cheat_Sheet.html |
-| php-session-fixation | Login or privilege change without `session_regenerate_id(true)` (or Laravel's `$request->session()->regenerate()`) | Regenerate on authentication | Session fixation | SESS, `php-patterns` |
+| php-session-fixation | Login or privilege change without `session_regenerate_id(true)` or the framework's equivalent | Regenerate on authentication | Session fixation | SESS, `php-patterns` |
 | php-session-cookie | Session config without `httponly`, `secure`, `samesite`, `use_strict_mode` | Set them | Cookie theft and fixation | OWASP-PHP |
 | php-mass-assign | `Model::create($request->all())`, `fill($request->input())`, new `$guarded = []`, `Model::unguard()` | `$request->validated()` into `$fillable` columns | A posted `is_admin` changes a column | LV-ELO `#mass-assignment`, LV-VAL |
 | php-sensitive-param | Function receiving a password or secret (floor 8.2+) | `#[\SensitiveParameter]` | Keeps it out of stack traces | REL82 |
@@ -193,7 +192,7 @@ where the cost lands.
 | id | Trigger | Check | Why | Source |
 |---|---|---|---|---|
 | php-n-plus-one | Relationship property read inside a loop over a collection (`$post->author->name` in `foreach`, Blade `@foreach`, API resource) | `with([...])` at the query; `load` when already fetched | One query per row | LV-REL `#eager-loading` |
-| php-n-plus-one-inverse | Loop over eager-loaded children that reads `$child->parent` | `chaperone()` on the relation, or eager load the inverse | Eloquent does not hydrate the parent on children | LV-REL (N + 1 note under "Automatically Hydrating Parent Models") |
+| php-n-plus-one-inverse | Loop over eager-loaded children that reads `$child->parent` | `chaperone()` on the relation, or eager load the inverse | Eloquent does not hydrate the parent on children | LV-REL `#automatically-hydrating-parent-models-on-children` |
 | php-count-relation | `$model->relation->count()` or `count($model->relation)` in a loop | `withCount` / `withExists` / `withSum` | Loads every related row to count it | LV-REL `#counting-related-models` |
 | php-lazy-guard | Laravel app with no `Model::preventLazyLoading(! app()->isProduction())` and repeated N+1 findings | Suggest enabling it outside production | Lazy loads then fail in tests | LV-REL `#preventing-lazy-loading` |
 | php-big-result | `Model::all()`/`->get()` over an unbounded table in a job or command | `chunkById`, `lazyById`, or pagination | Memory exhaustion | LV-ELO `#chunking-results` |
@@ -210,7 +209,6 @@ where the cost lands.
 |---|---|---|---|---|
 | php-array-record | Public method returning or accepting an associative array with fixed keys | DTO/value object | Untyped records drift | `php-patterns`, REL81 |
 | php-dto-readonly | New DTO with public mutable properties (floor 8.2+) | `readonly class` or readonly promoted properties | Value objects stay values | REL82, PROP |
-| php-bool-param | Boolean flag parameters switching behaviour | Separate methods or an enum | Call sites unreadable | general knowledge |
 | php-never | Function that always throws or exits typed `void` | `never` (8.1+) | Static analysis learns the branch ends | REL81 |
 | php-no-discard | Function whose result must be used (floor 8.5) | `#[\NoDiscard]` | Ignored results warn | REL85 |
 | php-deprecated-attr | `@deprecated` docblock on a new API (floor 8.4) | `#[\Deprecated(message:, since:)]` | Engine emits the deprecation | REL84 |
@@ -269,11 +267,11 @@ upgrades (CSF).
 
 | Version | Suggest | Old form still right when | Source |
 |---|---|---|---|
-| 8.1 (EOL) | Enums; readonly properties; `never`; first-class callables `f(...)`; `new` in initializers; pure intersection types; `0o` octal; Fibers (for libraries); `array_is_list` | Floor 8.0; constants when values must be extended by other packages (enums cannot be extended) | REL81, ENUM |
+| 8.1 (EOL) | Enums; readonly properties; `never`; first-class callables `f(...)`; `new` in initializers; pure intersection types; `0o` octal; Fibers (for libraries) | Floor 8.0; constants when values must be extended by other packages (enums cannot be extended) | REL81, ENUM |
 | 8.2 | `readonly class`; DNF types; `null`/`false`/`true` standalone types; `Random\Randomizer`; constants in traits; `#[\SensitiveParameter]`. Dynamic properties deprecated | Mutable entities (ORM models) stay non-readonly | REL82 |
 | 8.3 | Typed class constants; `#[\Override]`; readonly reinitialized in `__clone`; `json_validate`; `Randomizer::getBytesFromString`; `php -l` on many files | `json_decode` when the decoded value is needed anyway (validating then decoding parses twice) | REL83, PROP |
 | 8.4 | Property hooks; asymmetric visibility; `#[\Deprecated]`; `array_find`/`array_find_key`/`array_any`/`array_all`; `new Foo()->bar()`; lazy objects; `BcMath\Number`; `Pdo\Mysql` etc. subclasses; bcrypt cost 12. Implicit nullable and `E_STRICT` deprecated | Plain public readonly properties when no logic is needed — hooks add indirection; loops when early-exit logic is complex | REL84, PWH |
-| 8.5 | Pipe operator `\|>`; `clone($obj, ['prop' => …])`; `#[\NoDiscard]`; URI extension (`Uri\Rfc3986\Uri`, `Uri\WhatWg\Url`); `array_first`/`array_last`; closures in constant expressions; `final` on promoted properties; fatal-error backtraces. Deprecated: backtick operator, non-canonical casts, `case …;`, `null` array offsets; `__sleep`/`__wakeup` soft-deprecated | Pipes for one or two calls read worse than a nested call; `parse_url` only where the floor is below 8.5 | REL85 |
+| 8.5 | Pipe operator `\|>`; `clone($obj, ['prop' => …])`; `#[\NoDiscard]`; URI extension (`Uri\Rfc3986\Uri` and a WHATWG URL parser); `array_first`/`array_last`; closures in constant expressions; `final` on promoted properties; fatal-error backtraces. Deprecated: backtick operator, non-canonical casts, `case …;`, `null` array offsets; `__sleep`/`__wakeup` soft-deprecated | Pipes for one or two calls read worse than a nested call; `parse_url` only where the floor is below 8.5 | REL85 |
 
 ## 6. Concurrency model
 
@@ -296,8 +294,7 @@ upgrades (CSF).
   LV-OCT, LV-Q.
 - Fibers (8.1) are cooperative: a fiber runs until it calls
   `Fiber::suspend()`; nothing preempts it. Fibers do not provide concurrency
-  by themselves; an event loop library (Revolt, AMPHP, ReactPHP) schedules
-  them, and a blocking call (PDO, `file_get_contents`, `sleep`) blocks every
+  by themselves; an event loop library schedules them, and a blocking call (PDO, `file_get_contents`, `sleep`) blocks every
   fiber — FIB, REL81. Application code rarely calls the Fiber API directly.
 - Slow or retryable work goes to a queue. Jobs run at least once: design for
   retries (idempotency, `ShouldBeUnique`, `WithoutOverlapping`), dispatch
@@ -326,11 +323,11 @@ against a diff without explicit opt-in.
 | Tool | What to run | Covers |
 |---|---|---|
 | `php -l <files>` | Syntax check of changed files (several files per call from 8.3) | Parse errors only |
-| PHPStan | `vendor/bin/phpstan analyse` at the configured level; levels are cumulative 0–10, `max` aliases the highest; a baseline hides old errors, not new ones | Level 3 return/property types, 5 argument types, 6 missing typehints, 7 partial unions, 8 nullable access, 9–10 `mixed` (php-mixed, php-implicit-nullable, php-override partly) |
+| PHPStan | `vendor/bin/phpstan analyse` at the configured level; levels are cumulative 0–10, `max` aliases the highest; a baseline hides old errors, not new ones | Level 3 return/property types, 5 argument types, 6 missing typehints, 7 partial unions, 8 nullable access, 9–10 `mixed` (php-mixed) |
 | phpstan-strict-rules | When installed | php-loose-compare (`disallowedLooseComparison`), php-empty (`disallowedEmpty`), php-in-array-strict, php-switch-loose, booleans in conditions |
 | Psalm | `vendor/bin/psalm`; levels 1 (strictest) to 8, default 2; `--taint-analysis` for source-to-sink flows | Type items; taint mode covers parts of 4.3 (SQL, XSS, shell) |
-| PHP-CS-Fixer or Pint | `--dry-run --diff` (`pint --test`) with the project's set; `@PER-CS` follows the latest PER, `@PER-CS3x0` pins 3.0 | 4.7 formatting, `declare(strict_types=1)` placement, casts |
-| Rector | `vendor/bin/rector process --dry-run` | Section 5 upgrades, implicit nullable, dead code |
+| PHP-CS-Fixer or Pint | `--dry-run --diff` (`pint --test`) with the project's set; `@PER-CS` aliases the newest PER set the tool ships (currently `@PER-CS3x0`; no 3.1 set yet); `@PHP8xNMigration` sets apply syntax upgrades | 4.7 formatting |
+| Rector | `vendor/bin/rector process --dry-run` | Section 5 upgrades |
 
 No tool decides: whether a loose comparison is intended, whether a value
 reaching a sink is attacker-controlled through a framework helper, N+1

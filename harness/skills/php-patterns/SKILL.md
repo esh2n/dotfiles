@@ -1,6 +1,6 @@
 ---
 name: php-patterns
-description: Use when writing or reviewing PHP code — PSR-12 formatting, strict types, immutable DTOs and value objects, PHP-CS-Fixer/PHPStan, thin controllers with explicit services, dependency injection, ORM/SDK boundaries, and input validation/SQL/secret/auth security.
+description: Use when writing or reviewing PHP code — PER Coding Style formatting, strict types, immutable DTOs and value objects, PHP-CS-Fixer/PHPStan, thin controllers with explicit services, dependency injection, ORM/SDK boundaries, and input validation/SQL/secret/auth security.
 metadata:
   namespaces: [lang/php]
   origin: rules/php (folded 2026-09-23)
@@ -8,11 +8,13 @@ metadata:
 
 # PHP Patterns
 
+Writing or reviewing PHP: read `references/review-standard.md` first — the single PHP review standard (items with sources, version gates, execution and concurrency model, linter mapping) shared by the writer and `code-reviewer`; Laravel structure stays in `laravel-patterns`.
+
 ## Coding style
 
 ### Standards
 
-- Follow **PSR-12** formatting and naming conventions.
+- Follow **PER Coding Style** (it replaces PSR-12) for formatting and naming.
 - Prefer `declare(strict_types=1);` in application code.
 - Use scalar type hints, return types, and typed properties everywhere new code permits.
 
