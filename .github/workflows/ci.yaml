@@ -130,8 +130,8 @@ jobs:
         run: bash tests/integration/ledger-sync.sh
 
   linux:
-    # no green run has measured the full build yet; tighten from the first ones
-    timeout-minutes: 120
+    # the first green run took 20.5 minutes (run 39241179339)
+    timeout-minutes: 40
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
