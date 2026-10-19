@@ -1,0 +1,44 @@
+# Internal-term table for scripts/check_terms.py. One row per term, tab-separated.
+# class follows the four treatments of 文化庁「公用文作成の考え方」(2022) II-2/II-3:
+#   keep        standard term; use as is, never paraphrase it away
+#   keep+gloss  keep the term and explain it at its first use, in the same or the next sentence
+#   replace     in-house or coined word; write use_instead (or the real name)
+#   avoid       do not use; name what it refers to instead
+#   off         (override files only) disable a row of this table for one project
+# pattern is optional: a Python regular expression used instead of the literal term,
+# for terms that are also ordinary words (家 inside 専門家 is not the in-house word).
+# Per-project rows: .plain-japanese/terms.tsv at the project root, PLAIN_JAPANESE_TERMS, or --terms.
+term	refers_to	class	use_instead	gloss	source	pattern
+家の LLM	自宅の機械で動かすローカル LLM（LM Studio、llama-server）と、その前に置く LiteLLM	replace	自宅で動かすローカル LLM		harness/rules/decisions/2026-09-24-home-llm-second-host-omarchy-llama-server.md	家の\s?LLM
+家	このリポジトリのハーネス一式（harness/ の規則・skill・エージェント）を指す内輪の呼び名。pstack と対比して使われた	avoid	このハーネス、このリポジトリの skill、このリポジトリの規則（どれを指すかを名指す）		replies 2026-10-19; harness/rules/decisions/2026-10-18-pstack-shared-skills.md	(?<![一-龥ァ-ヴー])家(?![一-龥])
+本家	取り込み元のリポジトリ（upstream）	replace	上流（upstream）、または取り込み元のリポジトリ名		harness/rules/decisions/2026-10-17-pstack-evaluation-profile.md	本家(?!筋)
+床	guard-rules.json の floor 節。リポジトリ側の設定では外せない、所有者の方針ファイルの規則	avoid	guard-rules.json の floor 規則（リポジトリ側の設定では外せない規則）		harness/policy/guard-rules.json	(?<![一-龥])床(?![一-龥])
+拘束決定	harness/rules/decisions/ の採択済みの決定メモ。rule: 行が AGENTS.md に写される	replace	決定メモ、採択済みの決定		harness/rules/decisions/2026-09-22-decision-records.md	
+レーン	並列に走らせるサブエージェントやレビュー担当のひとつ分	replace	担当、並列の作業者（何を担当するかを書く）		harness/rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md	(?<![ァ-ヴー])レーン(?![ァ-ヴー])
+考え方の型	レビュアーを分ける観点の種類（正しさ、セキュリティ、ワークロード、UI、テスト、反証）	replace	観点、見る対象（何を見るかを書く）		review redesign draft 2026-10-19	(?:考え方|思考|推論|判断)の型
+腕	比較実験の条件のひとつ（arm）	replace	条件		evaluation wording 2026-09-23	(?<![一-龥])腕(?![時前力利章一-龥])
+正本	唯一の元データ（single source of truth）、または比較の基準にする原文	replace	元データ、原文、シングルソースオブトゥルース		harness/skills/writeup-kit/references/writing.md §5; nanaism/yomiyasu slop-catalog §5	
+台帳	記録や一覧。このリポジトリでは LiteLLM の利用記録（LiteLLM_SpendLogs）を集めた表を指した	replace	記録、一覧、コストの記録（LiteLLM_SpendLogs）		nanaism/yomiyasu slop-catalog §5; harness/rules/decisions/2026-09-25-llm-cost-ledger-local-first.md	(?<!会計)(?<!資産)(?<!登記)台帳
+ゲート	応答の終わり（Stop）に型検査と lint を走らせ、失敗したら応答を終わらせない検査	keep+gloss		応答の終わりに型検査と lint を走らせる検査	harness/rules/decisions/2026-09-22-format-on-edit-gate-on-stop.md	(?<![ァ-ヴー])ゲート(?!ウェイ|ウエイ|キーパー)
+継ぎ目	二つの仕組みが受け渡しをする箇所（例: 決定メモの rule: 行と AGENTS.md）	replace	受け渡しの箇所（何と何の間かを書く）		harness/rules/decisions/2026-09-23-model-facing-english.md	
+配線	設定の書き込みや登録（フック、MCP、skill をハーネスに登録すること）	replace	設定する、登録する（何を何に）		replies 2026-09; harness/rules/decisions/	配線
+窓	コンテキストウィンドウ	replace	コンテキストウィンドウ		harness/rules/decisions/2026-09-27-context-budget-1m-85pct.md	(?<![一-龥])窓(?![口際辺一-龥])
+強い格	complex tier（設計、難しいデバッグ、セキュリティレビューに使う上位のモデルの割り当て）	replace	complex tier		harness/rules/decisions/2026-10-19-model-assignment.md	(?:強い|上の|下の|安い)格
+部下	親のエージェントが作業を任せるサブエージェント	replace	サブエージェント		harness/rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md	
+席	役割の割り当て（例: Grok に割り当てたレビュアーの役）	replace	役割、担当		harness/rules/decisions/2026-10-17-pstack-evaluation-profile.md	(?<![一-龥])席(?=[はがをにでの])
+版	バージョン	replace	バージョン		harness/skills/writeup-kit/references/writing.md §5	(?:この|その|新しい|古い|最新の|前の|次の|今の|現在の|以前の|上流の)版(?=[でにからをがへの])
+索引	インデックス（例: rules/research/INDEX.md）	replace	インデックス		harness/skills/writeup-kit/references/writing.md §5	
+走査	スキャン、読み取り	replace	スキャン、読む		harness/skills/writeup-kit/references/writing.md §5	
+フローとストック	記録の二区分。フローは 14 日で期限が来る調査記録と計画、ストックは残す knowledge と決定メモ	keep+gloss		14 日で期限が来て消す記録と、残す記録の区別	harness/rules/decisions/2026-09-27-records-flow-and-stock.md	フロー(?:と|や)ストック|(?:記録|文書)の?(?:フロー|ストック)|(?:フロー|ストック)の?(?:記録|文書)|ストック(?:へ|に)(?:昇格|移)
+jig	このリポジトリの CLI。各ハーネスの設定を生成し（jig apply）、ツール呼び出しを実行前に検査する	keep+gloss		各ハーネスの設定を生成し、ツール呼び出しを実行前に検査する CLI	harness/jig/README.md	(?<![A-Za-z0-9_/.-])jig(?![A-Za-z0-9_-])
+guard	jig がツール呼び出しを実行前に検査し、許可・確認・拒否を決める仕組み	keep+gloss		ツール呼び出しを実行前に検査して許可・確認・拒否を決める仕組み	harness/policy/guard-rules.json	(?<![A-Za-z0-9_-])guard(?![A-Za-z0-9_-])
+tier	作業の種類ごとに決めたモデルの割り当て名。main、complex、executor の三つ	keep+gloss		作業の種類ごとに決めたモデルの割り当て名。main、complex、executor の三つ	harness/rules/decisions/2026-10-19-model-assignment.md	(?<![A-Za-z])tier(?![A-Za-z])
+executor	設計済みの計画を実行するローカルモデルの tier	keep+gloss		設計済みの計画を実行するローカルモデルの割り当て	harness/rules/decisions/2026-10-19-model-assignment.md	(?<![A-Za-z])executor(?![A-Za-z])
+effort	モデルが推論に使う量の段階（low、medium、high、xhigh、max）	keep+gloss		モデルが推論に使う量の段階。low から max まで	harness/rules/decisions/2026-10-19-model-assignment.md	(?<![A-Za-z])effort(?![A-Za-z])
+pstack	cursor/plugins で公開されている skill とエージェントのパック	keep+gloss		Cursor のリポジトリで公開されている skill とエージェントのパック	harness/rules/decisions/2026-10-18-pstack-shared-skills.md	(?<![A-Za-z/])pstack(?![A-Za-z-])
+ハーネス	モデルにツールを使わせて作業させる実行環境（Claude Code、Codex、pi、omp、DSH）	keep+gloss		モデルにツールを使わせて作業させる実行環境	harness/rules/decisions/2026-09-24-harness-top-level-dir.md	
+LiteLLM	複数の LLM の API を一つの形にそろえて中継するプロキシ	keep+gloss		複数の LLM の API を一つの形で中継するプロキシ	harness/rules/decisions/2026-09-27-model-catalog-and-tier-assignment.md	
+skill	SKILL.md に手順を書き、モデルが必要なときに読む指示のまとまり	keep			harness/skills/	
+サブエージェント	親のエージェントが別の文脈で動かす子のエージェント	keep			harness/rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md	
+worktree	git worktree。同じリポジトリの別ブランチを別のディレクトリに展開したもの	keep			harness/rules/decisions/2026-09-27-one-worktree-layout.md	
+AGENTS.md	各ハーネスが常に読む規則のファイル	keep			harness/rules/common/README.md	
