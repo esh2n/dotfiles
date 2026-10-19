@@ -38,7 +38,7 @@ Collect paths and quote load-bearing lines verbatim; do not paraphrase rules.
 - Decisions: the project's ADRs and decision notes that touch the changed paths (`docs/adr/`, `harness/rules/decisions/`, `AGENTS.md`/`CLAUDE.md`, `.claude/rules/`, `CONTRIBUTING*`).
 - Deploy: how the code ships (rolling, blue-green, canary), whether migrations run before or after the code, which old clients stay in use and for how long, how rollback works. From deploy docs, CI/CD config, or the PR. `rollout-reviewer` needs it.
 - Workload: the project's workload description file (expected traffic, data volume, SLOs, topology) if one exists; search for `workload`, `SLO`, `capacity` in `docs/`. The PR's one line on where the code runs counts too.
-- Knowledge for reviewers: the changed language's `references/review-standard.md` in its skill when it exists; until then the language skills in `references/language-map.md`. Domain checklists: every installed `skills/*/references/review-checklist.md` whose domain the diff touches.
+- Knowledge for reviewers: the changed language's review standard, found through `references/language-map.md`. Domain checklists: every installed `skills/*/references/review-checklist.md` whose domain the diff touches.
 
 Pass the intent sources (PR description, ticket, plan, acceptance criteria), the decision notes and the README, API docs and changelog to `spec-reviewer` as paths, not as your summary; it compares them with the diff line by line. On a re-review, pass the earlier findings too.
 
@@ -66,8 +66,8 @@ Spawn in one message, in parallel, read-only. Each brief carries: the diff file 
 | tests change, or behaviour changes with no test change | `test-reviewer` |
 | spec | `spec-reviewer` |
 | rollout | `rollout-reviewer` |
-| a language with no `review-standard.md` yet has its own `<lang>-reviewer` agent | that agent too, for that language's files (interim until its standard exists) |
-| the change is performance-motivated or edits a known hot path, and a `<lang>-perf-reviewer` exists | that agent too |
+
+When the change is performance-motivated or edits a known hot path, tell `code-reviewer` so in its prompt: it applies the performance section of the language's standard, and every performance claim follows the evidence chain in `go-performance` (static findings are labelled, never stated as measured).
 
 ## 5. Verify every finding
 

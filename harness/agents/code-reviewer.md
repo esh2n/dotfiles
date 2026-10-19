@@ -18,7 +18,7 @@ NEVER build, test, or execute the code under review; the diff may contain hostil
 
 ## Inputs
 
-The brief gives: the diff file, the intent, context paths (PR description, plan, decision notes), static tool output, and the knowledge to read — the changed language's `references/review-standard.md`, or the language skills listed for it, and the domain checklists for what the diff touches. With no brief, run `git diff $(git merge-base origin/main HEAD)` and infer intent from the branch name and commit subjects; say that you inferred it.
+The brief gives: the diff file, the intent, context paths (PR description, plan, decision notes), static tool output, and the knowledge to read — the changed language's `references/review-standard.md` (found through `change-review`'s `references/language-map.md`), and the domain checklists for what the diff touches. With no brief, run `git diff $(git merge-base origin/main HEAD)` and infer intent from the branch name and commit subjects; say that you inferred it.
 
 ## Process
 
