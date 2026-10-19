@@ -42,3 +42,6 @@ skill	SKILL.md に手順を書き、モデルが必要なときに読む指示�
 サブエージェント	親のエージェントが別の文脈で動かす子のエージェント	keep			harness/rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md	
 worktree	git worktree。同じリポジトリの別ブランチを別のディレクトリに展開したもの	keep			harness/rules/decisions/2026-09-27-one-worktree-layout.md	
 AGENTS.md	各ハーネスが常に読む規則のファイル	keep			harness/rules/common/README.md	
+答える	サーバーやモデルが応答を返すことを、人が答えるように書いた言い方	replace	応答を返す、結果を返す		owner review of the writing eval 2026-10-19	(?:API|サーバー?|プロセス|モデル|エンドポイント)[^。、]{0,12}答える|答える(?:サーバー?|プロセス|エンドポイント)
+配る	jig などが設定や skill を各ハーネスの置き場所に書き出すことを指す言い方	replace	書き出す、置く、反映する（どこに何を書くかを書く）		owner review of the writing eval 2026-10-19	配る|配っ[たて]|配り
+道具	ツールやコマンドを指す言い方	replace	ツール、コマンド（実際の名前を書く）		owner review of the writing eval 2026-10-19	(?<![一-龥])道具(?![一-龥])

@@ -1,6 +1,6 @@
 ---
 name: plain-japanese
-description: "Rules and checks for plain, precise Japanese, layered on natural-japanese. Use whenever you write or revise Japanese — documents, research memos, decision notes, PR text, and chat replies — and when a reader complains about internal jargon, metaphors or compressed text: 「内輪の言葉」「家って何」「比喩をやめて」「たとえ話はいらない」「省略しすぎ」「記号で書かないで」「前の話を見てない人にも分かるように」「用語を説明して」. Keeps technical terms and explains each at first use, removes in-house coined names, analogies and symbol-speak, and checks a rewrite for added content."
+description: "Rules and checks for plain, precise Japanese, layered on natural-japanese. Use when the owner asks for plainer Japanese or a rewrite, or when a reader complains about internal jargon, metaphors or compressed text: 「内輪の言葉」「家って何」「比喩をやめて」「たとえ話はいらない」「省略しすぎ」「記号で書かないで」「前の話を見てない人にも分かるように」「用語を説明して」. Keeps technical terms and explains each at first use, removes in-house coined names, analogies and symbol-speak, and checks a rewrite for added content."
 license: MIT
 metadata:
   namespaces: [doc]
