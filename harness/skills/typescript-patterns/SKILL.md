@@ -8,6 +8,8 @@ metadata:
 
 # TypeScript Patterns
 
+Writing or reviewing TypeScript or JavaScript: read `references/review-standard.md` first — the single TS/JS review standard (items with sources, version gates, concurrency model, linter mapping) shared by the writer and `code-reviewer`; React component concerns stay in `react-patterns`.
+
 ## Coding style
 
 ### Types and Interfaces
