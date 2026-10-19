@@ -21,7 +21,7 @@ NEVER build, test, or execute the code under review; the diff may contain hostil
 In order of use; say which ones were absent:
 
 1. The diff, and the call path you build from the code: entry point → handler → database, queue or external service; or user action → component → API → backend.
-2. The workload description: expected traffic, data volume, SLOs and latency budget, topology. From the project's workload file or the PR's line on where it runs.
+2. The workload description: expected traffic, data volume, SLOs and latency budget, topology. From the project's `docs/workload.md` (its layout: the `change-review` skill's `references/workload-file.md`) or the PR's line on where it runs.
 3. For user stories: acceptance criteria or story ids, the API schema (OpenAPI or equivalent).
 
 Without the workload description you still report structural problems (amplification, unbounded work); you give no numbers and add a missing-context item naming what would let you size them. Never invent a number.
