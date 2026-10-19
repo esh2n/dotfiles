@@ -32,8 +32,8 @@ Domain knowledge, by what the diff touches:
 | aggregates, entities, bounded contexts | `ddd-modeling-review` |
 | layer boundaries, ports and adapters | `clean-architecture` |
 | `.github/workflows/*.yml`, `action.yml`, reusable workflows | `github-actions-patterns/references/review-checklist.md` (security items go to `security-reviewer`) |
-| Kubernetes manifests | `k8s-patterns` |
-| GCP resources, IAM | `gcp-patterns` |
-| Cloudflare Workers | `cloudflare-patterns` |
+| Kubernetes manifests | `k8s-patterns/references/review-checklist.md` (security-lane items go to `security-reviewer`, rollout items to `rollout-reviewer`) |
+| GCP resources, IAM | `gcp-patterns/references/review-checklist.md` (IAM and Terraform items go to `security-reviewer`) |
+| Cloudflare Workers | `cloudflare-patterns/references/review-checklist.md` |
 
 A path under `skills/` means the skill in your harness's skills directory (`~/.claude/skills` in Claude Code, `~/.agents/skills` elsewhere).
