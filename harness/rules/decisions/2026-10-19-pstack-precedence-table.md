@@ -1,6 +1,6 @@
 # pstack と家の規則がぶつかる点は、80-pstack.md の短い表で家を勝たせる
 
-Status: accepted — 持ち主の裁定（2026-10-19）。`2026-10-18-pstack-shared-skills.md` の決定 6（住み分け）のうち優先順位の部分だけを置き換える。配り方・最新を追うこと・読み替えを adapter 1 本で持つこと・取り込み時の機械の止め方は変えない
+Status: superseded — 2026-10-19-pstack-house-wins-on-conflict.md が置き換える。表に無い点を pstack に譲る一文は持ち主が承認した案に無く、承認された「計画を信じない」の行も外していた。表、引用の見張り、guard への写し、重なる原則の扱いは新しい決定に引き継ぐ。もとの裁定は 2026-10-19
 
 rule: In a pstack task, the house wins only where the table in `rules/common/80-pstack.md` says so; outside the table the pstack playbook replaces the house rule it meets, and the git, security and language rules always bind. Each row quotes pstack's text, recorded with its file in `harness/plugins/pstack/precedence.json` so an upgrade that drops the quote is detected; a machine-checkable row also becomes a guard rule, and a principle both sides share is referenced by name, never rewritten in the house.
 
