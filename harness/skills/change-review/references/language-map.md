@@ -4,8 +4,8 @@ Until a language's skill carries `references/review-standard.md`, `code-reviewer
 
 | Files | Skills `code-reviewer` reads | Agent spawned beside it (interim) |
 | --- | --- | --- |
-| `.go` | `golang-patterns`, `go-modern`, `go-concurrency`, `go-performance` | `go-reviewer` |
-| `.ts`, `.js`, `.mjs`, `.cjs` | `typescript-patterns`, `ts-modern` | `typescript-reviewer` |
+| `.go` | `golang-patterns/references/review-standard.md` (it links `go-modern`, `go-concurrency`, `go-performance`, `golang-testing` for detail) | — |
+| `.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs` | `typescript-patterns/references/review-standard.md` | — |
 | `.tsx`, `.jsx` | the TypeScript row, plus `react-patterns`, `react-performance`, `react-testability` | `react-reviewer` |
 | `.py` | `python-patterns` (plus `django-patterns` or `fastapi-patterns` when used) | `python-reviewer` |
 | `.rs` | `rust-patterns` | `rust-reviewer` |
@@ -16,7 +16,7 @@ Until a language's skill carries `references/review-standard.md`, `code-reviewer
 | `.swift` | `swift-patterns` | — |
 | `.php` | `php-patterns` (plus `laravel-patterns` when used) | — |
 | `.dart` | — | `flutter-reviewer` |
-| `.sql`, migrations | `sql-tuning` | `database-reviewer` |
+| `.sql`, migrations | `sql-tuning/references/review-standard.md` | — |
 | `.css`, `.scss`, `.html` | `css-cascade`, `css-flow`, `css-modern`, `css-units`, `defensive-css` | `web-platform-reviewer` |
 | `.sh`, `.zsh`, `.bash` | — | — |
 
