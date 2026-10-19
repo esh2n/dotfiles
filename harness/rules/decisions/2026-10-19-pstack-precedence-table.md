@@ -50,7 +50,7 @@ rule: In a pstack task, the house wins only where the table in `rules/common/80-
 
 ## Consequences
 
-- 本家の更新で引用句が消えても、今は何も知らせない。jig apply に `precedence.json` の検査を足すまで、`source.json` の `translated` と同じく人が見る。
+- jig apply が `precedence.json` を検査し、本家の更新で消えた引用句と、`verifiedAt` 以降にファイルが変わった行を警告として出す（apply は止めない）。変わった行の一覧には `verifiedAt` のコミットが手元のチェックアウトに要る。`dotctl setup plugins` は depth 1 で取得するので、そのコミットが無いときは「どの行が変わったか不明」と出し、そのコミットを取得するか全行を見直すよう案内する。
 - 持ち主が guard の方針ファイルに書く規則（提案。名前は仮）:
   - `ask-git-worktree-remove-force`（`git worktree remove --force` / `-f`）と `ask-gh-pr-merge`（`gh pr merge`）。2026-10-18 から持ち越しの 2 本。
   - `ask-gh-pr-create-ready`: `gh pr create` で `--draft` を含まないもの、`"unlessCwdIn": "main-push-allowed"`。

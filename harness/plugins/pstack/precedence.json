@@ -1,5 +1,5 @@
 {
-  "_comment": "One entry per row of the precedence table in rules/common/80-pstack.md (details in skills/pstack-adapter, Overrides). Each row quotes the pstack text it overrides, verbatim, with the file it sits in (relative to the repo in source.json). A later jig check warns when a quote is no longer in the fetched pack, which means an upgrade rewrote or dropped that text and the row needs a fresh look. `verifiedAt` is the upstream commit the quotes were last checked against. Nothing from upstream is copied here beyond these short quotes (rules/decisions/2026-10-19-pstack-precedence-table.md).",
+  "_comment": "One entry per row of the precedence table in rules/common/80-pstack.md (details in skills/pstack-adapter, Overrides). Each row quotes the pstack text it overrides, verbatim, with the file it sits in (relative to the repo in source.json). jig apply warns when a quote is no longer in the fetched pack, which means an upgrade rewrote or dropped that text and the row needs a fresh look, and names the rows whose files changed since `verifiedAt`. `verifiedAt` is the upstream commit the quotes were last checked against. Nothing from upstream is copied here beyond these short quotes (rules/decisions/2026-10-19-pstack-precedence-table.md).",
   "verifiedAt": "019a6a20592c10bf92869e5740368f578a9997fd",
   "rows": [
     {

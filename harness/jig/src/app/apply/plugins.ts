@@ -13,6 +13,10 @@
  * from a pack whose source.json does not parse (named in the report; the
  * rest of the apply goes on).
  *
+ * A pack with a `precedence.json` beside its source.json has its quotes
+ * checked against the checkout (`./precedence-check.ts`); what is missing
+ * is reported, never a reason to stop linking.
+ *
  * A pack whose checkout is missing contributes nothing. Every link into the
  * plugins directory that is no longer planned is stale, so a pack removed
  * from the repository leaves nothing behind. jig itself never reaches the
@@ -31,6 +35,7 @@ import {
 } from "../../domain/plugins/plugin-source";
 import { listEntries, listSkillCandidates } from "./delivery";
 import type { ClaudeApplyPorts } from "./ports";
+import { type PrecedenceCheck, checkPrecedence } from "./precedence-check";
 
 export interface PluginCheckout {
   readonly name: string;
@@ -45,6 +50,12 @@ export interface PluginCheckout {
   readonly agentsDir?: string;
   /** Adapter names the house translation does not cover yet; empty without an adapter. */
   readonly untranslated: readonly string[];
+  /**
+   * The precedence quotes checked against the checkout (`./precedence-check.ts`);
+   * absent when the pack is not fetched or the repository keeps no
+   * `precedence.json` for it.
+   */
+  readonly precedence?: PrecedenceCheck;
 }
 
 export interface Plugins {
@@ -86,6 +97,9 @@ export async function loadPlugins(
       present && adapterPath !== undefined && (await ports.inspect(adapterPath)).kind === "file"
         ? await ports.readFile(adapterPath)
         : undefined;
+    const precedence = present
+      ? await checkPrecedence(ports, `${root}/${entry.name}/precedence.json`, source.name, dir)
+      : undefined;
     packs.push({
       name: source.name,
       dir,
@@ -94,6 +108,7 @@ export async function loadPlugins(
       skillsDir,
       ...(source.agents === undefined ? {} : { agentsDir: `${dir}/${source.agents}` }),
       untranslated: adapter === undefined ? [] : untranslated(adapter, source.translated),
+      ...(precedence === undefined ? {} : { precedence }),
     });
   }
   return { dir: pluginsDir, packs };

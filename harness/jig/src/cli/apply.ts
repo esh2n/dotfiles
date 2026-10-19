@@ -98,6 +98,7 @@ import type { ClaudeHookPaths } from "../domain/claude/hooks";
 import type { PathState } from "../domain/claude/links";
 import { describePathState, describeStaleReason } from "../domain/claude/managed-dir";
 import { DEFAULT_PERMITS, defaultPermitPolicyFragment } from "../domain/claude/permits";
+import { precedenceLines } from "./precedence-lines";
 
 export interface ApplyCliResult {
   readonly stdout: string;
@@ -573,8 +574,8 @@ function agentsSkillsMountLines(mount: AgentsSkillsMountReport): readonly string
 /**
  * The external packs a skills directory draws from (`harness/plugins/`):
  * where each is checked out and what it follows, a pack not fetched yet
- * (its skills are not linked until it is), and adapter names the house
- * translation rule does not cover.
+ * (its skills are not linked until it is), adapter names the house
+ * translation rule does not cover, and the precedence check (`./precedence-lines.ts`).
  */
 export function pluginLines(plugins: readonly PluginCheckout[]): readonly string[] {
   if (plugins.length === 0) return [];
@@ -604,6 +605,7 @@ export function pluginLines(plugins: readonly PluginCheckout[]): readonly string
         `${indent}add them to skills/pstack-adapter and to source.json's "translated"`,
       );
     }
+    lines.push(...precedenceLines(plugin.name, plugin.dir, plugin.precedence, indent));
   }
   return lines;
 }
