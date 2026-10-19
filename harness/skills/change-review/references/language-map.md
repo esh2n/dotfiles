@@ -16,7 +16,7 @@ Until a language's skill carries `references/review-standard.md`, `code-reviewer
 | `.cs` | `csharp-patterns` | — |
 | `.swift` | `swift-patterns` | — |
 | `.php` | `php-patterns` (plus `laravel-patterns` when used) | — |
-| `.dart` | — | `flutter-reviewer` |
+| `.dart` | `flutter-patterns/references/review-standard.md` | — |
 | `.sql`, migrations | `sql-tuning/references/review-standard.md` | — |
 | `.css`, `.scss` | `css-modern/references/review-standard.md` (it links `css-cascade`, `css-flow`, `css-units`, `defensive-css` for detail) | — |
 | `.html` (and template markup) | `semantic-html/references/review-standard.md` | — |

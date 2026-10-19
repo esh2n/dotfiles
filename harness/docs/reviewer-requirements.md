@@ -1,7 +1,7 @@
 # Reviewer agent requirements
 
 The minimum every reviewer agent in `harness/agents/*-reviewer.md` (including
-`security-reviewer` and the remaining flutter reviewers) and `review-verifier` must
+`security-reviewer`) and `review-verifier` must
 meet. Check a reviewer against this list before writing a new one or editing an
 existing one. The procedure that spawns them is the `change-review` skill
 (`harness/skills/change-review/`); its judgment rules are `code-review-discipline`
@@ -107,11 +107,10 @@ of: the nameable costs in its domain, the false-positive/false-negative asymmetr
 and the bar below which a finding is noise. A section that is only the boilerplate
 does not pass. The eight reviewers of the review redesign (code, security,
 workload, ui, test, spec, rollout, review-verifier; spec and rollout added by
-`rules/decisions/2026-10-19-spec-and-rollout-reviewers.md`) meet this today; the
-flutter reviewers still carry the boilerplate. Language knowledge lives in each
+`rules/decisions/2026-10-19-spec-and-rollout-reviewers.md`) meet this. Language knowledge lives in each
 language skill's `references/review-standard.md` (phase 2 of
-`rules/decisions/2026-10-19-review-redesign.md`), and the language reviewer
-agents are retired as their standard lands.
+`rules/decisions/2026-10-19-review-redesign.md`), read by `code-reviewer`; there
+are no per-language reviewer agents.
 
 ## 7. One finding shape
 
@@ -129,8 +128,6 @@ The eight reviewers of the review redesign return findings in one shape, so the
   to read it), verify (a test or command and a source URL);
 - three sections: Findings, Questions for the owner (trade-offs, taste, design
   calls), Missing context (inputs that were absent and what each would decide).
-
-The flutter reviewers still use the `[C:x/I:x]` threshold until their standard lands.
 
 ## Known deviation
 
