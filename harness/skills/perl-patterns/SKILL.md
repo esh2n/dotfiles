@@ -523,7 +523,7 @@ use Module::Runtime 'require_module';    # Good: safe module loading
 require_module($module);
 ```
 
-**Remember**: Modern Perl is clean, readable, and safe. Let `use v5.36` handle the boilerplate (on a 5.36+ interpreter; macOS `/usr/bin/perl` was 5.34.1 when checked), use the object system the codebase already has, and prefer CPAN's battle-tested modules over hand-rolled solutions.
+**Remember**: Modern Perl is clean, readable, and safe. Let `use v5.36` handle the boilerplate (on a 5.36+ interpreter: on this machine `perl` is 5.44 from mise and `perlcritic`/`perltidy` come from the Nix flake, while macOS's `/usr/bin/perl` is 5.34.1), use the object system the codebase already has, and prefer CPAN's battle-tested modules over hand-rolled solutions.
 
 ## Folded from rules/perl (2026-09-23)
 

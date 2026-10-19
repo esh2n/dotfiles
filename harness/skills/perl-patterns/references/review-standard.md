@@ -59,10 +59,12 @@ name and link only.
 | PROVE | prove | https://metacpan.org/pod/prove | `-l`, `-r`, `-j`, `-s`, `--state` | Test-Harness, current | not checked |
 | HOUSE | jig hook tables | `harness/jig/README.md` (Perl row) | Edit-time `perltidy -b -bext=/`; Stop-time `perl -c` per touched `.pl`/`.pm` | This repository | This repository |
 
-Observed on this machine in this run, not from a document: `/usr/bin/perl
--v` prints `v5.34.1 built for darwin-thread-multi-2level`; it is the only
-`perl` on `PATH`; `perl -T` reports `${^TAINT}` = 1; `perlcritic` and
-`perltidy` are not installed; `prove` is at `/usr/bin/prove`.
+Observed on this machine (2026-10-19), not from a document: `perl` comes
+from mise (5.44.0, `home/shared/mise/config/config.toml.template`), and
+`perlcritic` 1.156 and `perltidy` 20260826 come from the Nix flake, built
+against PPI 1.291 so signatures are parsed (`overlays/default.nix`); macOS's
+`/usr/bin/perl` (5.34.1) is still present but not first on `PATH` once mise
+is active.
 
 Not opened in this run and therefore not cited: Perl Best Practices (the
 book; Perl::Critic policies carry its page numbers in their `$EXPL`),
