@@ -8,7 +8,7 @@ Until a language's skill carries `references/review-standard.md`, `code-reviewer
 | `.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs` | `typescript-patterns/references/review-standard.md` | — |
 | `.tsx`, `.jsx` | `typescript-patterns/references/review-standard.md` plus `react-patterns/references/review-standard.md` (it links `react-performance`, `react-testability`, `react-testing` for detail) | — |
 | `.py` | `python-patterns/references/review-standard.md` (it links `python-testing`, plus `django-patterns` or `fastapi-patterns` when used) | — |
-| `.rs` | `rust-patterns` | `rust-reviewer` |
+| `.rs` | `rust-patterns/references/review-standard.md` (it links `rust-testing` for detail) | — |
 | `.java` | `java-coding-standards` (plus `springboot-patterns` when used) | `java-reviewer` |
 | `.kt`, `.kts` | `kotlin-patterns`, `kotlin-coroutines-flows` | `kotlin-reviewer` |
 | `.c`, `.cc`, `.cpp`, `.h`, `.hpp` | `cpp-coding-standards` | `cpp-reviewer` |
@@ -17,7 +17,8 @@ Until a language's skill carries `references/review-standard.md`, `code-reviewer
 | `.php` | `php-patterns` (plus `laravel-patterns` when used) | — |
 | `.dart` | — | `flutter-reviewer` |
 | `.sql`, migrations | `sql-tuning/references/review-standard.md` | — |
-| `.css`, `.scss`, `.html` | `css-cascade`, `css-flow`, `css-modern`, `css-units`, `defensive-css` | `web-platform-reviewer` |
+| `.css`, `.scss` | `css-modern/references/review-standard.md` (it links `css-cascade`, `css-flow`, `css-units`, `defensive-css` for detail) | — |
+| `.html` (and template markup) | `semantic-html/references/review-standard.md` | — |
 | `.sh`, `.zsh`, `.bash` | — | — |
 
 Domain knowledge, by what the diff touches:
