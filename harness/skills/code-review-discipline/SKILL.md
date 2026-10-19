@@ -128,7 +128,7 @@ GOOD:
 
 ## 7. Propose, then get review, then confirm, then build — one item at a time
 
-Don't jump straight to implementation. First form a proposal *after* looking at existing patterns (principle 1), present it as "here's what I'd do — does this look right?", and wait for explicit approval before writing code. Present one item at a time and wait for the reaction before moving to the next.
+This is the step for a design call: a new approach, a change across files, or anything an accepted decision or house rule already settles differently (`rules/decisions/2026-09-23-plan-by-size-grill-default.md` decides when a change needs it). Inside an agreed plan, reversible implementation proceeds and is shown afterwards (`rules/common/20-execution.md`). Don't jump straight to implementation on a design call. First form a proposal *after* looking at existing patterns (principle 1), present it as "here's what I'd do — does this look right?", and wait for explicit approval before writing code. Present one item at a time and wait for the reaction before moving to the next.
 
 **Why it works.** A proposal is cheap to change; committed code is expensive. Surfacing the plan first catches wrong assumptions while they cost nothing, and keeps the reviewer in control of direction. Batching many proposals at once forces the reviewer to evaluate them in bulk and buries the one that's actually wrong.
 

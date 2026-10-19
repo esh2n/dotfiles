@@ -13,6 +13,8 @@ When you fix a bug caused by invalid data, adding validation at one place feels 
 
 **Core principle:** Validate at EVERY layer data passes through. Make the bug structurally impossible.
 
+**How this fits boundary validation** (`rules/common/50-quality-and-testing.md`, pstack `principle-boundary-discipline`). Both hold. Parse external data once at the system boundary into a typed value that cannot hold the invalid state (a `ProjectDir` type, not a bare string), so inner layers rely on the type instead of re-checking the same thing. The extra layers below are for what a type cannot carry: business rules that depend on other state, environment guards before a dangerous operation (refusing to delete or `git init` outside a temp directory in tests), and logging for the case every check missed. A layer that only repeats a check the type already guarantees adds nothing; leave it out.
+
 ## Why Multiple Layers
 
 Single validation: "We fixed the bug"

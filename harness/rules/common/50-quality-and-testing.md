@@ -23,5 +23,5 @@
 
 ## Patterns
 
-- Repository pattern: encapsulate data access behind one interface (findAll/findById/create/update/delete); business logic depends on the abstraction, never the storage mechanism directly
+- Repository pattern: encapsulate data access behind one interface (findAll/findById/create/update/delete); business logic depends on the abstraction, never the storage mechanism directly. Add no other pass-through layer on top of it: a wrapper with one caller and no second implementation that only forwards the call is inlined
 - API responses: use one consistent envelope — a success/status indicator, a nullable data payload, a nullable error message, and pagination metadata (total/page/limit) where applicable
