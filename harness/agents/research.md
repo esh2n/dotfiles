@@ -47,7 +47,7 @@ When writing a one-off workflow to read a codebase:
 
 ## Output
 
-Write one Markdown file at the path the caller gives (default: `.tmp-research/<topic>.md`) with:
+Write one Markdown file at the path the caller gives (default: `.tmp-research/<topic>.md`; in the dotfiles repository, research records go in `harness/rules/research/YYYY-MM-DD-<topic>.md` instead, per `harness/rules/decisions/2026-09-27-records-flow-and-stock.md`) with:
 
 1. Method and verification legend (what was fetched directly, what came through a summarizer, what could not be reached).
 2. One section per lens, with sources inline.

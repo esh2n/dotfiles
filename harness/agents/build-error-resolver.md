@@ -103,7 +103,7 @@ Final: `Build Status: SUCCESS/FAILED | Errors Fixed: N | Files Modified: list`
 
 - Code needs refactoring → use `refactor-cleaner`
 - Architecture changes needed → use `architect`
-- New features required → use `planner`
+- New features required → use `architect`
 - Tests failing → follow the tdd-workflow skill
 - Security issues → use `security-reviewer`
 

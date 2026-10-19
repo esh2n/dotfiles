@@ -44,14 +44,17 @@ URL) instead of stating it as fact.
    - Diff its "changes relevant to writing code" (language changes, stdlib
      additions that affect idiom, `go fix`/modernizer changes, vet/test
      default changes) against:
-     - the replacement table in `packs/go/skills/go-modern/SKILL.md`
-     - `packs/go/skills/go-concurrency/references/` — reference by path
+     - the replacement table in `harness/skills/go-modern/SKILL.md`
+     - `harness/skills/go-concurrency/references/` — reference by path
        only. Another agent owns and writes this directory; do not assume its
        contents are stable mid-cycle, and never edit it.
-     - `packs/go/skills/go-performance/references/` — same: path-only, no
+     - `harness/skills/go-performance/references/` — same: path-only, no
        edits.
-   - Write the draft to `packs/go/docs/version-drafts/go1.NN.md` (create the
-     directory if it does not exist). **Never edit `go-modern/SKILL.md`
+   - Put the draft in your report under "Draft" — do not write it to a file
+     or create any directory (you have no Write tool, and a stray directory
+     would land in whatever checkout you run from). The caller decides where
+     it is kept; in the dotfiles repository that is a research record under
+     `harness/rules/research/`. **Never edit `go-modern/SKILL.md`
      directly** — a human reviews and applies the draft.
    - For each candidate row, classify it: does `go fix ./...` (Go 1.26+)
      already rewrite this mechanically (check `go tool fix help` on the
@@ -81,15 +84,15 @@ URL) instead of stating it as fact.
 |---|---|---|---|
 | ... | ... | 1.N | yes — modernizer `<name>` / no — judgment: <why> |
 
-## Draft written
-packs/go/docs/version-drafts/go1.N.md   (or: no draft — nothing idiom-affecting)
+## Draft
+<the proposed go-modern changes in full>   (or: no draft — nothing idiom-affecting)
 ```
 
 ## Constraints
 
-- Read-only with respect to `go-modern/SKILL.md`,
-  `go-concurrency/skills/references/`, and
-  `go-performance/skills/references/` — draft to `version-drafts/`, never
+- Read-only with respect to `harness/skills/go-modern/SKILL.md`,
+  `harness/skills/go-concurrency/references/`, and
+  `harness/skills/go-performance/references/` — draft in the report, never
   edit those files directly.
 - Every version number in the report must trace to a command run or a URL
   fetched in this session. A version cited without checking it this session
