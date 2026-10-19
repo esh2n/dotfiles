@@ -20,6 +20,7 @@
 | `.sql`, migrations | `sql-tuning/references/review-standard.md` |
 | `.css`, `.scss` | `css-modern/references/review-standard.md` (it links `css-cascade`, `css-flow`, `css-units`, `defensive-css` for detail) |
 | `.html` (and template markup) | `semantic-html/references/review-standard.md` |
+| `.pl`, `.pm`, `.t` (and `.psgi`, `.cgi`) | `perl-patterns/references/review-standard.md` (it links `perl-testing` for detail; shell, `eval STRING`, SQL and two-arg `open` findings also go to `security-reviewer`) |
 | `.sh`, `.bash`, `.zsh` (and `.bats`) | `shell-patterns/references/review-standard.md` (shell injection findings also go to `security-reviewer`) |
 
 Domain knowledge, by what the diff touches:
