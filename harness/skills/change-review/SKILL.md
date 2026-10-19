@@ -1,6 +1,6 @@
 ---
 name: change-review
-description: Use when reviewing a change — a diff, a branch, a pull request, or your own work before you hand it over or open a PR — in any harness, from a quick daily check to a heavy review of a large or risky change. Also covers a design or spec before code exists, and a whole-codebase security audit when asked. Symptoms include "レビューして", "review this", "PR を見て", "これで大丈夫？", finishing an implementation, or readying a PR. The review reports findings; it never posts to GitHub or applies fixes on its own.
+description: Use when reviewing a change — a diff, a branch, a pull request, or your own work before you hand it over or open a PR — in any harness, from a quick daily check to a heavy review of a large or risky change. Also covers a design or spec before code exists, and a whole-codebase security audit when asked. Symptoms include "レビューして", "review this", "PR を見て", "これで大丈夫？", finishing an implementation, or readying a PR. The review reports findings; it never posts to GitHub, and fixes only verified blocker and major findings in your own work in progress.
 metadata:
   namespaces: [practice]
 ---
@@ -101,6 +101,7 @@ Where it goes:
 Choices per finding: fix it, I'll fix it, comment on GitHub, dismiss.
 
 - Your own work in progress: fix verified blocker and major findings yourself and list them as fixed; the rest wait for the owner's choice.
+- Anyone else's code, a pull request, or a branch you did not write: fix nothing; every finding waits for the owner's choice.
 - Someone else's change: change nothing; wait for the owner's choice.
 - GitHub: never post a comment or review without the owner's approval of the exact text. Show the text, wait, then post. The guard asks too.
 - Dismissed and missed findings feed the checklists (`references/output-format.md`, "Learning loop").
