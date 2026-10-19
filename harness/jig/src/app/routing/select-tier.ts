@@ -19,8 +19,7 @@ export const TIERS: readonly Tier[] = ["main", "complex", "executor"];
 export const TIER_CRITERIA: Readonly<Record<Tier, string>> = {
   main: "routine work: ordinary edits, searches, explanations, small fixes",
   complex: "hard work: design, architecture, subtle debugging, long-horizon planning",
-  executor:
-    "mechanical work: formatting, renames, boilerplate, restating what is already known",
+  executor: "mechanical work: formatting, renames, boilerplate, restating what is already known",
 };
 
 export interface SelectTierOptions {
