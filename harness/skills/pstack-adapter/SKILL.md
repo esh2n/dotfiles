@@ -24,7 +24,8 @@ pstack skills name Cursor's tools. Read this once per session, then map each Cur
 | Cursor | Everywhere |
 | --- | --- |
 | `subagent_type: generalPurpose` | The default subagent type (Claude Code: `general-purpose`). |
-| `poteto-agent`, `comment-sicko` | The agents of the same name (Claude Code and omp). Where there is no such agent, brief a default subagent to read `<pack>/agents/<name>.md` first. |
+| `comment-sicko` | The agent of the same name (Claude Code and omp). Where there is no such agent, brief a default subagent to read `<pack>/agents/comment-sicko.md` first. |
+| `poteto-agent` | Not used for implementation: see Overrides, "Subagent type" and "Who implements". |
 | `readonly: true` | Claude Code: `subagent_type: "Explore"`. Everywhere: the brief says "do not edit files", and you check `git status` afterward. |
 | `readonly: false` | The default subagent type. |
 | `environment: "cloud"` | A worktree at `.claude/worktrees/<name>` on a branch `<name>`, the house layout. Name the branch or commit the worker checks out. |
@@ -36,11 +37,11 @@ pstack skills name Cursor's tools. Read this once per session, then map each Cur
 
 ## Models
 
-Pick no model from a pstack slug. Claude Code subagents may take `model: opus`, `sonnet`, `haiku` or `fable` with an `effort` when the skill asks for a stronger or cheaper role: a slug `claude-<family>-<version>-<effort>[-fast]` such as `claude-opus-5-5-xhigh`, or a role value `<model> <effort>` such as `opus high`, maps to that family and effort; drop `-fast`. A `grok-*`, `gpt-*` or other non-Claude slug, `auto` and `inherit-parent` mean omit the model. In Codex, pi and omp, omit every model field: the session keeps its tier, and a stronger model is reached through a subagent whose tier says so (house rule). `setup-pstack` and `pstack-models.mdc` (`~/.cursor/rules/pstack-models.mdc`) have nothing to write here: say so and go on.
+Pick no model from a pstack slug. Choose the tier and effort from the house's model table (`rules/common/60-delegation.md`, `rules/decisions/2026-10-19-model-assignment.md`) by the kind of work the step does: design and planning on `complex` at xhigh, hard debugging and reviews at high, exploration and carrying out a fixed plan at medium, implementation inheriting the session. The house table was built on pstack's own approach, so the two mostly agree; where a pstack role asks for more (xhigh for code delegates, raising to max), follow the house. In Claude Code that means `model: opus`, `sonnet`, `haiku` or `fable` with an `effort`; drop `-fast`. A `grok-*`, `gpt-*` or other non-Claude slug, `auto` and `inherit-parent` mean omit the model. When a model is unavailable, never continue on a different one: stop and report which failed and why. In Codex, pi and omp, omit every model field: the session keeps its tier, and a stronger model is reached through a subagent whose tier says so (house rule). `setup-pstack` and `pstack-models.mdc` (`~/.cursor/rules/pstack-models.mdc`) have nothing to write here: say so and go on.
 
 ## Review
 
-Outside a pstack task, reviews go through the house `change-review` skill. Inside one, pstack's review steps (`interrogate`, `no-comments`, `shipping`, the audit lanes) stay, with these mappings. The `change-review` skill's step 6 runs `interrogate` the same way.
+Every review goes through the house `change-review` skill, in a pstack task too (`rules/decisions/2026-10-19-pstack-house-wins-on-conflict.md`). Where a playbook says to run `interrogate`, run audit lanes, or verify a PR before shipping, run `change-review` instead; its step 6 runs `interrogate` as the heavy second review with these mappings. `no-comments` may still run on the diff before the review.
 
 - **Reviewer B runs on a model at least as strong as the session's, never weaker** (`rules/decisions/2026-10-19-second-review-model.md`). A weaker second reviewer breaks correct work more often than it fixes it. This replaces the Models rule (omit non-Claude slugs) for interrogate's Reviewer B only. Reviewer A runs as the Models section says.
   - Claude Code: Reviewer B is one delegation to Codex's strongest model. Write the filled reviewer prompt to a temp file, run `codex exec -m gpt-6-sol -c model_reasoning_effort=high --sandbox read-only --ephemeral -o <out-file> - < <prompt-file>` from the repository root (the model is the `complex` row of `agents/models.json`'s `codex` table), and read `<out-file>` as Reviewer B's answer. Set Reviewer A's `model` explicitly, because a `readonly` reviewer mapped to `Explore` may otherwise take that type's default model.
@@ -69,7 +70,7 @@ There are no Cursor Automations (routines, `update_state`, `api2.cursor.sh/autom
 
 ## Overrides
 
-The table in the always-on rules (the pstack section of `AGENTS.md`) names where the house wins over pstack's text. This section gives each row's reason and details. Outside these rows a pstack task follows its playbook. Each row's pstack quote is recorded, with its file, in the dotfiles repository's `harness/plugins/pstack/precedence.json`; when an upgrade rewrites a quoted line, the row is due for a fresh look, and until then follow the row.
+Wherever pstack and the house disagree, the house wins, in a pstack task too (`rules/decisions/2026-10-19-pstack-house-wins-on-conflict.md`); pstack only adds what the house lacks. The table in the always-on rules (the pstack section of `AGENTS.md`) lists the main conflicts; this section gives each row's reason and details, and "Other known conflicts" below covers the rest. A conflict not listed anywhere is still settled for the house: do the house's step and say in the reply which pstack step you replaced. Each row's pstack quote is recorded, with its file, in the dotfiles repository's `harness/plugins/pstack/precedence.json`; when an upgrade rewrites a quoted line, the row is due for a fresh look, and until then follow the row.
 
 ### pr-readiness
 
@@ -90,7 +91,11 @@ Reading and local work through MCP tools needs no question: search, fetch, read 
 
 ### model-slugs
 
-pstack: "explicit model per role (configurable via `/setup-pstack`." (`poteto-mode/SKILL.md`, Subagents). The Models section above already covers this: take the role's strength from the slug, never the slug itself. `setup-pstack` has nothing to write.
+pstack: "explicit model per role (configurable via `/setup-pstack`." (`poteto-mode/SKILL.md`, Subagents). The Models section above covers this: the house table picks tier and effort by the kind of work, never the slug. `setup-pstack` has nothing to write.
+
+### planning
+
+pstack: "i don't believe in planning. the best spec is code." (`README.md`), and the routes that make `how`, `architect` and `multi-phase-plan` the planning step. Plan by size as the house does (`rules/decisions/2026-09-23-plan-by-size-grill-default.md`): no plan when the diff fits one sentence, the `grilling` skill when it spans files or the method is uncertain, `sdd` only for large, ambiguous, multi-file work. `how` and `architect` may still be used to read the code or sketch types inside that plan; they do not replace it.
 
 ### stop-conditions
 
@@ -138,3 +143,26 @@ reflect's backlog filing is an outward write (outward-writes above).
 ### Not a conflict: tests
 
 pstack's tdd skill prefers no new test over a bad test; the house requires 80% coverage. Both hold. Reach coverage with tests of behaviour, and never pad it with a test that still passes when the behaviour breaks.
+
+### Other known conflicts
+
+Each line names the pstack step and the house step that runs in its place.
+
+- **Who implements** (Feature, Bug fix, Refactoring, Perf issue: "Delegate code-writing to a subagent", arena for implementations). Implementation that needs design judgment stays in the session; a subagent gets only read-and-report work or a fully specified step whose result a test, lint or type check confirms, and never two writers on one file (`rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md`). Skip arena for implementation and say so.
+- **Subagent type** ("Use `subagent_type: "poteto-agent"`"). Spawn the house agent for the kind of work (`rules/common/60-delegation.md`: architect, research, docs-lookup, build-error-resolver, the review agents); otherwise the default subagent type.
+- **Basis for a design** (prototype or 2-3 prototypes decide a fork). Before proposing a design, gather the four-lens research record with a URL per claim (`rules/decisions/2026-09-22-research-four-lenses.md`), and search existing implementations and registries first (`rules/common/20-execution.md`). A prototype may add measured evidence; it does not replace the research.
+- **When to ask** ("Reserve the question for a genuine product or preference call"). Also stop for a blocking error, a design decision that needs the owner, or an ambiguous requirement (`rules/common/20-execution.md`), one question at the end of the turn.
+- **Bug fix stop point** (keep going until a dead end). After three failed fixes, stop and discuss with the owner (`systematic-debugging`); a bug that survived two attempts goes to a `complex` agent (`rules/common/60-delegation.md`).
+- **Tests** (Bug fix commits the failing repro first; tdd only when cheap). Write tests first for features, fixes and refactors (`tdd-workflow`, `rules/common/50-quality-and-testing.md`), but never commit with failing tests (`rules/common/30-security.md`): commit the test together with the fix.
+- **Prototype** (no tests, quality ignored). Allowed only in a scratch directory outside the repository; anything that lands in the repository follows the quality rules.
+- **Code style** (inline one-caller wrappers). The house coding style holds (`rules/common/50-quality-and-testing.md`).
+- **Parallel workers** (ten live lanes per PR, about ten children in flight). Three to five workers (`rules/decisions/2026-10-19-swarm-on-native-subagents.md`).
+- **Worktree by default** (Opening a PR: work from a worktree, `git reset --hard` between tasks). Work in the current checkout; isolate only for parallel writers, with the `using-git-worktrees` skill (`rules/decisions/2026-09-27-one-worktree-layout.md`). `git reset --hard` is forbidden by the guard.
+- **Unattended runs** (Cursor's `/loop`, `/loop 1h`, Autonomous run's "a plateau is not a stop"). Use the harness's native goal feature only, with a machine-checkable success condition, and deliver no more than the launch named (`rules/decisions/2026-09-22-loop-native-goal.md`). Never start `/loop`.
+- **Run state** (Orchestrate's store outside the repository). Keep the run's record in the repository's plan files (`plans/` in the dotfiles repository) or decision notes (`rules/decisions/2026-09-22-memory-files-only.md`).
+- **Answer shape** (`how` and Investigation open with Key Concepts). No glossary or prerequisites block up front; explain each term where it first appears (`rules/common/90-writing.md`).
+- **Perf delivery** (Perf issue and Hillclimb open a PR). For Go, report by default and commit only when asked (`go-performance`).
+- **Pausing** (Pause safely: a `wip:` commit, even on a broken tree). Leave the work uncommitted and write the resume note; commit only a passing tree in the house commit format (`rules/common/10-git.md`).
+- **PR text** (Opening a PR's sections and rebased history). Follow the house PR rules: summary and a test-plan checklist from the full history, never rewrite pushed history (`rules/common/10-git.md`).
+- **GitHub posts** (Babysit replies and resolves threads, Shipping posts verdicts). Show the text and get the owner's approval before any post, reply or thread resolution (`rules/common/60-delegation.md`).
+- **Risky commits.** Before a commit touching auth, input handling, secrets, CI or dependencies, wait for `security-reviewer` through `change-review` (`rules/common/60-delegation.md`).
