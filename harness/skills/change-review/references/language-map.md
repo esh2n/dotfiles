@@ -9,7 +9,7 @@ Until a language's skill carries `references/review-standard.md`, `code-reviewer
 | `.tsx`, `.jsx` | `typescript-patterns/references/review-standard.md` plus `react-patterns/references/review-standard.md` (it links `react-performance`, `react-testability`, `react-testing` for detail) | — |
 | `.py` | `python-patterns/references/review-standard.md` (it links `python-testing`, plus `django-patterns` or `fastapi-patterns` when used) | — |
 | `.rs` | `rust-patterns/references/review-standard.md` (it links `rust-testing` for detail) | — |
-| `.java` | `java-coding-standards` (plus `springboot-patterns` when used) | `java-reviewer` |
+| `.java` | `java-coding-standards/references/review-standard.md` (it links `java-testing`, `springboot-patterns`, `springboot-tdd`, `springboot-verification` for detail) | — |
 | `.kt`, `.kts` | `kotlin-patterns/references/review-standard.md` (it links `kotlin-coroutines-flows`, `kotlin-testing`, `compose-multiplatform-patterns`, `android-clean-architecture`, `kotlin-ktor-patterns`, `kotlin-exposed-patterns` for detail) | — |
 | `.c`, `.cc`, `.cpp`, `.h`, `.hpp` | `cpp-coding-standards` | `cpp-reviewer` |
 | `.cs` | `csharp-patterns` | — |
