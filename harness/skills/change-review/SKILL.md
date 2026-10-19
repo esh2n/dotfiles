@@ -67,6 +67,8 @@ Spawn in one message, in parallel, read-only. Each brief carries: the diff file 
 | spec | `spec-reviewer` |
 | rollout | `rollout-reviewer` |
 
+Pass each reviewer the domain checklists `references/language-map.md` routes to it, as paths in its prompt; where a row names no reviewer, the checklist goes to `code-reviewer`. A reviewer reports a checklist's defects as findings, citing the item id. In a design or spec review, a checklist's silences and trade-offs go to `spec-reviewer` (and to `rollout-reviewer` for rollout items).
+
 When the change is performance-motivated or edits a known hot path, tell `code-reviewer` so in its prompt: it applies the performance section of the language's standard, and every performance claim follows the evidence chain in `go-performance` (static findings are labelled, never stated as measured).
 
 ## 5. Verify every finding

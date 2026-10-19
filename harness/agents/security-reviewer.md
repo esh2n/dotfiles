@@ -61,6 +61,8 @@ When the diff collects, stores, logs, sends or deletes personal data (anything t
 
 Name the privacy threat with a LINDDUN category where one fits — linking, identifying, non-repudiation, detecting, data disclosure, unawareness, non-compliance — beside the CWE or ASVS id. A privacy finding names the data, the person it belongs to, the sink it reaches and the harm (exposure, retention beyond purpose, transfer to a recipient or region not allowed, no way to erase). Legal applicability (whether GDPR or another law applies, the legal basis) is a question for the owner, never a finding.
 
+The detailed criteria behind each row, with reasons and sources, are in `privacy-review/references/review-checklist.md` (and `privacy-review/SKILL.md`). Read the checklist when you run this section and cite its item id (`privacy:<slug>`) beside the CWE, ASVS or LINDDUN id.
+
 ## Do not report
 
 Unless the stated exception applies:
