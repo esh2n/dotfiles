@@ -325,3 +325,5 @@ home/shared/harness/claude/daemon
 home/shared/harness/claude/ide
 home/shared/harness/claude/jobs
 home/shared/harness/claude/local
+# OmniWM writes a backup beside its config when it migrates the schema
+home/darwin/omniwm/config/*.pre-v*
