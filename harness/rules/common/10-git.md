@@ -4,13 +4,14 @@ Commit message format: `<type>(<scope>): <subject>` — one line, English. Subje
 
 - Commit at your own discretion once a unit of work is complete; do not stop to ask. Split commits by concern
 - Never include company-internal words in commit content or messages
-- Push freely on feature branches; never push to main/master
+- Personal repositories are those under a path prefix in `~/.config/jig/policy/main-push-allowed`; when that file is missing or unreadable, no repository is personal
+- Push freely on feature branches; never push to main/master outside a personal repository (the guard enforces this). In a personal repository, working on main is allowed
 - Never force push (`-f` / `--force`)
 - Never add `Co-Authored-By` or any trailer mentioning AI/Claude
 - Never use grandiose language ("revolutionize", "dramatically", "comprehensive overhaul")
-- Never create a PR without explicit user instruction
+- Creating a PR needs no instruction. Outside a personal repository, open it as a draft (a draft means "do not review yet") and mark it ready with `gh pr ready` once your own review of the full diff is done. In a personal repository, open it ready
 - The jig guard (policy/guard-rules.json) is the authority on what git commands are permitted — these conventions describe intent, not enforcement
-- Workflows may deliver commits or draft PRs only when the user explicitly chose a delivery mode at launch
+- A workflow or unattended run follows the same PR rule; when its launch names a delivery mode (commits only, a draft PR), deliver no more than that
 
 ## Pull Requests
 
