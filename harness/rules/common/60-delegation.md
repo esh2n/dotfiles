@@ -29,7 +29,8 @@ Agent definitions name only a tier — `main`, `complex` or `executor` — and a
 ## Running workers in parallel
 
 - Fan out reading, research, verification and review freely; for N workers follow pstack's `swarm` procedure (frame, fan out, aggregate, report).
-- Parallel writers each own separate files, and their changes land one at a time.
+- Parallel writers each own separate files, and their changes land one at a time. Tasks whose files overlap never run at the same time; the later one waits and builds on the earlier one.
+- Unattended parallel implementation of an agreed task list (the `implement` workflow where the harness runs it): one plain-git worktree per task, a test or check confirms each task inside its worktree, and the owner merges each branch with `git merge --no-ff`. Otherwise work through the list in order.
 - Aim for three to five workers at once.
 - Never mix harnesses inside one swarm; asking another harness for a second opinion is a single delegation.
 
