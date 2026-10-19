@@ -11,6 +11,8 @@ metadata:
 
 Idiomatic Go patterns and best practices for building robust, efficient, and maintainable applications.
 
+Writing or reviewing Go: read `references/review-standard.md` first — the single Go review standard (items with sources, version gates, concurrency rules, linter mapping) shared by the writer and `code-reviewer`.
+
 ## When to Activate
 
 - Writing new Go code
