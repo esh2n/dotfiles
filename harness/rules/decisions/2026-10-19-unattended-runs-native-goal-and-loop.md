@@ -35,7 +35,7 @@ rule: Never build a custom loop or execution engine; drive unattended repetition
 
 - Claude Code では、pstack の四通りの繰り返しがすべて本体の機能で動く。ただしセッションの中だけで、Claude Code を閉じると止まり、7 日で切れる。
 - Codex と omp では、条件を満たすまで回すことだけができる。どちらも完了は自己申告なので、制約と上限の重みが大きい。omp を画面なしで回すときは `goal.continuationModes` に `rpc` が要る。
-- pi は、pi-goal を入れない限り無人の繰り返しをしない。
+- pi は、pi-goal を入れない限り無人の繰り返しをしない。このリポジトリの pi の拡張 `home/shared/harness/pi/extensions/gate.ts`（2026-09-13 から、earlyaidopters/marks-pi-harness を MIT で取り込んだもの）も `/goal` を持つが、これは目標を毎ターン差し込み、完了の前に検査のコマンド（`/gate`）を通させるだけで、モデルがターンを終えたあとに次のターンを自分で始めない。そのため無人の繰り返しにはあたらず、自前の実行系でもない。pi-goal を入れるときは、二つが同じ `/goal` を登録するので、どちらかの名前を変える。
 - 無人の間の制約（テストのパスへの書き込みとデプロイ系のコマンドの禁止）は、いまの `guard-rules.json` に規則が無い。規則は持ち主が書く。
 
 ## Sources
