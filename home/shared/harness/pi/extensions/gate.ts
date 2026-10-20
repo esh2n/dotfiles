@@ -25,8 +25,11 @@ async function run(
 ): Promise<{ code: number; out: string }> {
   try {
     const r: any = await (pi as any).exec("/bin/zsh", ["-lc", cmd], { timeout });
-    const code = r?.exitCode ?? r?.code ?? 0;
     const out = [r?.stdout ?? "", r?.stderr ?? ""].filter(Boolean).join("\n");
+    // pi's exec reports a child it killed on timeout as code 0 with killed: true,
+    // so a gate that never finished would otherwise count as passed.
+    if (r?.killed) return { code: 124, out: `${out}\n(timed out after ${timeout} ms)`.trim() };
+    const code = r?.exitCode ?? r?.code ?? 0;
     return { code, out };
   } catch (e: any) {
     return { code: 1, out: String(e?.message ?? e) };
