@@ -65,6 +65,8 @@
       tree-sitter
       universal-ctags
 
+      # Tasks
+      taskwarrior3 # plain `taskwarrior` is the 2.x line, renamed to taskwarrior2
     ]
   );
 }
