@@ -108,7 +108,8 @@ These agree with the house's execution rules on most points: do not ask about re
 pstack: worktree-cleanup's "Per path, `git worktree remove --force <path>`." and "`rm -rf` it, then `git worktree prune`", and the Claude Code mapping of `environment: "cloud"` to `isolation: "worktree"`.
 
 - A worktree is `.claude/worktrees/<name>` on a branch `<name>`, made with plain git and ignored through the repository's `info/exclude`; never a harness's own isolation form (the `environment: "cloud"` row above).
-- In the cleanup playbook, remove only worktrees that are clean, merged and not in use, with `git worktree remove <path>` and no `--force`. Never `rm -rf` a worktree path. A worktree with uncommitted, untracked or ignored files stays; list it with the reason. Merging a worktree branch back is the owner's step.
+- A worktree made only to read, build or run code (checking a PR head, comparing with main) is made with `--detach` and no branch; the `using-git-worktrees` skill, "Verification worktrees", has the commands.
+- In the cleanup playbook, remove a worktree that is not in use only when it passes the `using-git-worktrees` skill's removal check (no commits outside branches and remotes, no tracked changes, no untracked files, only rebuildable or unchanged `.worktreeinclude` ignored files), with `git worktree remove <path>` and no `--force`. Never `rm -rf` a worktree path. A worktree that fails the check stays; list it with the reason. Merging a worktree branch back, and deleting the branch, is the owner's step (`rules/decisions/2026-10-22-verification-worktrees.md`).
 
 ### merge
 

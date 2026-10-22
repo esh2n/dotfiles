@@ -1,6 +1,6 @@
 # 作業の隔離はどのハーネスでも一つの形にし、合流は持ち主が決める
 
-Status: accepted — 持ち主の裁定（2026-09-27）。隔離の形をハーネスごとに変えず、専用のコマンドも足さない
+Status: accepted — 持ち主の裁定（2026-09-27）。隔離の形をハーネスごとに変えず、専用のコマンドも足さない。確認用の worktree の作り方と、worktree を消してよい条件は 2026-10-22-verification-worktrees.md が置き換える
 
 rule: Work in the current checkout by default; parallel workers whose files overlap wait instead of sharing them. When isolation is needed, every harness (Claude Code, Codex, pi, omp, the Swarm) makes the same thing with plain git — a worktree at `.claude/worktrees/<name>` on a branch named `<name>`, ignored through the repository's `info/exclude`, with only `.worktreeinclude`-listed ignored files copied in — never a harness's own isolation form. Merging back is the owner's decision, done with `git merge --no-ff <name>`, then `git worktree remove` and `git branch -d`; nothing merges automatically, no dedicated command is added, and unmerged or dirty worktrees are never force-removed.
 

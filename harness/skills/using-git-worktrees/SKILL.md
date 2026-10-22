@@ -125,6 +125,27 @@ git branch -d <name>                   # -d, not -D: refuses if anything is unme
 
 A worktree with uncommitted changes, or a branch that is not merged, is left in place and reported — never force-removed.
 
+## Verification worktrees
+
+A worktree made only to read, build or run code — checking a PR head, comparing with main — gets no branch, so nothing is left to merge or force-delete (`rules/decisions/2026-10-22-verification-worktrees.md`). The exception is a tool that needs a branch name and fails or behaves differently on a detached HEAD: then make it on a branch `<name>` as in Step 1 and leave the branch to the owner.
+
+```bash
+git -C "$root" fetch origin pull/<n>/head          # or any commit: origin/main, a sha
+git -C "$root" worktree add --detach "$root/.claude/worktrees/<name>" FETCH_HEAD
+```
+
+When done, remove it yourself if it passes the removal check below. The same check applies to any worktree before you remove it.
+
+```bash
+wt="$root/.claude/worktrees/<name>"
+git -C "$wt" log --oneline HEAD --not --branches --remotes   # must print nothing: no commits only this worktree holds
+git -C "$wt" status --porcelain                              # must print nothing: no tracked changes, no untracked files
+git -C "$wt" status --porcelain --ignored | grep '^!!'       # every path must be rebuildable or an unchanged .worktreeinclude copy
+git -C "$root" worktree remove "$wt"                         # no --force
+```
+
+Rebuildable paths: `node_modules/`, `dist/`, `build/`, `out/`, `target/`, `.venv/`, `.next/`, `.turbo/`, `coverage/`, `__pycache__/`. A `.worktreeinclude` copy counts only when `cmp` finds it identical to the main checkout's file. Any other ignored path keeps the worktree in place; report the path to the owner. Never `rm -rf` a worktree.
+
 ## Quick Reference
 
 | Situation | Action |
