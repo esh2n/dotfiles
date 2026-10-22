@@ -19,6 +19,9 @@
     "emSign Root CA - C1"
     "emSign Root CA - G1"
   ];
+  # OpenSSL-based tools outside Nix (mise's Python among them) default to
+  # macOS's /etc/ssl/cert.pem, which still trusts those roots.
+  environment.variables.SSL_CERT_FILE = "/etc/ssl/certs/ca-certificates.crt";
 
   system.stateVersion = 4;
 }
