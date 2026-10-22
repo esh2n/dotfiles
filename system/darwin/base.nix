@@ -10,5 +10,15 @@
     "flakes"
   ];
 
+  # Keys of eight eMudhra intermediates were recoverable (Mozilla, 2026-10-20),
+  # and nixpkgs' cacert 3.126 still trusts the roots they chain to. Drop every
+  # eMudhra root until a cacert with the fix lands, then remove this list.
+  security.pki.caCertificateBlacklist = [
+    "emSign ECC Root CA - C3"
+    "emSign ECC Root CA - G3"
+    "emSign Root CA - C1"
+    "emSign Root CA - G1"
+  ];
+
   system.stateVersion = 4;
 }
