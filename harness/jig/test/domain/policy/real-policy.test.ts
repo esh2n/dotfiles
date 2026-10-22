@@ -1206,6 +1206,14 @@ const PRECEDENCE_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
     ["git restore of one file asks", "git restore src/a.ts", "ask"],
     ["git restore --staged is allowed", "git restore --staged src/a.ts", "allow"],
   ]),
+  ...shellRows("ask-git-switch-discard", [
+    ["git switch --discard-changes asks", "git switch --discard-changes feature/x", "ask"],
+    ["git switch -f asks", "git switch -f main", "ask"],
+    ["git checkout -f asks", "git checkout -f main", "ask"],
+    ["git checkout --force asks", "git checkout --force main", "ask"],
+    ["git switch to a branch is allowed", "git switch main", "allow"],
+    ["git switch -c from main is allowed", "git switch -c feature/x origin/main", "allow"],
+  ]),
   ...shellRows("ask-git-stash-drop", [
     ["git stash drop asks", "git stash drop", "ask"],
     ["git stash clear asks", "git stash clear", "ask"],

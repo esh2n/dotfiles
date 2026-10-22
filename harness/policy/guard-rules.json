@@ -906,6 +906,20 @@
       ]
     },
     {
+      "id": "ask-git-switch-discard",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*(?:switch|checkout)\\b.*(?:^|\\s)(?:--discard-changes|--force|-f)(?:\\s|$)"
+      },
+      "why": "2026-10-19-pstack-house-wins-on-conflict: switching with --discard-changes or --force throws away every uncommitted change, the same as `git checkout .`",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
       "id": "ask-git-stash-drop",
       "effect": "ask",
       "action": "shell.exec",
