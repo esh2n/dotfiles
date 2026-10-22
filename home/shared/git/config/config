@@ -6,6 +6,12 @@
 [include]
     path = ~/.config/git/delta-theme.gitconfig
 
+# Homebrew's git links macOS's libcurl, which reads /etc/ssl/cert.pem. Apple
+# has not shipped the 2026-10 eMudhra distrust there yet, so point git at the
+# Nix bundle (security.pki in system/darwin/base.nix) instead.
+[http]
+    sslCAInfo = /etc/ssl/certs/ca-certificates.crt
+
 [alias]
     uncommit = reset --soft HEAD^
     unpushed = log @{u}.. --oneline
