@@ -486,6 +486,36 @@ const CASES: readonly Case[] = [
     expected: "deny",
   },
   {
+    label: "a lowercase core.hookspath is forbidden too (git keys ignore case)",
+    call: shellCall("git -c core.hookspath=/dev/null commit -m wip"),
+    profile: "standard",
+    expected: "deny",
+  },
+  {
+    label: "setting core.hooksPath with git config is forbidden",
+    call: shellCall("git config core.hooksPath /dev/null"),
+    profile: "standard",
+    expected: "deny",
+  },
+  {
+    label: "unsetting core.hooksPath is forbidden",
+    call: shellCall("git config --unset core.hooksPath"),
+    profile: "standard",
+    expected: "deny",
+  },
+  {
+    label: "reading core.hooksPath is allowed",
+    call: shellCall("git config core.hooksPath"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "reading core.hooksPath with --get is allowed",
+    call: shellCall("git config --get core.hooksPath"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
     label: "handing a plain rm to xargs is allowed (D-18); only what is forbidden is caught",
     call: shellCall("cat urls.txt | xargs rm"),
     profile: "standard",

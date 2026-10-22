@@ -234,7 +234,7 @@
       "action": "shell.exec",
       "subject": {
         "program": "git",
-        "argv": "(?:^|\\s)-c\\s+core\\.hooksPath=|(?:^|\\s)config\\b.*\\bcore\\.hooksPath\\b"
+        "argv": "(?:^|\\s)-c\\s+[cC][oO][rR][eE]\\.[hH][oO][oO][kK][sS][pP][aA][tT][hH]=|(?:^|\\s)config\\b(?!.*(?:^|\\s)(?:--get(?:-all|-regexp|-urlmatch)?|get|--list|-l)(?:\\s|$)).*\\b[cC][oO][rR][eE]\\.[hH][oO][oO][kK][sS][pP][aA][tT][hH]\\s+(?!-)\\S|(?:^|\\s)config\\b.*(?:^|\\s)(?:--unset(?:-all)?|--replace-all|--add|set|unset)\\s(?:.*\\s)?[cC][oO][rR][eE]\\.[hH][oO][oO][kK][sS][pP][aA][tT][hH]\\b"
       },
       "why": "pointing core.hooksPath elsewhere skips the repository's hooks",
       "profiles": [
