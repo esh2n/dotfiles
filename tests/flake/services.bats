@@ -20,11 +20,11 @@ field() { printf '%s' "$1" | python3 -c 'import json,sys; d=json.load(sys.stdin)
 for k in sys.argv[1:]: v=v.get(k) if isinstance(v, dict) else None
 print(json.dumps(v))' "${@:2}"; }
 
-@test "services: no roles, no services" {
+@test "services: no roles, only the base role's task sync" {
 	roles ''
 	run --separate-stderr agents
 	[ "$status" -eq 0 ]
-	[ "$output" = "{}" ]
+	[ "$(printf '%s' "$output" | python3 -c 'import json,sys; print(" ".join(sorted(json.load(sys.stdin))))')" = "task-sync" ]
 }
 
 @test "services: developer and model-provider on the mac give the three agents the plists defined" {
@@ -59,11 +59,11 @@ print(json.dumps(v))' "${@:2}"; }
 	roles '"developer"'
 	run --separate-stderr units
 	[ "$status" -eq 0 ]
-	[ "$output" = '["jig-decision","litellm-proxy","llm-ledger-sync"]' ]
+	[ "$output" = '["jig-decision","litellm-proxy","llm-ledger-sync","task-sync"]' ]
 	printf '{"roles": ["developer", "model-provider"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA=", "acceptLicense": true}}\n' >"${BATS_TEST_TMPDIR}/roles.json"
 	run --separate-stderr units
 	[ "$status" -eq 0 ]
-	[ "$output" = '["jig-decision","litellm-proxy","llama-server","llm-ledger-sync"]' ]
+	[ "$output" = '["jig-decision","litellm-proxy","llama-server","llm-ledger-sync","task-sync"]' ]
 }
 
 setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
@@ -154,4 +154,34 @@ gpu_linux() { # gpu_linux <attr under config>
 	printf '{"roles": ["developer"]}\n' >"${BATS_TEST_TMPDIR}/roles.json"
 	run --separate-stderr gpu_linux 'systemd.user.services.litellm-proxy.Service.Environment'
 	[[ "$output" != *"LINUX_MODEL_HOST"* ]]
+}
+
+tasks_cfg() { # tasks_cfg: what the tasks module rendered on linux, as one JSON object
+	nix_eval_expr_json "let c = (builtins.getFlake \"git+file://${REPO_ROOT}\").homeConfigurations.linux.config; u = c.systemd.user.services; in { taskrc = c.xdg.configFile.\"task/taskrc\".text; rc = c.xdg.configFile.\"task/machine.rc\".text; sync = u.task-sync.Service.Environment; server = if u ? taskchampion-sync-server then u.taskchampion-sync-server.Service.Environment else null; }"
+}
+
+@test "services: the observer runs the tasks' sync server on loopback, syncs with it there, and alone makes recurring tasks" {
+	printf '{"roles": ["developer", "observer"], "observerHost": "mac.example.ts.net"}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+	run --separate-stderr tasks_cfg
+	[ "$status" -eq 0 ]
+	[ "$(field "$output" rc)" = '"recurrence=on\n"' ]
+	[[ "$(field "$output" sync)" == *'"TASK_SYNC_URL=http://127.0.0.1:10222"'* ]]
+	[[ "$(field "$output" server)" == *'"SYNC_LISTEN=127.0.0.1:10222"'* ]]
+}
+
+@test "services: another machine syncs its tasks with the observer over the tailnet, with recurrence off and no server" {
+	printf '{"roles": ["developer"], "observerHost": "mac.example.ts.net"}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+	run --separate-stderr tasks_cfg
+	[ "$status" -eq 0 ]
+	[ "$(field "$output" rc)" = '"recurrence=off\n"' ]
+	# absolute includes: a relative one would resolve from the checkout, not ~/.config/task
+	[ "$(field "$output" taskrc)" = "\"include ${REPO_ROOT}/home/shared/taskwarrior/taskrc\\ninclude ${HOME}/.config/task/machine.rc\\n\"" ]
+	[[ "$(field "$output" sync)" == *'"TASK_SYNC_URL=https://mac.example.ts.net:10222"'* ]]
+	[ "$(field "$output" server)" = null ]
+	roles '"developer"'
+	run --separate-stderr tasks_cfg
+	[ "$status" -eq 0 ]
+	[[ "$(field "$output" sync)" != *"TASK_SYNC_URL"* ]]
 }

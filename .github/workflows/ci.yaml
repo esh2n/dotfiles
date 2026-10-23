@@ -35,6 +35,7 @@ jobs:
           shellcheck -x bootstrap.sh adopt-mac.sh tests/run.sh \
             home/shared/litellm/config/{secrets,litellm-up,proxy-key}.sh \
             home/shared/services/jig-decision-up.sh \
+            home/shared/taskwarrior/{sync-server-up,task-sync-up}.sh \
             home/shared/sbx/config/kits/agents/link-harness.sh
 
   # jig, the harness generator and guard (harness/jig): types, lint, tests

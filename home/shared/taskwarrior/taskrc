@@ -1,0 +1,58 @@
+# Taskwarrior 3.5 for the owner's own tasks, on every machine
+# (harness/rules/decisions/2026-10-23-personal-tasks-sync.md). Nix writes
+# ~/.config/task/taskrc, which includes this file and machine.rc by absolute
+# path: Taskwarrior resolves a relative include from the real file's
+# directory, so a link here could not reach machine.rc. Sync settings are not
+# here either: `dotctl tasks sync` includes ~/.config/task/taskrc from a
+# private rc of its own.
+
+# The data stays in ~/.task (taskchampion.sqlite3).
+news.version=3.5.0
+
+# Top level: work or personal. The second level is a finite outcome only
+# (personal.moving); a single task sits directly under work or personal.
+context.work.read=project:work
+context.work.write=project:work
+context.personal.read=project:personal
+context.personal.write=project:personal
+
+# Important is priority:H, or nothing.
+uda.priority.values=H,
+urgency.uda.priority.H.coefficient=12.0
+# Urgent: +DUE means due within 3 days; +OVERDUE is past due. due is for
+# real deadlines only — a start date is scheduled or wait.
+due=3
+
+# +in is the inbox: captured, not yet sorted.
+urgency.user.tag.in.coefficient=0.0
+
+# The four views: important x urgent.
+report.now.description=Important and urgent
+report.now.filter=status:pending -WAITING priority:H (+DUE or +OVERDUE)
+report.now.columns=id,project,due.relative,description.count,urgency
+report.now.labels=ID,Project,Due,Description,Urg
+report.now.sort=urgency-
+
+report.plan.description=Important, not urgent
+report.plan.filter=status:pending -WAITING priority:H -DUE -OVERDUE
+report.plan.columns=id,project,scheduled.relative,due.relative,description.count,urgency
+report.plan.labels=ID,Project,Sched,Due,Description,Urg
+report.plan.sort=urgency-
+
+report.quick.description=Urgent, not important
+report.quick.filter=status:pending -WAITING priority: (+DUE or +OVERDUE)
+report.quick.columns=id,project,due.relative,description.count,urgency
+report.quick.labels=ID,Project,Due,Description,Urg
+report.quick.sort=urgency-
+
+report.someday.description=Neither important nor urgent
+report.someday.filter=status:pending -WAITING priority: -DUE -OVERDUE -in
+report.someday.columns=id,project,scheduled.relative,description.count,urgency
+report.someday.labels=ID,Project,Sched,Description,Urg
+report.someday.sort=urgency-
+
+report.in.description=Inbox: captured, not yet sorted
+report.in.filter=status:pending -WAITING +in
+report.in.columns=id,entry.age,description.count
+report.in.labels=ID,Age,Description
+report.in.sort=entry+
