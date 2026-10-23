@@ -23,7 +23,7 @@ todo tool, never here.
   `personal`). A second level exists only for a finite outcome with several
   steps — `personal.moving`, `work.auth-migration` — never for an area that
   never ends. A single task sits directly under `work` or `personal`.
-  Run `task _projects` and reuse an existing outcome before making one.
+  Run `task projects` and reuse an existing outcome before making one.
 - **priority**: `H` means important; otherwise leave it empty. No M or L
   (the taskrc rejects them).
 - **due**: a real deadline only — something breaks or someone waits if it
@@ -44,14 +44,34 @@ todo tool, never here.
 | `task someday` | neither |
 | `task in` | the inbox |
 | `task next` | everything, by urgency |
-| `task context work` / `task context personal` / `task context none` | limits every read and add to one side |
+| `task context work` / `task context personal` / `task context none` | limits reports and adds to one side (the owner's switch; see the machine limit below) |
 
 Read with `rc.verbose=nothing` when you parse output, and `task <filter> export`
 when you need fields exactly.
 
 ## What you may do
 
-- **Read freely**: any report, `export`, `_projects`, `_tags`.
+- **First, check this machine's limit**: `cat ~/.config/task/agent-context
+  2>/dev/null`. If it names `work` or `personal`, only that side's tasks may
+  reach you on this machine
+  (`harness/rules/decisions/2026-10-23-tasks-agent-context.md`). Then:
+  - Start every `task` command with the filter `project:<it>`, before any
+    other filter, ID or UUID: `task project:work now`,
+    `task project:work <uuid> info`, `task project:work <uuid> done`. The
+    context alone is not enough: `export`, `info`, `modify`, `_get`,
+    `_projects`, `_tags`, `ids`/`uuids` and any command given an ID or UUID
+    ignore it, but a filter applies to every command.
+  - Add only into that side: `task add project:<it>...`. If the owner asks
+    to add or read the other side, say it is outside what you may touch here.
+  - Use only these commands: the reports in Views (not `task context`),
+    `projects`, `tags`, `info`, `export`, `add`, `done`, `modify`,
+    `annotate`, `delete`. Never use `_get`, `_projects`, `_tags`, `_unique`,
+    `_uuids`, `_ids`, `undo`, `import`, or `or`/`xor`/`not`/`!`/parentheses
+    in a filter, never pass an `rc.` override other than `rc.verbose` and
+    `rc.confirmation`, never set `TASKRC` or `TASKDATA`, and never read or
+    write `~/.task` (its database or hooks) or the backups under
+    `~/.local/state/task-sync`.
+- **Read freely** within that limit: any report, `export`, `projects`, `tags`.
 - **Add only after the owner says yes.** When the owner mentions something
   they must do, propose it in one line — description, project, and only the
   priority or due the owner actually stated — and add it when they agree.
@@ -76,7 +96,7 @@ answer before changing anything:
    says so; remove `+in`.
 2. `task +OVERDUE` and `task +DUE`: done, new real deadline, or dropped?
 3. `task +waiting`: still waiting, or follow up?
-4. Each second-level project (`task _projects`): is the outcome finished, and
+4. Each second-level project (`task projects`): is the outcome finished, and
    does it still have a next step?
 5. `task someday`: anything to delete or promote?
 
