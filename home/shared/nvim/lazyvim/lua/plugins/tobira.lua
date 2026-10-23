@@ -10,12 +10,14 @@ return {
   },
   config = function(_, opts)
     require("tobira").setup(opts)
-    -- j / k の5連打で出る {n}j / {n}k の提案だけ止める。setup に該当オプションが無いので、
-    -- :TobiraProgress の x と同じ suppress 状態を起動時に書き込む
+    -- j / k を連打したときの提案（{n}j, {n}k, }, {）だけ止める。setup に該当
+    -- オプションが無いので、連打の検出結果を提案キューに渡す手前で捨てる
+    local ignored = { j_repeat = true, j_many = true, k_repeat = true, k_many = true }
     local logger = require("tobira.core.logger")
-    for _, cmd in ipairs({ "{n}j", "{n}k" }) do
-      if not logger.get(cmd).suppressed then
-        logger.set_suppressed(cmd, true)
+    local queue = logger.on_pattern
+    logger.on_pattern = function(pattern, cmd)
+      if not ignored[pattern] then
+        queue(pattern, cmd)
       end
     end
   end,
