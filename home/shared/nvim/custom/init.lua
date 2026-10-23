@@ -1142,6 +1142,7 @@ require('lazy').setup({
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   { import = 'custom.plugins' },
+  { import = 'dotfiles.plugins' },
   --
   -- For additional information with loading, sourcing and examples see `:help lazy.nvim-🔌-plugin-spec`
   -- Or use telescope!
@@ -1172,7 +1173,7 @@ require('lazy').setup({
 -- Apply the auto-generated colorscheme (managed by `theme-switch`).
 -- Wrap both require and load: if the chosen theme's plugin is missing or fails,
 -- fall back to catppuccin so nvim still boots.
-require('custom.diff_colors').setup()
+require('dotfiles.diff_colors').setup()
 do
   local ok, colorscheme = pcall(require, 'custom.colorscheme')
   local applied = ok and colorscheme and pcall(colorscheme.load)

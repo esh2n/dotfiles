@@ -23,11 +23,14 @@ require("lazy").setup({
   },
 
   { import = "plugins" },
+  { import = "dotfiles.plugins" },
 }, lazy_config)
 
 -- load theme
 dofile(vim.g.base46_cache .. "defaults")
 dofile(vim.g.base46_cache .. "statusline")
+-- base46 applies highlights without a ColorScheme event, so apply once here too
+require("dotfiles.diff_colors").setup()
 
 require "options"
 require "autocmds"
