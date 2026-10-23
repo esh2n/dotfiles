@@ -20,7 +20,8 @@ import (
 //	GPU     : tailscale serve 8080 (llama-server, Linux) and the models it
 //	          serves (home/linux/llama-server/models.json into ~/models)
 //	Console : Prometheus + Grafana + Open WebUI, the cost ledger's table,
-//	          tailscale serve https 3001 and tcp 5432 (the ledger); without
+//	          tailscale serve https 3001, tcp 5432 (the ledger) and https
+//	          10222 (the tasks' sync server); without
 //	          it, tailscale serve 4001 so the console can scrape this
 //	          machine's LiteLLM metrics
 //	always  : LiteLLM restarted onto the current config
@@ -75,7 +76,8 @@ func serveTailnet(e Env, add func(string, ...any)) {
 	}
 	if e.Offer.Console {
 		serve("--https=3001", "127.0.0.1:3001")
-		serve("--tcp", "5432", "tcp://127.0.0.1:5432") // the cost ledger, for the other machines' sync
+		serve("--tcp", "5432", "tcp://127.0.0.1:5432")   // the cost ledger, for the other machines' sync
+		serve("--https=10222", "http://127.0.0.1:10222") // the tasks' sync server, for the other machines and the phone
 	} else {
 		serve("--tcp", "4001", "tcp://127.0.0.1:4001")
 	}

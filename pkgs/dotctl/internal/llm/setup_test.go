@@ -26,7 +26,7 @@ func TestSetupServesWhatTheOfferNames(t *testing.T) {
 		want, not []string
 	}{
 		{Offer{LMStudio: true, Console: true},
-			[]string{"tailscale serve --bg --tcp 1234 tcp://127.0.0.1:1234", "tailscale serve --bg --https=3001 127.0.0.1:3001", "tailscale serve --bg --tcp 5432 tcp://127.0.0.1:5432"},
+			[]string{"tailscale serve --bg --tcp 1234 tcp://127.0.0.1:1234", "tailscale serve --bg --https=3001 127.0.0.1:3001", "tailscale serve --bg --tcp 5432 tcp://127.0.0.1:5432", "tailscale serve --bg --https=10222 http://127.0.0.1:10222"},
 			[]string{"tailscale serve --bg --tcp 4001"}},
 		{Offer{}, []string{"tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001"}, []string{"tailscale serve --bg --tcp 1234", "tailscale serve --bg --tcp 5432", "tailscale serve --bg --https"}},
 		{Offer{GPU: true}, []string{"tailscale serve --bg --tcp 8080 tcp://127.0.0.1:8080", "tailscale serve --bg --tcp 4001"}, []string{"tailscale serve --bg --tcp 5432"}},

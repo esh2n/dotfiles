@@ -381,6 +381,7 @@ func checkTailnet(e Env, c *Checker) {
 	}
 	served("5432", "cost ledger", " (the other machines cannot ship spend to the ledger)")
 	served("3001", "Open WebUI", " (HTTPS certificates enabled in the admin console?)")
+	served("10222", "tasks sync", " (the other machines and the phone cannot sync their tasks)")
 	var peers []string
 	for _, p := range st.Peer {
 		peers = append(peers, fmt.Sprintf("%s (%s)", p.HostName, p.OS))

@@ -14,7 +14,7 @@ func healthy(w world) {
 	w.running()
 	w.sys.have["omp"] = true
 	w.sys.outputs[w.env.litellm("proxy-key.sh")] = "k\n"
-	w.sys.outputs["tailscale serve status"] = "tcp://mac:1234\ntcp://mac:5432\nhttps://mac:3001\ntcp://mac:4001\ntcp://mac:8080\n"
+	w.sys.outputs["tailscale serve status"] = "tcp://mac:1234\ntcp://mac:5432\nhttps://mac:3001\nhttps://mac:10222\ntcp://mac:4001\ntcp://mac:8080\n"
 	w.sys.outputs["omp models ls --json"] = `{"models": [{"provider": "proxy", "id": "main"}, {"provider": "proxy", "id": "complex"}, {"nested": [{"provider": "proxy", "id": "executor"}]}, {"provider": "other", "id": "x"}]}`
 	w.svc.set("/lms/v1/models", `{"data": [{"id": "qwen"}, {"id": "nomic"}]}`)
 	fallbackIs(w, "qwen")
@@ -55,6 +55,7 @@ func TestCheckAllPassOnAHealthyObserver(t *testing.T) {
 		"PASS LiteLLM :4001 metrics listener healthy (2 litellm_* series)",
 		"PASS Prometheus scrapes litellm: up http://host:4000/metrics/",
 		"PASS tailscale serve 5432 (cost ledger) → mac.example.ts.net:5432",
+		"PASS tailscale serve 10222 (tasks sync) → mac.example.ts.net:10222",
 		"PASS tailnet devices besides this machine: phone (iOS)",
 		"open https://mac.example.ts.net:3001",
 		"home-llm check: 0 FAIL",
@@ -123,6 +124,7 @@ func TestCheckPartialAnswersFail(t *testing.T) {
 		"FAIL Prometheus litellm target: down u",
 		"FAIL omp does not list proxy/{main,complex,executor} (models.yml provider, or key) — got: none",
 		"FAIL tailscale serve 5432 missing (the other machines cannot ship spend to the ledger)",
+		"FAIL tailscale serve 10222 missing (the other machines and the phone cannot sync their tasks)",
 		"FAIL no other device on the tailnet",
 		"open https://?:3001",
 	} {
