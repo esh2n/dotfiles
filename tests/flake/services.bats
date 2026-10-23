@@ -157,7 +157,7 @@ gpu_linux() { # gpu_linux <attr under config>
 }
 
 tasks_cfg() { # tasks_cfg: what the tasks module rendered on linux, as one JSON object
-	nix_eval_expr_json "let c = (builtins.getFlake \"git+file://${REPO_ROOT}\").homeConfigurations.linux.config; u = c.systemd.user.services; in { taskrc = c.xdg.configFile.\"task/taskrc\".text; rc = c.xdg.configFile.\"task/machine.rc\".text; sync = u.task-sync.Service.Environment; server = if u ? taskchampion-sync-server then u.taskchampion-sync-server.Service.Environment else null; }"
+	nix_eval_expr_json "let c = (builtins.getFlake \"git+file://${REPO_ROOT}\").homeConfigurations.linux.config; u = c.systemd.user.services; in { taskrc = c.xdg.configFile.\"task/taskrc\".text; rc = c.xdg.configFile.\"task/machine.rc\".text; agent = c.xdg.configFile.\"task/agent-context\".text or null; sync = u.task-sync.Service.Environment; server = if u ? taskchampion-sync-server then u.taskchampion-sync-server.Service.Environment else null; }"
 }
 
 @test "services: the observer runs the tasks' sync server on loopback, syncs with it there, and alone makes recurring tasks" {
@@ -180,8 +180,17 @@ tasks_cfg() { # tasks_cfg: what the tasks module rendered on linux, as one JSON 
 	[ "$(field "$output" taskrc)" = "\"include ${REPO_ROOT}/home/shared/taskwarrior/taskrc\\ninclude ${HOME}/.config/task/machine.rc\\n\"" ]
 	[[ "$(field "$output" sync)" == *'"TASK_SYNC_URL=https://mac.example.ts.net:10222"'* ]]
 	[ "$(field "$output" server)" = null ]
+	[ "$(field "$output" agent)" = null ]
 	roles '"developer"'
 	run --separate-stderr tasks_cfg
 	[ "$status" -eq 0 ]
 	[[ "$(field "$output" sync)" != *"TASK_SYNC_URL"* ]]
+}
+
+@test "services: a machine whose roles file names tasksAgentContext tells the agent that context alone" {
+	printf '{"roles": ["developer"], "observerHost": "mac.example.ts.net", "tasksAgentContext": "work"}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+	run --separate-stderr tasks_cfg
+	[ "$status" -eq 0 ]
+	[ "$(field "$output" agent)" = '"work\n"' ]
 }

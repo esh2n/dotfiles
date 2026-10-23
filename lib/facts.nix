@@ -27,6 +27,9 @@
 #   macModelHost the Mac's tailnet name, where executor falls back
 #             while the desktop is off, from the same file's optional
 #             "macModelHost"; null when absent (the Mac itself needs none).
+#   tasksAgentContext the one Taskwarrior context ("work" or "personal") an
+#             agent on this machine may read and add to, from the same
+#             file's optional "tasksAgentContext"; null when absent (no limit).
 let
   getEnv = builtins.getEnv;
   known = import ../roles/names.nix;
@@ -119,4 +122,12 @@ in
       h
     else
       throw ''facts: "macModelHost" in ${rolesFile} must be a string (a tailnet name)'';
+  tasksAgentContext =
+    let
+      c = doc.tasksAgentContext or null;
+    in
+    if c == null || c == "work" || c == "personal" then
+      c
+    else
+      throw ''facts: "tasksAgentContext" in ${rolesFile} must be "work" or "personal" (a context in the taskrc)'';
 }

@@ -122,3 +122,22 @@ facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).nvidia"
 	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).macModelHost"
 	[ "$status" -ne 0 ]
 }
+
+@test "facts: tasksAgentContext, the one task context an agent may touch, is read from the roles file" {
+	printf '{"roles": ["developer"], "tasksAgentContext": "work"}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).tasksAgentContext"
+	[ "$output" = '"work"' ]
+	printf '{"roles": ["developer"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).tasksAgentContext"
+	[ "$output" = null ]
+	printf '{"roles": ["developer"], "tasksAgentContext": "family"}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).tasksAgentContext"
+	[ "$status" -ne 0 ]
+	[[ "$stderr" == *"tasksAgentContext"* ]]
+}
+
+@test "facts: each tasksAgentContext value is a context the taskrc defines, so the limit names a real side" {
+	for c in work personal; do
+		grep -qx "context.${c}.read=project:${c}" "${REPO_ROOT}/home/shared/taskwarrior/taskrc"
+	done
+}

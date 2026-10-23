@@ -34,6 +34,11 @@ in
     '';
     # recurring tasks are made by one replica only, the server's machine
     xdg.configFile."task/machine.rc".text = "recurrence=${if cfg.syncServer then "on" else "off"}\n";
+    # the one context an agent on this machine may touch (the personal-tasks
+    # skill reads it); the owner's own `task` is not limited by it
+    xdg.configFile."task/agent-context" = lib.mkIf (facts.tasksAgentContext != null) {
+      text = "${facts.tasksAgentContext}\n";
+    };
 
     dotfiles.services.taskchampion-sync-server = {
       enable = cfg.syncServer;
