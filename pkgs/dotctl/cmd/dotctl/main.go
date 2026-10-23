@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/nvim"
+	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/sys"
+	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/tasks"
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/ui"
 )
 
@@ -33,6 +35,7 @@ commands:
   wallpaper search|random|set ...        Wallhaven wallpapers on the desktop, macOS or Omarchy (also: wallpaper)
   templates render [--repo DIR]          render every *.template in the checkout beside itself
   ledger sync once|loop                  ship this machine's LiteLLM spend to the cost ledger (LEDGER_* env)
+  tasks sync once|loop                   sync this machine's Taskwarrior replica and back it up (TASK_* env)
   mado [use|stop|status|list|layout|info]  switch the macOS window-manager profile (also: mado)
   theme [--repo DIR] list|current|init|set <name>
                                          switch the colour theme (one link, then reloads)
@@ -113,6 +116,8 @@ func run(args []string, out, errOut io.Writer) int {
 		return runTemplates(args[1:], out, errOut)
 	case "ledger":
 		return runLedger(home, args[1:], out, errOut)
+	case "tasks":
+		return runTasks(home, args[1:], out, errOut)
 	case "mado":
 		return runMado(home, args[1:], out, errOut)
 	case "theme":
@@ -163,5 +168,30 @@ func runNvim(home string, args []string, out, errOut io.Writer) int {
 		}
 		p.With("nvim").Success("switched to nvim-%s", args[0])
 	}
+	return 0
+}
+
+// runTasks is `dotctl tasks sync once|loop`: this machine's Taskwarrior
+// replica with the observer's sync server, and its daily backup (the service
+// runs loop).
+func runTasks(home string, args []string, out, errOut io.Writer) int {
+	if len(args) != 2 || args[0] != "sync" || (args[1] != "once" && args[1] != "loop") {
+		fmt.Fprint(errOut, "usage: dotctl tasks sync once|loop\n")
+		return 2
+	}
+	p := ui.Printer{Out: out, Err: errOut, Prefix: "tasks sync"}
+	c, err := tasks.FromEnv(os.Getenv, home)
+	if err != nil {
+		p.Error("%v", err)
+		return 1
+	}
+	if args[1] == "once" {
+		if err := tasks.Once(sys.OS{}, p, c, time.Now()); err != nil {
+			p.Error("%v", err)
+			return 1
+		}
+		return 0
+	}
+	tasks.Loop(sys.OS{}, p, c, 300*time.Second, time.Now, time.Sleep)
 	return 0
 }
