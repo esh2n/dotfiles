@@ -10,10 +10,10 @@ return {
   },
   config = function(_, opts)
     require("tobira").setup(opts)
-    -- j の5連打で出る {n}j の提案だけ止める。setup に該当オプションが無いので、
+    -- j / k の5連打で出る {n}j / {n}k の提案だけ止める。setup に該当オプションが無いので、
     -- :TobiraProgress の x と同じ suppress 状態を起動時に書き込む
     local logger = require("tobira.core.logger")
-    for _, cmd in ipairs({ "{n}j" }) do
+    for _, cmd in ipairs({ "{n}j", "{n}k" }) do
       if not logger.get(cmd).suppressed then
         logger.set_suppressed(cmd, true)
       end
