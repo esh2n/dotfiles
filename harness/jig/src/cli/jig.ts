@@ -47,6 +47,7 @@ import { commandExists, createPrompter, spawnHarness } from "../infra/interactiv
 import { ConsoleLogger } from "../infra/logger/console-logger";
 import { appendRouterLog } from "../infra/logs/router-log";
 import { appendSessionLog } from "../infra/logs/session-log";
+import { appendSkillRun, readSkillRuns } from "../infra/logs/skill-run-log";
 import { appendTierLog } from "../infra/logs/tier-log";
 import { currentJudgmentKind } from "../infra/metrics/judgment-kind";
 import { recordJudgmentUsage } from "../infra/metrics/judgment-usage";
@@ -56,6 +57,7 @@ import { runCommand } from "../infra/proc/exec-file";
 import { packHistory } from "../infra/proc/pack-history";
 import { createSetupPorts } from "../infra/setup/setup-ports";
 import { readSkillCatalog } from "../infra/skills/catalog";
+import { findingsRuleFor } from "../infra/skills/findings-rule";
 import { detectRepoSignals } from "../infra/skills/repo-signals";
 import { findTranscripts, parseSkillTurns } from "../infra/transcripts/transcript";
 import { applyCli } from "./apply";
@@ -63,6 +65,11 @@ import { type BoxCliContext, boxCli } from "./box";
 import { codexCli } from "./codex";
 import { parseCoverageArgs, renderCoverage } from "./coverage";
 import { decide } from "./decide";
+import {
+  recordFromPostToolUse,
+  recordFromPrompt,
+  recordFromSubagentStop,
+} from "./hooks/findings-record";
 import { postToolUseFormat } from "./hooks/post-tool-use-format";
 import { preToolUse } from "./hooks/pre-tool-use";
 import { sessionStart } from "./hooks/session-start";
@@ -482,6 +489,30 @@ function codexRegistration(): {
   };
 }
 
+/** Where the findings check keeps its day files (`infra/logs/skill-run-log.ts`). */
+function skillRunsDir(): string {
+  return join(resolveStateDir(process.env), "skill-runs");
+}
+
+/**
+ * Append one findings-check record. A failure is logged and swallowed: the hook that
+ * records must never fail the tool call or the prompt it rides on. A record lost here is
+ * one the gate never sees — a lost skill use or the only report with findings lets the
+ * turn end with nothing said; the gate's "did not run" covers a record it cannot read,
+ * not one that was never written.
+ */
+async function recordSkillRun(
+  event: Parameters<typeof appendSkillRun>[1] | undefined,
+  logger: Ports["logger"],
+): Promise<void> {
+  if (event === undefined) return;
+  await appendSkillRun(skillRunsDir(), event).catch((error: unknown) =>
+    logger.warn("findings.record-failed", {
+      message: error instanceof Error ? error.message : String(error),
+    }),
+  );
+}
+
 /** `--harness <name>` after a hook subcommand: who the adapter says is calling. */
 function harnessFlag(argv: readonly string[]): string | undefined {
   const at = argv.indexOf("--harness");
@@ -549,6 +580,12 @@ export async function main(argv: readonly string[]): Promise<number> {
         const stdin = await new Response(Bun.stdin.stream()).text();
         const threshold = Number.parseFloat(process.env.JIG_SKILL_ROUTER_THRESHOLD ?? "");
         const harness = harnessFlag(argv);
+        // Before the router, and whatever its switch says: the findings check needs to know
+        // a typed `/skill` was used even when skill selection is off.
+        await recordSkillRun(
+          recordFromPrompt(stdin, new Date().toISOString(), harness ?? "claude"),
+          ports.logger,
+        );
         process.stdout.write(
           await userPromptSubmit(
             stdin,
@@ -578,14 +615,41 @@ export async function main(argv: readonly string[]): Promise<number> {
       }
       if (subcommand === "post-tool-use-format") {
         const stdin = await new Response(Bun.stdin.stream()).text();
+        await recordSkillRun(
+          recordFromPostToolUse(stdin, new Date().toISOString(), harnessFlag(argv) ?? "claude"),
+          ports.logger,
+        );
         // Nothing reaches stdout: Claude Code shows a PostToolUse hook's
         // output to the model, and a formatter has nothing to tell it.
         await postToolUseFormat(stdin, { run: runCommand, logger: ports.logger });
         return 0;
       }
+      if (subcommand === "subagent-stop") {
+        const stdin = await new Response(Bun.stdin.stream()).text();
+        // Nothing reaches stdout: a SubagentStop hook's decision would steer the subagent,
+        // and this hook only writes the record down.
+        await recordSkillRun(
+          recordFromSubagentStop(stdin, new Date().toISOString(), harnessFlag(argv) ?? "claude"),
+          ports.logger,
+        );
+        return 0;
+      }
       if (subcommand === "stop-gate") {
         const stdin = await new Response(Bun.stdin.stream()).text();
-        process.stdout.write(await stopGate(stdin, { run: runCommand, logger: ports.logger }));
+        const skillRoot = resolveSkillRoot(process.env);
+        process.stdout.write(
+          await stopGate(stdin, {
+            run: runCommand,
+            logger: ports.logger,
+            findings: {
+              read: () => readSkillRuns(skillRunsDir(), new Date()),
+              rules: (skill) => findingsRuleFor(skillRoot, skill),
+              record: (event) => appendSkillRun(skillRunsDir(), event),
+              now: () => new Date(),
+              harness: harnessFlag(argv) ?? "claude",
+            },
+          }),
+        );
         return 0;
       }
       ports.logger.error("unknown hook subcommand", { subcommand });
@@ -815,7 +879,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         return result.code;
       }
       process.stdout.write(
-        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write [--take-over]] | tiers [use <tier> <model>...] | setup [--target claude|codex|pi|omp|dsh] | codex register [--write] | retire yoki [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
+        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|subagent-stop|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write [--take-over]] | tiers [use <tier> <model>...] | setup [--target claude|codex|pi|omp|dsh] | codex register [--write] | retire yoki [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
           "  run with no arguments on a terminal for the interactive entry point:\n" +
           "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
           "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
@@ -856,6 +920,11 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  .pre-commit-config.yaml (lefthook run pre-commit --file <f> / pre-commit run --files <f>,\n" +
           "  the gate on the files the turn touched); jig's tables apply only without such a file,\n" +
           "  and a config whose tool is not installed blocks once with 'install it', never the table.\n" +
+          "  The gate first runs the findings check: since a skill with metadata findings-reporters /\n" +
+          "  findings-verifier was last used, reported findings with no verifier finished or running\n" +
+          "  stop the turn, twice per use at most, then the owner is told. post-tool-use-format,\n" +
+          "  user-prompt-submit and hooks subagent-stop record what it reads, under\n" +
+          "  $JIG_STATE_DIR/skill-runs/ (one file per day, 14 days kept).\n" +
           "  apply --target claude composes ~/.claude/settings.json's hooks, permissions and sandbox\n" +
           "  from policy/guard-rules.json; every other key in the live file is preserved (a leftover\n" +
           "  mcpServers key is removed: Claude Code never read it there). Dry-run prints the whole-file\n" +

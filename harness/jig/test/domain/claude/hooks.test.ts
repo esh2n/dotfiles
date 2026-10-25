@@ -5,14 +5,15 @@ import {
   buildClaudeHooks,
 } from "../../../src/domain/claude/hooks";
 import { HOST_SANDBOX } from "../../../src/domain/claude/sandbox";
+import { isJigHookCommand } from "../../../src/domain/claude/settings";
 
 const PATHS = { bun: "/abs/bun", jig: "/abs/jig/src/cli/jig.ts" };
 
-describe("the five hooks", () => {
-  test("one event each, and no sixth", () => {
+describe("the six hooks", () => {
+  test("one event each, and no seventh", () => {
     const hooks = buildClaudeHooks(PATHS);
     expect(Object.keys(hooks).sort()).toEqual([...CLAUDE_HOOK_EVENTS].sort());
-    expect(Object.keys(hooks)).toHaveLength(5);
+    expect(Object.keys(hooks)).toHaveLength(6);
   });
 
   test("every event holds exactly one group with exactly one command", () => {
@@ -37,11 +38,18 @@ describe("the five hooks", () => {
     expect(command("PostToolUse")).toBe(
       "/abs/bun /abs/jig/src/cli/jig.ts hooks post-tool-use-format --harness claude",
     );
+    // `|| true`: on SubagentStop an exit 2 (an older checkout's "unknown subcommand") keeps the subagent running.
+    expect(command("SubagentStop")).toBe(
+      "/abs/bun /abs/jig/src/cli/jig.ts hooks subagent-stop --harness claude || true",
+    );
     expect(command("Stop")).toBe(
       "/abs/bun /abs/jig/src/cli/jig.ts hooks stop-gate --harness claude",
     );
     for (const event of CLAUDE_HOOK_EVENTS) {
       expect(command(event).startsWith("/abs/bun /abs/jig/")).toBe(true);
+      // apply recognizes its own entries by this, before and after the change
+      expect(isJigHookCommand(command(event))).toBe(true);
+      expect(command(event).endsWith("|| true")).toBe(event === "SubagentStop");
     }
   });
 
@@ -51,8 +59,10 @@ describe("the five hooks", () => {
       (hooks[event] as Record<string, unknown>[])[0] ?? {};
 
     expect(group("PreToolUse").matcher).toContain("Bash");
-    // The formatter never fires on Bash: it formats the file a tool named.
-    expect(group("PostToolUse").matcher).toBe("Write|Edit|MultiEdit");
+    // Never Bash: the formatter formats the file a tool named. Skill and
+    // SubagentHandback feed the findings check's record.
+    expect(group("PostToolUse").matcher).toBe("Write|Edit|MultiEdit|Skill|SubagentHandback");
+    expect(group("SubagentStop")).not.toHaveProperty("matcher");
     expect(group("SessionStart")).not.toHaveProperty("matcher");
     expect(group("UserPromptSubmit")).not.toHaveProperty("matcher");
     expect(group("Stop")).not.toHaveProperty("matcher");

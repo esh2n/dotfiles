@@ -195,7 +195,7 @@ export interface ClaudeApplyReport {
   readonly composition: ClaudeComposition;
   /** Rules the guard enforces that no native permission can express. */
   readonly hookOnly: ClaudePermissions["hookOnly"];
-  /** The five hook command lines, for the dry-run listing. */
+  /** The six hook command lines, for the dry-run listing. */
   readonly hookCommands: readonly { readonly event: string; readonly command: string }[];
   readonly agentsMd: AgentsMdReport;
   /** The dotfiles repository's own AGENTS.md, when `paths.repoAgentsMd` names it. */

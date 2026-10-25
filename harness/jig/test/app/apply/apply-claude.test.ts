@@ -163,12 +163,12 @@ describe("dry-run is the default", () => {
 });
 
 describe("what the composed file contains", () => {
-  test("the five hooks, the projected permissions, the sandbox and the filtered MCP list", async () => {
+  test("the six hooks, the projected permissions, the sandbox and the filtered MCP list", async () => {
     const { ports } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     const report = await run(ports);
     const settings = report.composition.settings;
 
-    expect(Object.keys(settings.hooks as JsonObject)).toHaveLength(5);
+    expect(Object.keys(settings.hooks as JsonObject)).toHaveLength(6);
 
     const permissions = settings.permissions as JsonObject;
     expect(permissions.deny).toEqual(["Bash(shutdown *)"]);

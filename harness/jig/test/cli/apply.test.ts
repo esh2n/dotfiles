@@ -218,12 +218,12 @@ describe("applyCli --target claude", () => {
     [CLAUDE_PATHS.commands]: `${CLAUDE}/.commands-merged`,
   };
 
-  test("reports the five hooks, the owned keys, and the paste-ready permit fragment", async () => {
+  test("reports the six hooks, the owned keys, and the paste-ready permit fragment", async () => {
     const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
     const result = await applyCli(["--target", "claude"], ports, paths, claudeContext());
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("hooks (5):");
+    expect(result.stdout).toContain("hooks (6):");
     expect(result.stdout).toContain("hooks stop-gate --harness claude");
     expect(result.stdout).toContain("keys jig now owns (5):");
     expect(result.stdout).not.toContain("  mcpServers\n");

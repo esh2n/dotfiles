@@ -7,8 +7,12 @@
  * 切り詰める。」All three are here, and all three are about cost:
  *
  * - **once.** Claude Code sets `stop_hook_active: true` on the Stop that
- *   follows a hook-forced continuation. Seeing it, this returns nothing and
- *   the turn ends — whatever the check still says. Without that check the gate
+ *   follows a hook-forced continuation. Seeing it, the typecheck does not run
+ *   and the turn ends — whatever the check still says — unless the findings
+ *   check, not the typecheck, made that continuation: then the edits made in it
+ *   are checked once too. Which gate stopped last is read from the findings
+ *   record, where a typecheck block is written; without that record,
+ *   `stop_hook_active` alone decides. Without that check the gate
  *   is a loop, and the decision cites the price of one: 35k tokens and 20
  *   minutes. Claude Code's own ceiling (8) is a backstop, not an allowance.
  * - **the tail only.** A whole `tsc` log in the model's context is the same
@@ -35,6 +39,15 @@
 
 import { existsSync, readdirSync } from "node:fs";
 import type { ChangedFiles } from "../../domain/hooks/changed";
+import {
+  type FindingsRule,
+  type GateOutcome,
+  type SkillRunEvent,
+  blockReason,
+  checkFindings,
+  lastBlock,
+  ownerNotice,
+} from "../../domain/hooks/findings-check";
 import type { ReadDir } from "../../domain/hooks/format";
 import { gatePlanFor, gateWantsChangedFiles, projectHooksFor, tail } from "../../domain/hooks/gate";
 import { missingToolReason } from "../../domain/hooks/project-hooks";
@@ -70,6 +83,21 @@ const ONCE_PER_TURN =
 interface StopPayload {
   readonly stop_hook_active?: unknown;
   readonly cwd?: unknown;
+  readonly session_id?: unknown;
+  /** In-flight tasks; a `subagent` entry carries `agent_type` (https://code.claude.com/docs/en/hooks, Stop input). */
+  readonly background_tasks?: unknown;
+}
+
+/**
+ * The findings check's inputs and its one write: the gate records what it did for each
+ * skill use, so the cap and the once-only notices hold across stops.
+ */
+export interface FindingsDeps {
+  readonly read: () => Promise<readonly SkillRunEvent[]>;
+  readonly rules: (skill: string) => FindingsRule | undefined;
+  readonly record: (event: SkillRunEvent) => Promise<void>;
+  readonly now: () => Date;
+  readonly harness: string;
 }
 
 export interface StopGateDeps {
@@ -81,12 +109,84 @@ export interface StopGateDeps {
   readonly changedFiles?: ChangedFiles;
   readonly timeoutMs?: number;
   readonly logger?: Logger;
+  /** The findings check (`2026-10-23-findings-verification-check.md`); absent, it does not run. */
+  readonly findings?: FindingsDeps;
 }
 
-/** @returns what to write to stdout: a block decision, or the empty string. */
-export async function stopGate(stdin: string, deps: StopGateDeps): Promise<string> {
-  const exists = deps.exists ?? existsSync;
+const OUTCOME = {
+  block: "blocked",
+  unverified: "unverified",
+  "not-checked": "not-checked",
+} as const;
 
+function runningSubagents(tasks: unknown): readonly string[] {
+  if (!Array.isArray(tasks)) return [];
+  return tasks.flatMap((task) => {
+    const t = task as { type?: unknown; agent_type?: unknown };
+    return t.type === "subagent" && typeof t.agent_type === "string" ? [t.agent_type] : [];
+  });
+}
+
+interface FindingsStepResult {
+  readonly reasons: readonly string[];
+  readonly notices: readonly string[];
+  /** Which gate stopped this session's turn before this stop, when the record says. */
+  readonly last?: "findings" | "typecheck";
+}
+
+/**
+ * The findings check for this stop: reasons to stop the turn, and lines for the owner.
+ * It runs whatever `stop_hook_active` says, because its own cap (per skill use) is what
+ * bounds it; a failure to read is said to the owner as "not run", never passed over.
+ */
+async function findingsStep(
+  payload: StopPayload,
+  deps: FindingsDeps,
+  logger: Logger | undefined,
+): Promise<FindingsStepResult> {
+  if (typeof payload.session_id !== "string" || payload.session_id === "") {
+    return { reasons: [], notices: [] };
+  }
+  const session = payload.session_id;
+  try {
+    const events = await deps.read();
+    const last = lastBlock(session, events);
+    const actions = checkFindings({
+      session,
+      events,
+      rules: deps.rules,
+      running: runningSubagents(payload.background_tasks),
+    });
+    const reasons: string[] = [];
+    const notices: string[] = [];
+    for (const action of actions) {
+      if (action.action === "block") reasons.push(blockReason(action));
+      else notices.push(ownerNotice(action));
+      const outcome: GateOutcome = OUTCOME[action.action];
+      await deps.record({
+        at: deps.now().toISOString(),
+        session,
+        harness: deps.harness,
+        kind: "gate",
+        skill: action.skill,
+        useAt: action.useAt,
+        outcome,
+      });
+      logger?.debug(`gate.findings-${outcome}`, { skill: action.skill });
+    }
+    return { reasons, notices, ...(last === undefined ? {} : { last }) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger?.debug("gate.findings-failed", { message });
+    return {
+      reasons: [],
+      notices: [`jig: the findings check did not run (${message}). Not a pass.`],
+    };
+  }
+}
+
+/** @returns what to write to stdout: a block decision, a message for the owner, or the empty string. */
+export async function stopGate(stdin: string, deps: StopGateDeps): Promise<string> {
   let payload: StopPayload;
   try {
     payload = JSON.parse(stdin) as StopPayload;
@@ -95,12 +195,57 @@ export async function stopGate(stdin: string, deps: StopGateDeps): Promise<strin
     return "";
   }
 
-  // The one check that makes this a gate and not a loop.
-  if (payload.stop_hook_active === true) {
+  const findings =
+    deps.findings === undefined
+      ? { reasons: [], notices: [] }
+      : await findingsStep(payload, deps.findings, deps.logger);
+
+  // The one check that makes the typecheck a gate and not a loop.
+  let typecheck: string | undefined;
+  if (payload.stop_hook_active === true && findings.last !== "findings") {
     deps.logger?.debug("gate.already-continued");
-    return "";
+  } else {
+    typecheck = await typecheckReason(payload, deps);
+    if (typecheck !== undefined) await recordTypecheckBlock(payload, deps);
   }
 
+  const reasons = [...findings.reasons, ...(typecheck === undefined ? [] : [typecheck])];
+  const systemMessage =
+    findings.notices.length === 0 ? {} : { systemMessage: findings.notices.join("\n") };
+  if (reasons.length > 0) {
+    return `${JSON.stringify({ decision: "block", reason: reasons.join("\n\n"), ...systemMessage })}\n`;
+  }
+  return findings.notices.length === 0 ? "" : `${JSON.stringify(systemMessage)}\n`;
+}
+
+/**
+ * Write that the typecheck stopped this turn, so its next stop knows the block was its own.
+ * A failed write is logged; the next stop then falls back to `stop_hook_active` only if the
+ * record cannot be read either.
+ */
+async function recordTypecheckBlock(payload: StopPayload, deps: StopGateDeps): Promise<void> {
+  if (deps.findings === undefined) return;
+  if (typeof payload.session_id !== "string" || payload.session_id === "") return;
+  try {
+    await deps.findings.record({
+      at: deps.findings.now().toISOString(),
+      session: payload.session_id,
+      harness: deps.findings.harness,
+      kind: "typecheck",
+    });
+  } catch (error) {
+    deps.logger?.debug("gate.typecheck-record-failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/** The typecheck/lint gate: the reason to stop the turn, or `undefined` to let it end. */
+async function typecheckReason(
+  payload: StopPayload,
+  deps: StopGateDeps,
+): Promise<string | undefined> {
+  const exists = deps.exists ?? existsSync;
   const cwd = typeof payload.cwd === "string" && payload.cwd !== "" ? payload.cwd : process.cwd();
   const readDir = deps.readDir ?? readDirSync;
 
@@ -122,7 +267,7 @@ export async function stopGate(stdin: string, deps: StopGateDeps): Promise<strin
   const plan = gatePlanFor(cwd, exists, changed, readDir);
   if (plan.kind === "nothing") {
     deps.logger?.debug(`gate.${plan.reason}`, { cwd, tool: hooks?.tool });
-    return "";
+    return undefined;
   }
 
   // In order; the first failure is the one reported. A table tool that is
@@ -141,7 +286,7 @@ export async function stopGate(stdin: string, deps: StopGateDeps): Promise<strin
         source: plan.source,
         message: error instanceof Error ? error.message : String(error),
       });
-      return "";
+      return undefined;
     }
 
     if (result.missing) {
@@ -149,7 +294,7 @@ export async function stopGate(stdin: string, deps: StopGateDeps): Promise<strin
         // The ruling's one hard line: a project's rules are never replaced by
         // jig's, so the answer is "install it", said once (stop_hook_active).
         deps.logger?.debug("gate.project-tool-missing", { tool: hooks.tool, config: hooks.config });
-        return `${JSON.stringify({ decision: "block", reason: missingToolReason(hooks) })}\n`;
+        return missingToolReason(hooks);
       }
       deps.logger?.debug("gate.tool-missing", { label: command.label, bin: command.bin });
       continue;
@@ -164,7 +309,7 @@ export async function stopGate(stdin: string, deps: StopGateDeps): Promise<strin
       label: command.label,
       code: result.code,
     });
-    return `${JSON.stringify({ decision: "block", reason })}\n`;
+    return reason;
   }
-  return "";
+  return undefined;
 }

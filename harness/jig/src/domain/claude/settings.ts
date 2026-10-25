@@ -25,8 +25,8 @@
  * Code's own tooling writes into the same key — Orca's agent-hooks put a
  * `~/.orca/agent-hooks/claude-hook.sh` entry on every event (measured
  * 2026-09-24: 12 events, ~28 KB) — and replacing the key outright made every
- * Orca launch a "hand-edit conflict" that stopped `--write`. The five-hooks
- * ruling (`2026-09-22-hooks-five-events.md`) bounds what jig registers, not
+ * Orca launch a "hand-edit conflict" that stopped `--write`. The six-hooks
+ * ruling (`2026-10-23-claude-hooks-six-events.md`) bounds what jig registers, not
  * what other programs may.
  *
  * One key is neither owned nor carried: `mcpServers`. Milestone 1 wrote it on
@@ -69,7 +69,7 @@ export function isJigHookCommand(command: string): boolean {
 }
 
 export interface ClaudeManagedInput {
-  /** The five hook entries (domain/claude/hooks.ts). Replaces jig's own entries; other programs' entries are carried. */
+  /** The six hook entries (domain/claude/hooks.ts). Replaces jig's own entries; other programs' entries are carried. */
   readonly hooks: JsonObject;
   /** Projected from guard-rules.json plus the decision's default permits. */
   readonly allow: readonly string[];
