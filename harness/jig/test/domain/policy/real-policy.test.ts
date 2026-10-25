@@ -1254,6 +1254,60 @@ const PRECEDENCE_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
     ["a draft PR is allowed", "gh pr create --draft", "allow"],
     ["reading a PR through the API is allowed", "gh api repos/o/r/pulls/3", "allow"],
   ]),
+  ...shellRows("ask-iac-apply", [
+    ["terraform apply asks", "terraform apply -auto-approve", "ask"],
+    ["tofu apply asks", "tofu apply", "ask"],
+    ["terraform plan is allowed", "terraform plan", "allow"],
+  ]),
+  ...shellRows("ask-pulumi-up", [
+    ["pulumi up asks", "pulumi up --yes", "ask"],
+    ["pulumi preview is allowed", "pulumi preview", "allow"],
+  ]),
+  ...shellRows("ask-kubectl-apply", [
+    ["kubectl apply asks", "kubectl apply -f deploy.yaml", "ask"],
+    ["kubectl rollout restart asks", "kubectl rollout restart deploy/web", "ask"],
+    ["kubectl get is allowed", "kubectl get pods", "allow"],
+  ]),
+  ...shellRows("ask-helm-release", [
+    ["helm upgrade asks", "helm upgrade web ./chart", "ask"],
+    ["helm list is allowed", "helm list", "allow"],
+  ]),
+  ...shellRows("ask-wrangler-deploy", [
+    ["wrangler deploy asks", "wrangler deploy", "ask"],
+    ["wrangler pages deploy asks", "wrangler pages deploy dist", "ask"],
+    ["wrangler dev is allowed", "wrangler dev", "allow"],
+  ]),
+  ...shellRows("ask-vercel-prod", [
+    ["vercel --prod asks", "vercel --prod", "ask"],
+    ["vercel deploy --prod asks", "vercel deploy --prod", "ask"],
+    ["a preview deploy is allowed", "vercel deploy", "allow"],
+  ]),
+  ...shellRows("ask-netlify-prod", [
+    ["netlify deploy --prod asks", "netlify deploy --prod --dir dist", "ask"],
+    ["a draft deploy is allowed", "netlify deploy --dir dist", "allow"],
+  ]),
+  ...shellRows("ask-fly-deploy", [
+    ["fly deploy asks", "fly deploy", "ask"],
+    ["flyctl deploy asks", "flyctl deploy --remote-only", "ask"],
+    ["fly status is allowed", "fly status", "allow"],
+  ]),
+  ...shellRows("ask-firebase-deploy", [
+    ["firebase deploy asks", "firebase deploy --only hosting", "ask"],
+    ["firebase emulators is allowed", "firebase emulators:start", "allow"],
+  ]),
+  ...shellRows("ask-gcloud-deploy", [
+    ["gcloud run deploy asks", "gcloud run deploy web --source .", "ask"],
+    ["gcloud run services list is allowed", "gcloud run services list", "allow"],
+  ]),
+  ...shellRows("ask-aws-deploy", [
+    ["cloudformation deploy asks", "aws cloudformation deploy --template-file t.yaml", "ask"],
+    [
+      "lambda update-function-code asks",
+      "aws lambda update-function-code --function-name f",
+      "ask",
+    ],
+    ["aws s3 ls is allowed", "aws s3 ls", "allow"],
+  ]),
   ...shellRows("ask-tailscale-expose", [
     ["tailscale serve asks", "tailscale serve --bg 8080", "ask"],
     ["tailscale funnel asks", "tailscale funnel 443", "ask"],

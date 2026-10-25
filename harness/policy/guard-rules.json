@@ -750,6 +750,160 @@
       ]
     },
     {
+      "id": "ask-iac-apply",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "terraform|terragrunt|tofu",
+        "argv": "(?:^|\\s)apply\\b"
+      },
+      "why": "applies infrastructure changes to a live environment — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-pulumi-up",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "pulumi",
+        "argv": "(?:^|\\s)(?:up|update)\\b"
+      },
+      "why": "applies infrastructure changes to a live environment — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-kubectl-apply",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "kubectl",
+        "argv": "\\b(?:apply|replace|patch|scale|rollout\\s+(?:restart|undo))\\b"
+      },
+      "why": "changes resources in a live cluster — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-helm-release",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "helm",
+        "argv": "(?:^|\\s)(?:install|upgrade|rollback)\\b"
+      },
+      "why": "installs or changes a release in a live cluster — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-wrangler-deploy",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "wrangler",
+        "argv": "\\b(?:deploy|publish)\\b"
+      },
+      "why": "deploys a Cloudflare Worker or Pages site — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-vercel-prod",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "vercel",
+        "argv": "(?:^|\\s)(?:--prod|promote)\\b"
+      },
+      "why": "deploys to Vercel production — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-netlify-prod",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "netlify",
+        "argv": "\\bdeploy\\b.*\\s--prod\\b"
+      },
+      "why": "deploys to Netlify production — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-fly-deploy",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "fly|flyctl",
+        "argv": "^deploy\\b"
+      },
+      "why": "deploys a Fly.io app — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-firebase-deploy",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "firebase",
+        "argv": "^deploy\\b"
+      },
+      "why": "deploys to Firebase — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-gcloud-deploy",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "gcloud",
+        "argv": "\\b(?:run|app|functions)\\s+deploy\\b"
+      },
+      "why": "deploys to Google Cloud — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-aws-deploy",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "aws",
+        "argv": "\\b(?:cloudformation\\s+deploy|ecs\\s+update-service|lambda\\s+update-function-code|deploy\\s+create-deployment)\\b"
+      },
+      "why": "deploys to AWS — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
       "id": "ask-package-publish",
       "effect": "ask",
       "action": "shell.exec",
