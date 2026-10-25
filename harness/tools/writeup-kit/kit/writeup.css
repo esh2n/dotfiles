@@ -170,6 +170,7 @@ body {
   font-family: var(--wu-font-body);
   font-size: var(--wu-fs-3);
   line-height: var(--wu-lh-body);
+  text-autospace: normal; /* the gap between Japanese and Latin text is drawn here, never typed into the text */
   -webkit-font-smoothing: antialiased;
 }
 
