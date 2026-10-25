@@ -1,6 +1,6 @@
 # 無人の繰り返しは各ハーネスの goal と loop で回し、jig はその制約だけを持つ
 
-Status: accepted — 持ち主の裁定（2026-10-19）。2026-09-22-loop-native-goal.md を置き換える。自前の実行系を作らないこと、無人の間の制約、機械で確かめられる成功の条件を先に書くことは引き継ぐ
+Status: superseded — 2026-10-25-unattended-runs-overnight-contract.md が置き換える（無人の間だけ guard でテストの書き込みを禁じる決まりを外し、pstack の寝る前の契約に従う）。もとの裁定は 2026-10-19。2026-09-22-loop-native-goal.md を置き換える。自前の実行系を作らないこと、無人の間の制約、機械で確かめられる成功の条件を先に書くことは引き継ぐ
 
 rule: Never build a custom loop or execution engine; drive unattended repetition through each harness's own features — its goal feature to run until a condition holds, and its own loop or scheduling (Claude Code `/loop`, `ScheduleWakeup`, `CronCreate`, Monitor; omp `/loop` with a shell continue-condition) for fixed intervals, self-paced wakeups and watchers. Where a harness lacks a feature, the pstack playbook step that needs it runs once and reports instead of looping (`pstack-adapter`, Unattended runs). During any unattended run, forbid fs.write/fs.edit to test paths and forbid credential and deploy commands, and start only tasks whose success condition is machine-checkable before starting; write the turn, time or token cap into the run yourself.
 
