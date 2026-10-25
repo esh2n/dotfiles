@@ -54,6 +54,8 @@ Most model design critique does not match what human designers value, and AI rev
 
 Start with `Mode: A`, `Mode: B` or `Mode: A (spec not confirmed)`.
 
+End the report with one line, `Findings: <n>`, where `<n>` is the number of entries in your Findings section (`Findings: 0` when there are none, as in mode A). jig's end-of-turn check reads that line to know whether `review-verifier` must run (`rules/decisions/2026-10-23-findings-verification-check.md`); a report without it is reported to the owner as unchecked.
+
 **Findings** (mode B only), each:
 
 ```

@@ -83,6 +83,8 @@ A rollout defect is invisible in a single-version test run and appears only in p
 
 Return four sections.
 
+End the report with one line, `Findings: <n>`, where `<n>` is the number of entries in your Findings section (`Findings: 0` when there are none). jig's end-of-turn check reads that line to know whether `review-verifier` must run (`rules/decisions/2026-10-23-findings-verification-check.md`); a report without it is reported to the owner as unchecked.
+
 **Findings**, each:
 
 ```

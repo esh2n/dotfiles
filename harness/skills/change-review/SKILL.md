@@ -3,6 +3,8 @@ name: change-review
 description: Use when reviewing a change — a diff, a branch, a pull request, or your own work before you hand it over or open a PR — in any harness, from a quick daily check to a heavy review of a large or risky change. Also covers a design or spec before code exists, and a whole-codebase security audit when asked. Symptoms include "レビューして", "review this", "PR を見て", "これで大丈夫？", finishing an implementation, or readying a PR. The review reports findings; it never posts to GitHub, and fixes only verified blocker and major findings in your own work in progress.
 metadata:
   namespaces: [practice]
+  findings-reporters: [code-reviewer, security-reviewer, workload-reviewer, ui-reviewer, test-reviewer, spec-reviewer, rollout-reviewer]
+  findings-verifier: review-verifier
 ---
 
 # Review
@@ -73,7 +75,7 @@ When the change is performance-motivated or edits a known hot path, tell `code-r
 
 ## 5. Verify every finding
 
-Spawn one `review-verifier` per finding, in parallel, with the finding, the diff file path and the context paths. At most 12 per review, highest severity first; the rest are reported as unverified, never dropped.
+Spawn one `review-verifier` per finding, in parallel, with the finding, the diff file path and the context paths. At most 12 per review, highest severity first; the rest are reported as unverified, never dropped. Where jig runs the end-of-turn findings check (Claude Code), a turn that ends after a reviewer reported findings and before any `review-verifier` finished or started is stopped and sent back to this step (`rules/decisions/2026-10-23-findings-verification-check.md`).
 
 - holds → Findings.
 - does not hold → removed; count it under Refuted with the one-line reason.
