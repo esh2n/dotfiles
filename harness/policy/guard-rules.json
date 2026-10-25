@@ -183,6 +183,20 @@
   ],
   "rules": [
     {
+      "id": "ask-task-change",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "task",
+        "argv": "(?:^|\\s)(?:done|delete|modify|annotate|undo|purge|import)(?:\\s|$)"
+      },
+      "why": "2026-10-23-personal-tasks-sync: changing the owner's tasks syncs to every device within five minutes",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
       "id": "git-force-push",
       "effect": "forbid",
       "action": "shell.exec",
