@@ -11,11 +11,13 @@ set -euo pipefail
 # shellcheck source=SCRIPTDIR/../litellm/config/secrets.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../litellm/config/secrets.sh"
 use_service_path
+# the tasks' own service account, which reads only the taskwarrior vault
+OP_TOKEN_ITEM="taskwarrior-op-token"
 
 : "${SYNC_SERVER:?set by the unit}"
 : "${SYNC_LISTEN:?set by the unit}"
 export_op_token
-CLIENT_ID="$(read_secret op://llm-automation/taskwarrior/client-id)"
+CLIENT_ID="$(read_secret op://taskwarrior/taskwarrior/client-id)"
 # the server reads --allow-client-id from CLIENT_ID: off the command line, and
 # the vault token does not go with it
 export CLIENT_ID

@@ -40,6 +40,9 @@ launch() { PATH="${BIN}:/usr/bin:/bin" bash "$D/$1.sh"; }
 	[ "$status" -eq 0 ]
 	grep -qx "server --listen 127.0.0.1:10222 --data-dir ${HOME}/.local/share/taskchampion-sync-server" "$LOG"
 	grep -qx "env id=the-id op=none" "$LOG"
+	# the tasks' own token and vault, apart from LiteLLM's
+	grep -qx "security find-generic-password -s taskwarrior-op-token -w" "$LOG"
+	grep -qx "op read op://taskwarrior/taskwarrior/client-id" "$LOG"
 	f="${HOME}/.local/share/taskchampion-sync-server"
 	[ "$(stat -c %a "$f" 2>/dev/null || stat -f %Lp "$f")" = 700 ]
 }
@@ -59,6 +62,9 @@ launch() { PATH="${BIN}:/usr/bin:/bin" bash "$D/$1.sh"; }
 	grep -qx "dotctl tasks sync loop" "$LOG"
 	grep -qx "env url=https://mac.example.ts.net:10222 id=the-id secret=the-secret op=none" "$LOG"
 	run ! grep -q "^dotctl .*the-secret" "$LOG"
+	grep -qx "security find-generic-password -s taskwarrior-op-token -w" "$LOG"
+	grep -qx "op read op://taskwarrior/taskwarrior/client-id" "$LOG"
+	grep -qx "op read op://taskwarrior/taskwarrior/encryption-secret" "$LOG"
 }
 
 @test "task-sync-up: without the secrets it backs up once and exits, so the service manager tries again" {

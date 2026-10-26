@@ -45,7 +45,8 @@ scope: repo
 
 ## Consequences
 
-- 持ち主が一度だけ行うこと: 1Passwordに項目`taskwarrior`を作る（`client-id`に`uuidgen`の値、`encryption-secret`に`openssl rand -base64 32`の値）。observerの機械のroles.jsonに`observer`を入れ、ほかのマシンのroles.jsonに`observerHost`（observerの機械のtailnet名）を入れて、それぞれ`make up`する。スマートフォンのアプリには、URL `https://<observer の機械の tailnet 名>:10222`と、同じclient idと鍵を入れる。
+- launcherは、LiteLLMとは別の1Passwordサービスアカウントのトークンで秘密を読む。このトークンが読めるのは、タスクの項目を置いたvaultだけである。タスクの秘密をLLMの秘密と同じvaultに置かないためで、持ち主の裁定（2026-10-26）による。各マシンのOSのストアに、このトークンを一度だけ入れる（`home/shared/taskwarrior/task-sync-up.sh`の`OP_TOKEN_ITEM`）。
+- 持ち主が一度だけ行うこと: 1Passwordに、タスクの秘密だけを置くvaultと、そのvaultだけを読めるサービスアカウントを作り、そのvaultに項目`taskwarrior`を作る（`client-id`に`uuidgen`の値、`encryption-secret`に`openssl rand -base64 32`の値）。observerの機械のroles.jsonに`observer`を入れ、ほかのマシンのroles.jsonに`observerHost`（observerの機械のtailnet名）を入れて、それぞれ`make up`する。スマートフォンのアプリには、URL `https://<observer の機械の tailnet 名>:10222`と、同じclient idと鍵を入れる。
 - observerの機械が止まっている間、各マシンは自分のレプリカで動き、同期は再開したときに行われる。
 - `dotctl llm check`がobserverで`tailscale serve 10222`を確かめる。
 - 週次の見直しの繰り返しタスクは、observerの機械で一度だけ作る。
