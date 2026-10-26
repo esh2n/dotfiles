@@ -2,7 +2,7 @@
 
 Status: accepted — 持ち主の裁定（2026-10-26）。2026-10-25-no-space-between-japanese-and-latin.mdを置き換える
 
-rule: In any Japanese text you write, put no space between Japanese and Latin letters, digits or inline code (`skillを使う`, `2件`, `` `jig`の設定 ``). Keep a space only where it carries meaning: inside code blocks, in quoted text, and beside Markdown emphasis that would otherwise not render — and there first move the brackets outside the markers (`「**重要**」です`). A page you write sets `text-autospace: normal` on `body` for the visual gap.
+rule: In any Japanese text you write, put no space between Japanese and Latin letters, digits or inline code (`skillを使う`, `2件`, `` `jig apply`を実行する ``). Keep a space only where it carries meaning: inside code blocks, in quoted text, and beside Markdown emphasis that would otherwise not render — and there first move the brackets outside the markers (`「**重要**」です`). A page you write sets `text-autospace: normal` on `body` for the visual gap.
 
 ## Problem
 
