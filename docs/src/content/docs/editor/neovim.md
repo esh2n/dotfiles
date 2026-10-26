@@ -19,6 +19,30 @@ nvim-switch custom
 
 すべてのdistributionでleader keyは`<Space>`。`<Space>`を押して待つとwhich-keyでkeybindingの一覧が表示される。
 
+## 全distribution共通
+
+`home/shared/nvim/common/lua/dotfiles/`に、4つのdistributionで共有するLuaを置いている。各distributionの`lua/dotfiles`はこのdirectoryへのsymlinkなので、ここを直すと全distributionに反映される。
+
+### Branchの差分をまとめて見る
+
+[diffview+](https://github.com/dlyongemallo/diffview-plus.nvim)を入れている。更新が止まった[diffview.nvim](https://github.com/sindrets/diffview.nvim)の、今もメンテナンスされているforkである。変更されたfileの一覧が左に出て、fileを選ぶと左右に並んだ差分に切り替わる。
+
+```vim
+" origin/mainから分岐した点とHEADを比べる。-- の後ろでpathを絞り込める
+:DiffviewOpen origin/main...HEAD -- tools/backend_test
+" fileの変更履歴
+:DiffviewFileHistory %
+:DiffviewClose
+```
+
+shellから開く場合は`nvim +"DiffviewOpen origin/main...HEAD"`と打つ。diffview内で`g?`を押すとkey操作の一覧が出る。
+
+### 差分表示の色
+
+solarized、dracula、nordなどのthemeは、差分の色(`DiffAdd`、`DiffChange`、`DiffText`)を文字色で指定している。そのため差分表示ではsyntax highlightの色が上書きされ、追加行が全部同じ色になる。`dotfiles/diff_colors.lua`は、themeを読み込むたびにこれらを調べる。文字色か反転が指定されていれば、その色をeditorの背景色に混ぜた薄い背景色だけに置き換える。背景色だけで指定しているthemeは変えない。
+
+背景を透明にする設定で、themeの背景色が`Normal`にも`NormalFloat`にも無い場合は、黒(light themeでは白)に混ぜる。そのため端末の背景色とは少しずれることがある。
+
 ## LazyVim
 
 | 操作 | Key |
@@ -37,6 +61,8 @@ nvim-switch custom
 | window移動 | `Ctrl+h/j/k/l` |
 | 保存 | `<Space> + w` |
 | 終了 | `<Space> + q` |
+
+LazyVimには[tobira.nvim](https://github.com/kamegoro/tobira.nvim)を入れている。tobira.nvimは、操作の癖から効率のよいコマンドを提案するpluginである。ただしj/kを連打したときの提案(`{n}j`、`{n}k`、`}`、`{`)は出さないようにしている。setupに該当optionが無いので、`lua/plugins/tobira.lua`で連打の検出結果を提案の手前で捨てている。
 
 ## NvChad
 
