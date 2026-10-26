@@ -41,7 +41,7 @@ describe("the skill-run day files", () => {
 });
 
 describe("every record kind reads back as written", () => {
-  test("subagent with and without id and count, each gate outcome, typecheck", async () => {
+  test("subagent with and without id and count, each gate outcome, typecheck, stale settings", async () => {
     const dir = await mkdtemp(join(tmpdir(), "jig-runs-"));
     const base = { at: "2026-10-23T10:00:00.000Z", session: "s", harness: "claude" };
     const records: SkillRunEvent[] = [
@@ -57,6 +57,7 @@ describe("every record kind reads back as written", () => {
         }),
       ),
       { ...base, kind: "typecheck" },
+      { ...base, kind: "stale-settings" },
     ];
     for (const record of records) await appendSkillRun(dir, record);
     expect(await readSkillRuns(dir, new Date("2026-10-23T12:00:00.000Z"))).toEqual(records);

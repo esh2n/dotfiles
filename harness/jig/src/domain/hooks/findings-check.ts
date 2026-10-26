@@ -47,7 +47,9 @@ export type SkillRunEvent =
       readonly outcome: GateOutcome;
     })
   /** The typecheck gate stopped the turn; read back so that only its own block makes it "once". */
-  | (EventBase & { readonly kind: "typecheck" });
+  | (EventBase & { readonly kind: "typecheck" })
+  /** The owner was told the settings lack the recording hooks; read back so it is said once a session. */
+  | (EventBase & { readonly kind: "stale-settings" });
 
 export interface ReporterCount {
   readonly agentType: string;

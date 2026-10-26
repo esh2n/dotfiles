@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { buildClaudeHooks } from "../../src/domain/claude/hooks";
 
 // The real entry, as the hooks run it: the recorders and the gate meet only through the
 // state directory, so only a run of `jig.ts` itself shows that they agree on it.
@@ -35,7 +36,11 @@ describe("the findings hooks through jig.ts", () => {
     );
     const project = join(root, "project");
     await mkdir(project, { recursive: true });
-    const env = { JIG_STATE_DIR: join(root, "state"), JIG_SKILL_ROOT: skills };
+    const env = {
+      JIG_STATE_DIR: join(root, "state"),
+      JIG_SKILL_ROOT: skills,
+      CLAUDE_CONFIG_DIR: join(root, "no-claude"),
+    };
     const session = { session_id: "wiring-1", cwd: project };
 
     const used = await hook(
@@ -70,5 +75,37 @@ describe("the findings hooks through jig.ts", () => {
     );
     expect(result).toEqual({ code: 0, stdout: "" });
     expect(await readFile(file, "utf8")).toBe("");
+  });
+
+  describe("the Stop gate reads the settings at CLAUDE_CONFIG_DIR", () => {
+    const gate = async (name: string, settings: string | undefined) => {
+      const dir = join(root, name);
+      await mkdir(dir, { recursive: true });
+      if (settings !== undefined) await writeFile(join(dir, "settings.json"), settings);
+      return hook(
+        "stop-gate",
+        { session_id: `settings-${name}`, cwd: root, stop_hook_active: false },
+        { JIG_STATE_DIR: join(root, `state-${name}`), CLAUDE_CONFIG_DIR: dir },
+      );
+    };
+
+    test("settings without the recorders are told to the owner, without a block", async () => {
+      const result = await gate("old", JSON.stringify({ hooks: {} }));
+      const message = JSON.parse(result.stdout) as Record<string, string>;
+      expect(message.decision).toBeUndefined();
+      expect(message.systemMessage).toContain(join(root, "old", "settings.json"));
+      expect(message.systemMessage).toContain("SubagentStop");
+    });
+
+    test("settings as jig writes them, a missing file and broken JSON say nothing", async () => {
+      const good = JSON.stringify({ hooks: buildClaudeHooks({ bun: "/b", jig: "/j/jig.ts" }) });
+      for (const [name, settings] of [
+        ["good", good],
+        ["missing", undefined],
+        ["broken", "{not json"],
+      ] as const) {
+        expect({ name, ...(await gate(name, settings)) }).toEqual({ name, code: 0, stdout: "" });
+      }
+    });
   });
 });

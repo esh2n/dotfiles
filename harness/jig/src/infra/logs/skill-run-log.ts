@@ -1,7 +1,7 @@
 /**
  * The findings check's record: which skills a session used, which subagents finished in it
- * with their `Findings` line, what the gate already did for each use, and when the
- * typecheck gate stopped a turn
+ * with their `Findings` line, what the gate already did for each use, when the
+ * typecheck gate stopped a turn, and when the owner was told the settings are stale
  * (`rules/decisions/2026-10-23-findings-verification-check.md`).
  *
  * One jsonl file per UTC day under the directory, appended like the session and router
@@ -59,6 +59,7 @@ export function parseSkillRun(line: string): SkillRunEvent | undefined {
     };
   }
   if (r.kind === "typecheck") return { ...base, kind: "typecheck" };
+  if (r.kind === "stale-settings") return { ...base, kind: "stale-settings" };
   return undefined;
 }
 

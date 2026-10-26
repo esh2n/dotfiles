@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type FindingsDeps, stopGate } from "../../src/cli/hooks/stop-gate";
+import { buildClaudeHooks } from "../../src/domain/claude/hooks";
 import type { FindingsRule, SkillRunEvent } from "../../src/domain/hooks/findings-check";
 import type { Runner } from "../../src/domain/hooks/run";
 import { appendSkillRun, readSkillRuns } from "../../src/infra/logs/skill-run-log";
@@ -203,5 +204,89 @@ describe("the findings check over the real day files", () => {
     expect((await run()).systemMessage).toContain("no review-verifier checked");
     expect(await stopGate(stop(), { run: pass, exists, findings: deps })).toBe("");
     await rm(dirname(dir), { recursive: true, force: true });
+  });
+});
+
+describe("settings without the findings recorders", () => {
+  const old = {
+    path: "/home/u/.claude/settings.json",
+    value: {
+      hooks: { Stop: [{ hooks: [{ type: "command", command: "/b /j/jig.ts hooks stop-gate" }] }] },
+    },
+  };
+
+  test("the owner is told once a session, and the turn is not stopped", async () => {
+    const { deps, written } = store([]);
+    const withSettings: FindingsDeps = { ...deps, settings: async () => old };
+    const first = out(await stopGate(stop(), { run: pass, exists, findings: withSettings }));
+    expect(first.decision).toBeUndefined();
+    expect(first.systemMessage).toContain("/home/u/.claude/settings.json");
+    expect(first.systemMessage).toContain("SubagentStop");
+    expect(written.map((e) => e.kind)).toEqual(["stale-settings"]);
+
+    const second = out(await stopGate(stop(), { run: pass, exists, findings: withSettings }));
+    expect(second.systemMessage).toBeUndefined();
+  });
+
+  test("a notice in another session does not silence this one", async () => {
+    const other: SkillRunEvent = {
+      ...base,
+      session: "s0",
+      at: "2026-10-23T09:00:00.000Z",
+      kind: "stale-settings",
+    };
+    const { deps } = store([other]);
+    const result = out(
+      await stopGate(stop(), {
+        run: pass,
+        exists,
+        findings: { ...deps, settings: async () => old },
+      }),
+    );
+    expect(result.systemMessage).toContain("SubagentStop");
+  });
+
+  test("settings as jig writes them say nothing and record nothing", async () => {
+    const { deps, written } = store([]);
+    const good = {
+      path: old.path,
+      value: { hooks: buildClaudeHooks({ bun: "/b", jig: "/j/jig.ts" }) },
+    };
+    const result = await stopGate(stop(), {
+      run: pass,
+      exists,
+      findings: { ...deps, settings: async () => good },
+    });
+    expect(result).toBe("");
+    expect(written).toEqual([]);
+  });
+
+  test("a failed notice record keeps the findings block", async () => {
+    const { deps } = store([used, reported(2)]);
+    const record: FindingsDeps["record"] = async (event) => {
+      if (event.kind === "stale-settings") throw new Error("ENOSPC");
+      await deps.record(event);
+    };
+    const result = out(
+      await stopGate(stop(), {
+        run: pass,
+        exists,
+        findings: { ...deps, record, settings: async () => old },
+      }),
+    );
+    expect(result.decision).toBe("block");
+    expect(result.reason).toContain("review-verifier");
+    expect(result.systemMessage ?? "").not.toContain("did not run");
+  });
+
+  test("an unreadable settings file says nothing", async () => {
+    const { deps, written } = store([]);
+    const result = await stopGate(stop(), {
+      run: pass,
+      exists,
+      findings: { ...deps, settings: async () => undefined },
+    });
+    expect(result).toBe("");
+    expect(written).toEqual([]);
   });
 });

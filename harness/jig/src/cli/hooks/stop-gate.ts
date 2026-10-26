@@ -48,6 +48,7 @@ import {
   lastBlock,
   ownerNotice,
 } from "../../domain/hooks/findings-check";
+import { missingFindingsHooks, staleSettingsNotice } from "../../domain/hooks/findings-wiring";
 import type { ReadDir } from "../../domain/hooks/format";
 import { gatePlanFor, gateWantsChangedFiles, projectHooksFor, tail } from "../../domain/hooks/gate";
 import { missingToolReason } from "../../domain/hooks/project-hooks";
@@ -98,6 +99,8 @@ export interface FindingsDeps {
   readonly record: (event: SkillRunEvent) => Promise<void>;
   readonly now: () => Date;
   readonly harness: string;
+  /** Claude Code's settings file and its parsed content; absent, or `undefined` when unreadable, it is not checked. */
+  readonly settings?: () => Promise<{ readonly path: string; readonly value: unknown } | undefined>;
 }
 
 export interface StopGateDeps {
@@ -174,6 +177,15 @@ async function findingsStep(
       });
       logger?.debug(`gate.findings-${outcome}`, { skill: action.skill });
     }
+    // Its own failure is its own: the reasons above are already counted against the cap.
+    try {
+      const stale = await staleSettingsStep(session, events, deps, logger);
+      if (stale !== undefined) notices.push(stale);
+    } catch (error) {
+      logger?.debug("gate.stale-settings-failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
     return { reasons, notices, ...(last === undefined ? {} : { last }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -183,6 +195,34 @@ async function findingsStep(
       notices: [`jig: the findings check did not run (${message}). Not a pass.`],
     };
   }
+}
+
+/**
+ * Said once a session: settings that lack the recording hooks leave the check blind, and
+ * it would pass every turn without a word. An unreadable settings file is not judged.
+ */
+async function staleSettingsStep(
+  session: string,
+  events: readonly SkillRunEvent[],
+  deps: FindingsDeps,
+  logger: Logger | undefined,
+): Promise<string | undefined> {
+  if (deps.settings === undefined) return undefined;
+  if (events.some((event) => event.session === session && event.kind === "stale-settings")) {
+    return undefined;
+  }
+  const settings = await deps.settings();
+  if (settings === undefined) return undefined;
+  const missing = missingFindingsHooks(settings.value);
+  if (missing.length === 0) return undefined;
+  await deps.record({
+    at: deps.now().toISOString(),
+    session,
+    harness: deps.harness,
+    kind: "stale-settings",
+  });
+  logger?.debug("gate.findings-stale-settings", { missing: missing.join(",") });
+  return staleSettingsNotice(missing, settings.path);
 }
 
 /** @returns what to write to stdout: a block decision, a message for the owner, or the empty string. */

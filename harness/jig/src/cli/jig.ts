@@ -361,6 +361,17 @@ function resolveRetirePaths(): RetirePaths {
   };
 }
 
+/** The settings file the Stop gate checks for the findings recorders; unreadable or not JSON is `undefined`. */
+async function readClaudeSettings(
+  path: string,
+): Promise<{ readonly path: string; readonly value: unknown } | undefined> {
+  try {
+    return { path, value: JSON.parse(await readFile(path, "utf8")) as unknown };
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * How Claude Code should invoke jig from a hook: absolute paths only, for the
  * same reason the Codex registration uses them — a hook runs in whatever
@@ -647,6 +658,7 @@ export async function main(argv: readonly string[]): Promise<number> {
               record: (event) => appendSkillRun(skillRunsDir(), event),
               now: () => new Date(),
               harness: harnessFlag(argv) ?? "claude",
+              settings: () => readClaudeSettings(resolveClaudeApplyPaths().settings),
             },
           }),
         );
