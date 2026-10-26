@@ -1,6 +1,6 @@
 # 日本語と英字・数字の間に空白を入れない
 
-Status: accepted — 持ち主の裁定（2026-10-25）
+Status: superseded — 2026-10-26-japanese-latin-spacing.mdが置き換える（調査の結果を足し、空白を残す場所と既存の文書の直し方を決める）。もとの裁定は2026-10-25
 
 rule: In any Japanese text the model writes, put no space between Japanese and Latin letters, digits or inline code; where a page needs the visual gap, its CSS adds it with `text-autospace`, and the text never carries it.
 
