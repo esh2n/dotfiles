@@ -24,7 +24,7 @@ python3 "$SCRIPT" > /tmp/morning-brief-blocked.json
 [ -s /tmp/morning-brief-blocked.json ] || echo "WARN: blocked-sources取得に失敗。Reddit/NHK/IGNをスキップして続行"
 ```
 
-結果は `/tmp/morning-brief-blocked.json` に保存される。このファイルをReadツールで読み込んで後続ステップで使う。
+結果は`/tmp/morning-brief-blocked.json`に保存される。このファイルをReadツールで読み込んで後続ステップで使う。
 
 ---
 
@@ -44,10 +44,10 @@ python3 "$SCRIPT" > /tmp/morning-brief-blocked.json
 | はてブ 政治経済 | `https://b.hatena.ne.jp/hotentry/economics.rss` | RSS 1.0 | 同上 |
 | はてブ ゲーム | `https://b.hatena.ne.jp/hotentry/game.rss` | RSS 1.0 | 同上 |
 | はてブ エンタメ | `https://b.hatena.ne.jp/hotentry/entertainment.rss` | RSS 1.0 | 同上 |
-| Zenn トレンド | `https://zenn.dev/api/articles?order=daily&count=20` | JSON | title, path, liked_count, user.name |
-| Qiita 人気 | `https://qiita.com/api/v2/items?page=1&per_page=20&query=stocks:>10` | JSON | title, url, likes_count, tags |
+| Zennトレンド | `https://zenn.dev/api/articles?order=daily&count=20` | JSON | title, path, liked_count, user.name |
+| Qiita人気 | `https://qiita.com/api/v2/items?page=1&per_page=20&query=stocks:>10` | JSON | title, url, likes_count, tags |
 | Hacker News Top | `https://hacker-news.firebaseio.com/v0/topstories.json` | JSON | IDリスト→上位10件を個別取得 |
-| Google News 日本 | `https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja` | RSS | title, link |
+| Google News日本 | `https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja` | RSS | title, link |
 | Yahoo!ニュース | `https://news.yahoo.co.jp/rss/topics/top-picks.xml` | RSS | title, link |
 | 4Gamer | `https://www.4gamer.net/rss/index.xml` | RSS 1.0 | title, link |
 | AUTOMATON | `https://automaton-media.com/feed/` | RSS 2.0 | title, link |
@@ -55,14 +55,14 @@ python3 "$SCRIPT" > /tmp/morning-brief-blocked.json
 | PC Watch | `https://pc.watch.impress.co.jp/data/rss/1.0/pcw/feed.rdf` | RSS 1.0 | title, link |
 | ITmedia NEWS | `https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml` | RSS 2.0 | title, link |
 | Yahoo Finance | `https://finance.yahoo.com/news/rssindex` | RSS | title, link |
-| Google News 株式 | `https://news.google.com/rss/search?q=株式市場+OR+日経平均&hl=ja&gl=JP&ceid=JP:ja` | RSS | title, link |
+| Google News株式 | `https://news.google.com/rss/search?q=株式市場+OR+日経平均&hl=ja&gl=JP&ceid=JP:ja` | RSS | title, link |
 
-**Hacker News の個別記事取得方法:**
-topstories.json から上位10件のIDを取得し、それぞれ `https://hacker-news.firebaseio.com/v0/item/{id}.json` で title, url, score, descendants を取得。
+**Hacker Newsの個別記事取得方法:**
+topstories.jsonから上位10件のIDを取得し、それぞれ`https://hacker-news.firebaseio.com/v0/item/{id}.json`でtitle, url, score, descendantsを取得。
 
 ### グループB: スクリプト結果の読み込み
 
-Step 1 で取得済みの `/tmp/morning-brief-blocked.json` をReadツールで読む。
+Step 1で取得済みの`/tmp/morning-brief-blocked.json`をReadツールで読む。
 内容: Reddit (7サブレディット), NHK NEWS (6カテゴリ), IGN Japan
 
 ### グループC: WebSearch（検索でしか取れないもの）
@@ -85,7 +85,7 @@ Step 1 で取得済みの `/tmp/morning-brief-blocked.json` をReadツールで�
 以下のルールで重複を排除:
 - 同一URLの記事は1つにまとめる
 - 同一トピックが複数ソースに出ている場合、最もスコア/ブクマ数が高いソースを主とし、他ソースは「他: [source名]でも話題」と記載
-- 過去のブリーフィングがある場合 (`~/.cache/morning-brief/` 配下)、直近7日分のURLと重複するものは除外
+- 過去のブリーフィングがある場合 (`~/.cache/morning-brief/`配下)、直近7日分のURLと重複するものは除外
 
 ---
 
@@ -175,14 +175,14 @@ Step 1 で取得済みの `/tmp/morning-brief-blocked.json` をReadツールで�
 
 ## Step 7: 出力
 
-実行条件: 7a/7b/7d は**常に実行**。7c(Notion)は**Notion MCPが接続されている場合のみ**
+実行条件: 7a/7b/7dは**常に実行**。7c(Notion)は**Notion MCPが接続されている場合のみ**
 (未接続ならスキップした旨を報告)。
 
 ### 7a. ローカルファイル出力（Obsidian vault）
 
-`~/morning-brief/` にカテゴリ別ファイルを出力する。
+`~/morning-brief/`にカテゴリ別ファイルを出力する。
 このディレクトリはgitリポジトリであり、Obsidianのvaultとしても開ける。
-存在しない場合は `mkdir -p ~/morning-brief && git -C ~/morning-brief init` で初期化してから出力する。
+存在しない場合は`mkdir -p ~/morning-brief && git -C ~/morning-brief init`で初期化してから出力する。
 
 ```
 ~/morning-brief/
@@ -202,11 +202,11 @@ Step 1 で取得済みの `/tmp/morning-brief-blocked.json` をReadツールで�
 ```
 
 各ファイルにはfrontmatter（date, category）を付ける。
-index.mdにはObsidianのwikilink `[[tech|Tech]]` 形式で各カテゴリへのリンクを置く。
+index.mdにはObsidianのwikilink `[[tech|Tech]]`形式で各カテゴリへのリンクを置く。
 
 ### 7b. ターミナル出力
 
-index.md の内容（サマリー、Deep Dive候補、Action Items）をターミナルに表示。
+index.mdの内容（サマリー、Deep Dive候補、Action Items）をターミナルに表示。
 全カテゴリの記事一覧は長くなるため、ターミナルにはカテゴリ名と記事数のみ表示。
 
 ### 7c. Notionに書き出し (Notion MCP接続時)
@@ -218,7 +218,7 @@ Ask the owner first: a Notion page is a write other people may see, and the guar
 
 ### 7d. アーカイブ保存（重複排除用）
 
-`~/.cache/morning-brief/YYYY-MM-DD.md` にURLリストを保存（ディレクトリがなければ `mkdir -p ~/.cache/morning-brief` で作成）。
+`~/.cache/morning-brief/YYYY-MM-DD.md`にURLリストを保存（ディレクトリがなければ`mkdir -p ~/.cache/morning-brief`で作成）。
 
 ---
 

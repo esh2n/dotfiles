@@ -3,42 +3,42 @@ title: Git Config
 description: Conventional Commits template と global gitignore。
 ---
 
-Git の global 設定。commit message template と gitignore を共通化している。
+Gitのglobal設定。commit message templateとgitignoreを共通化している。
 
 ## Commit message template
 
-Conventional Commits 形式の template を `~/.config/git/message` に定義。`git commit` 時にテンプレートが表示される。
+Conventional Commits形式のtemplateを`~/.config/git/message`に定義。`git commit`時にテンプレートが表示される。
 
 ```text
 <type>[(scope)]: <description>
 ```
 
-### Type 一覧
+### Type一覧
 
 | Type | 用途 |
 |------|------|
 | `feat` | 新機能 |
 | `fix` | bug fix |
-| `docs` | document のみの変更 |
-| `style` | formatting, semicolon など |
+| `docs` | documentのみの変更 |
+| `style` | formatting, semicolonなど |
 | `refactor` | 機能変更を伴わないコード修正 |
-| `perf` | performance 改善 |
-| `test` | test の追加・修正 |
+| `perf` | performance改善 |
+| `test` | testの追加・修正 |
 | `chore` | build, CI, 依存関係の更新 |
 
 ### Breaking Change
 
-type の後に `!` を付けて breaking change を示す。
+typeの後に`!`を付けてbreaking changeを示す。
 
 ```text
 feat(auth)!: implement OAuth2 authentication
 ```
 
-footer に `BREAKING CHANGE:` を記述して詳細を説明。
+footerに`BREAKING CHANGE:`を記述して詳細を説明。
 
 ## Global gitignore
 
-`~/.config/git/ignore` で全 repository 共通の ignore pattern を定義。
+`~/.config/git/ignore`で全repository共通のignore patternを定義。
 
 ### OS generated
 

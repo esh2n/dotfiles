@@ -3,9 +3,9 @@ title: WezTerm
 description: Lua で構成された modular な WezTerm の設定。Windows/WSL にも対応。
 ---
 
-WezTerm は Lua で設定を書ける terminal emulator。modular な構成で、OS ごとの最適化、テーマ切替、Claude Code の通知連携などを含む。
+WezTermはLuaで設定を書けるterminal emulator。modularな構成で、OSごとの最適化、テーマ切替、Claude Codeの通知連携などを含む。
 
-## Module 構成
+## Module構成
 
 ```
 ~/.config/wezterm/
@@ -33,28 +33,28 @@ WezTerm は Lua で設定を書ける terminal emulator。modular な構成で�
 | Opacity | 0.6 | 0.6 |
 | Window decoration | RESIZE | RESIZE |
 
-背景透過は `0.6` がデフォルト。`toggle-opacity` event で `0.6 ↔ 1.0` を切り替えられる。
+背景透過は`0.6`がデフォルト。`toggle-opacity` eventで`0.6 ↔ 1.0`を切り替えられる。
 
-## OS 別の最適化
+## OS別の最適化
 
 ### macOS/Linux
 
 - WebGpu rendering (HighPerformance)
 - 60fps animation
-- カスタム status bar (天気、Spotify など)
+- カスタムstatus bar (天気、Spotifyなど)
 - Hack Nerd Font
 
 ### Windows/WSL
 
 - Software rendering (安定性優先)
 - 15fps animation, 30fps max
-- シンプルな status bar (時刻とバッテリーのみ)
-- auto config reload を無効化
+- シンプルなstatus bar (時刻とバッテリーのみ)
+- auto config reloadを無効化
 - WSL (Ubuntu) を直接起動
 
-## Claude Code 通知
+## Claude Code通知
 
-WezTerm の `bell` event を hook して、foreground process が Claude Code の場合に toast notification を表示する。
+WezTermの`bell` eventをhookして、foreground processがClaude Codeの場合にtoast notificationを表示する。
 
 ```lua
 wezterm.on("bell", function(window, pane)
@@ -64,22 +64,22 @@ wezterm.on("bell", function(window, pane)
 end)
 ```
 
-Claude Code がタスクを完了すると bell を鳴らすので、別の window で作業していても通知が届く。
+Claude Codeがタスクを完了するとbellを鳴らすので、別のwindowで作業していても通知が届く。
 
 ## Tab title
 
-tab title には現在の working directory を表示。home directory は `~` に置換。
+tab titleには現在のworking directoryを表示。home directoryは`~`に置換。
 
 ## テーマ連動
 
-Catppuccin ベースの color palette を `lua/ui/colors.lua` で定義。`theme-switch` で切り替えると色が変わる。
+Catppuccinベースのcolor paletteを`lua/ui/colors.lua`で定義。`theme-switch`で切り替えると色が変わる。
 
 ## Status bar (macOS/Linux)
 
-macOS と Linux では、外部 script を呼び出すリッチな status bar を表示する。天気、Spotify、network speed などの情報を含む。
+macOSとLinuxでは、外部scriptを呼び出すリッチなstatus barを表示する。天気、Spotify、network speedなどの情報を含む。
 
-Windows 環境では外部プロセスを使わず、時刻とバッテリーのみのシンプルな表示。
+Windows環境では外部プロセスを使わず、時刻とバッテリーのみのシンプルな表示。
 
-## 起動時 layout
+## 起動時layout
 
-`gui-startup` event で起動時に window を最大化する。macOS では `lua/core/layout.lua` のカスタム layout を適用。Windows では最小限の初期化のみ。
+`gui-startup` eventで起動時にwindowを最大化する。macOSでは`lua/core/layout.lua`のカスタムlayoutを適用。Windowsでは最小限の初期化のみ。

@@ -3,11 +3,11 @@ title: direnv
 description: Directory ごとに環境変数を自動で load/unload する。
 ---
 
-direnv は directory に入ると環境変数を自動で load し、離れると unload する。project ごとに独立した環境を持てる。
+direnvはdirectoryに入ると環境変数を自動でloadし、離れるとunloadする。projectごとに独立した環境を持てる。
 
 ## 基本
 
-project root に `.envrc` を作成:
+project rootに`.envrc`を作成:
 
 ```bash
 # 環境変数を設定
@@ -24,7 +24,7 @@ PATH_add ./bin
 use mise
 ```
 
-初回 (と変更後) は approve が必要:
+初回 (と変更後) はapproveが必要:
 
 ```bash
 direnv allow
@@ -32,14 +32,14 @@ direnv allow
 
 ## mise integration
 
-mise と組み合わせて言語 runtime を自動で切り替える:
+miseと組み合わせて言語runtimeを自動で切り替える:
 
 ```bash
 # .envrc
 use mise
 ```
 
-version は `.mise.toml` で指定:
+versionは`.mise.toml`で指定:
 
 ```toml
 [tools]
@@ -48,9 +48,9 @@ python = "3.12"
 go = "1.21"
 ```
 
-`cd` するだけで正しい version が activate される。
+`cd`するだけで正しいversionがactivateされる。
 
-## よくある pattern
+## よくあるpattern
 
 ### Database credentials
 
@@ -89,14 +89,14 @@ STRIPE_SECRET_KEY="sk_test_..."
 
 ## Security
 
-- `.envrc.local` は machine 固有の secret 用。必ず gitignore する
-- `.envrc` に本物の secret を置かない。placeholder を使う
-- `direnv allow` は明示的な trust mechanism
-- PR で `.envrc` の変更は慎重に review する
+- `.envrc.local`はmachine固有のsecret用。必ずgitignoreする
+- `.envrc`に本物のsecretを置かない。placeholderを使う
+- `direnv allow`は明示的なtrust mechanism
+- PRで`.envrc`の変更は慎重にreviewする
 
 ## direnv + wtp workflow
 
-worktree ごとに独立した環境を持たせる:
+worktreeごとに独立した環境を持たせる:
 
 ```bash
 # feature worktree を作成

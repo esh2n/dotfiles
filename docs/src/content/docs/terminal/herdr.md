@@ -3,18 +3,18 @@ title: Herdr
 description: コーディングエージェント向けターミナルマルチプレクサ Herdr の設定と使い方。
 ---
 
-[Herdr](https://herdr.dev) は、コーディングエージェント（Claude Code / Codex / OpenCode など）を
-1 つのターミナルから扱うためのマルチプレクサ。tmux に近い操作感のまま、各ペインで動くエージェントの
-状態（working / blocked / idle）を認識し、SSH 越しのリモートマシンでも同じセッションを扱える。
+[Herdr](https://herdr.dev) は、コーディングエージェント（Claude Code / Codex / OpenCodeなど）を
+1つのターミナルから扱うためのマルチプレクサ。tmuxに近い操作感のまま、各ペインで動くエージェントの
+状態（working / blocked / idle）を認識し、SSH越しのリモートマシンでも同じセッションを扱える。
 
-- 設定ファイル: `~/.config/herdr/config.toml`（dotfiles では `home/shared/herdr/config/config.toml`）
-- インストール: macOS は `pkgs.herdr`（`home/darwin/herdr/default.nix`）、Linux は Omarchy の `/usr/bin/herdr`
-- prefix key は tmux / Zellij / WezTerm と統一で `Ctrl+q`
+- 設定ファイル: `~/.config/herdr/config.toml`（dotfilesでは`home/shared/herdr/config/config.toml`）
+- インストール: macOSは`pkgs.herdr`（`home/darwin/herdr/default.nix`）、LinuxはOmarchyの`/usr/bin/herdr`
+- prefix keyはtmux / Zellij / WezTermと統一で`Ctrl+q`
 
 ## 概念
 
-Workspace（リポジトリ単位）> Tab（作業 / エージェント単位）> Pane（実ターミナル）の 3 階層。
-あるペインでエージェントを起動すると、Herdr がそれを **agent ペイン**として認識し、
+Workspace（リポジトリ単位）> Tab（作業 / エージェント単位）> Pane（実ターミナル）の3階層。
+あるペインでエージェントを起動すると、Herdrがそれを **agentペイン**として認識し、
 サイドバーに状態を表示する。
 
 ## 起動
@@ -23,63 +23,63 @@ Workspace（リポジトリ単位）> Tab（作業 / エージェント単位）
 herdr          # 起動 / デフォルトセッションに接続
 ```
 
-プロジェクトの `cd` 先で起動するとそのリポジトリ用に立ち上がる。デタッチしてもサーバ側で
-セッションとエージェントは動き続け、再度 `herdr` で再接続できる。
+プロジェクトの`cd`先で起動するとそのリポジトリ用に立ち上がる。デタッチしてもサーバ側で
+セッションとエージェントは動き続け、再度`herdr`で再接続できる。
 
 ## Keybindings
 
-prefix key は `Ctrl+q`。`Ctrl+q` → `x` は「prefix を押してから x」の意味。
+prefix keyは`Ctrl+q`。`Ctrl+q` → `x`は「prefixを押してからx」の意味。
 
-### Prefix なし
+### Prefixなし
 
 | Key | 操作 |
 |-----|------|
-| `Alt+l` / `Alt+h` | 次 / 前の tab（tmux の `M-l`/`M-h` に合わせて設定） |
-| `Alt+j` / `Alt+k` | 次 / 前の Workspace（サイドバーの縦軸に対応） |
+| `Alt+l` / `Alt+h` | 次 / 前のtab（tmuxの`M-l`/`M-h`に合わせて設定） |
+| `Alt+j` / `Alt+k` | 次 / 前のWorkspace（サイドバーの縦軸に対応） |
 
 ### Prefix mode (`Ctrl+q` →)
 
 | Key | 操作 |
 |-----|------|
-| `c` | 新規 tab |
-| `1`–`9` | tab 1–9 に切替 |
-| `Shift+t` | tab 名変更 |
+| `c` | 新規tab |
+| `1`–`9` | tab 1–9に切替 |
+| `Shift+t` | tab名変更 |
 | `\` | 縦分割（左右） |
 | `-` | 横分割（上下） |
-| `h`/`j`/`k`/`l` | pane 間の focus 移動 |
-| `p` | 直前の pane へ戻る（2 pane 間の往復に） |
-| `Alt+1`–`Alt+9` | サイドバーの N 番目の agent へ直接ジャンプ |
-| `z` | pane をズーム |
-| `r` | リサイズモード（`h`/`j`/`k`/`l` でサイズ調整） |
-| `x` | pane を閉じる |
+| `h`/`j`/`k`/`l` | pane間のfocus移動 |
+| `p` | 直前のpaneへ戻る（2 pane間の往復に） |
+| `Alt+1`–`Alt+9` | サイドバーのN番目のagentへ直接ジャンプ |
+| `z` | paneをズーム |
+| `r` | リサイズモード（`h`/`j`/`k`/`l`でサイズ調整） |
+| `x` | paneを閉じる |
 | `[` | コピーモード |
-| `e` | スクロールバックを `$EDITOR` で開く（長い出力の検索・コピーに） |
-| `g` | goto（インクリメンタル検索で Workspace / tab へ飛ぶ） |
-| `o` | 最後に通知を出した agent の pane へジャンプ |
-| `Shift+n` | 新規 Workspace |
-| `Shift+g` | git worktree を作成して Workspace として開く（下記） |
-| `w` | Workspace 選択 |
-| `Shift+p` | pane 名変更（ボーダーの agent ラベルを上書き） |
+| `e` | スクロールバックを`$EDITOR`で開く（長い出力の検索・コピーに） |
+| `g` | goto（インクリメンタル検索でWorkspace / tabへ飛ぶ） |
+| `o` | 最後に通知を出したagentのpaneへジャンプ |
+| `Shift+n` | 新規Workspace |
+| `Shift+g` | git worktreeを作成してWorkspaceとして開く（下記） |
+| `w` | Workspace選択 |
+| `Shift+p` | pane名変更（ボーダーのagentラベルを上書き） |
 | `b` | サイドバー開閉 |
 | `s` | アプリ内設定画面 |
 | `q` | デタッチ（裏で継続） |
 | `Shift+r` | 設定を再読み込み |
 | `?` | アプリ内ヘルプ |
 
-dotfiles で変えているのは `\`/`-`/`Alt+h`/`Alt+l`/`Alt+j`/`Alt+k`/`p`/`Alt+1..9` と後述の popup。
-それ以外は Herdr のデフォルト（既に tmux 風）。全一覧は `herdr --default-config` で確認できる。
+dotfilesで変えているのは`\`/`-`/`Alt+h`/`Alt+l`/`Alt+j`/`Alt+k`/`p`/`Alt+1..9`と後述のpopup。
+それ以外はHerdrのデフォルト（既にtmux風）。全一覧は`herdr --default-config`で確認できる。
 
 ## Popup（floating / 一時ウィンドウ）
 
-タブのレイアウトを崩さずに浮かせるターミナル。任意の pane を後から float 化する
-トグルはなく、`[[keys.command]]` で「このコマンドをこのキーで開く」を事前定義する方式。
-type は 3 種類：
+タブのレイアウトを崩さずに浮かせるターミナル。任意のpaneを後からfloat化する
+トグルはなく、`[[keys.command]]`で「このコマンドをこのキーで開く」を事前定義する方式。
+typeは3種類：
 
 - `popup` — セッションモーダルな浮きターミナル。閉じれば元の画面にそのまま戻る
-- `pane` — 一時 pane。コマンド終了で自動的に閉じる
+- `pane` — 一時pane。コマンド終了で自動的に閉じる
 - `shell` — 画面を出さずバックグラウンド実行
 
-dotfiles では popup を 4 つ定義している：
+dotfilesではpopupを4つ定義している：
 
 | Key | 開くもの | サイズ |
 |-----|---------|--------|
@@ -88,9 +88,9 @@ dotfiles では popup を 4 つ定義している：
 | `Prefix + f` | yazi | 85% |
 | `Prefix + t` | スクラッチシェル | 70%×60% |
 
-popup は cwd を引き継がないため、各コマンドが `HERDR_ACTIVE_PANE_CWD`
-（Herdr がフォーカス中 pane の cwd として export する変数）へ自分で `cd` している。
-新しい popup を足すときも同じパターンで：
+popupはcwdを引き継がないため、各コマンドが`HERDR_ACTIVE_PANE_CWD`
+（Herdrがフォーカス中paneのcwdとしてexportする変数）へ自分で`cd`している。
+新しいpopupを足すときも同じパターンで：
 
 ```toml
 [[keys.command]]
@@ -101,24 +101,24 @@ width = "85%"
 height = "85%"
 ```
 
-## git worktree 統合
+## git worktree統合
 
-`Ctrl+q` → `Shift+g` で現リポジトリの worktree を新規作成し、そのまま Workspace として開く。
-ブランチごとに独立した作業コピーを 1 キーで用意できるので、エージェントの並行作業に向く。
-worktree 本体は `~/.herdr/worktrees` に置かれる。
+`Ctrl+q` → `Shift+g`で現リポジトリのworktreeを新規作成し、そのままWorkspaceとして開く。
+ブランチごとに独立した作業コピーを1キーで用意できるので、エージェントの並行作業に向く。
+worktree本体は`~/.herdr/worktrees`に置かれる。
 
-## Neovim 連携
+## Neovim連携
 
-Herdr のペイン内で Neovim を開いているときだけ有効になる（通常のターミナルや tmux/zellij では
-キーマップ自体が登録されず無影響）。lazyvim / custom / nvchad / astrovim の全ディストロに対応。
+Herdrのペイン内でNeovimを開いているときだけ有効になる（通常のターミナルやtmux/zellijでは
+キーマップ自体が登録されず無影響）。lazyvim / custom / nvchad / astrovimの全ディストロに対応。
 
 | Key | 動作 |
 |-----|------|
-| `<leader>zf`（ノーマル） | 現在ファイルのパスを、同じ tab の最初のエージェントに送る（`@path`） |
+| `<leader>zf`（ノーマル） | 現在ファイルのパスを、同じtabの最初のエージェントに送る（`@path`） |
 | `<leader>zl`（ビジュアル選択後） | パス + 選択行範囲を送る（`@path#L10-22`） |
 
-テキストを**挿入するだけで Enter は押さない**ため、`@path` が入った後に続けて指示を書いて自分で送信する。
-`HERDR_ENV` などの環境変数（Herdr がペインに export）を使って対象エージェントを特定している。
+テキストを**挿入するだけでEnterは押さない**ため、`@path`が入った後に続けて指示を書いて自分で送信する。
+`HERDR_ENV`などの環境変数（Herdrがペインにexport）を使って対象エージェントを特定している。
 
 ## 通知
 
@@ -129,17 +129,17 @@ Herdr のペイン内で Neovim を開いているときだけ有効になる（
 delivery = "terminal"   # Ghostty / WezTerm 経由。SSH 越しでもローカル端末に届く
 ```
 
-音は既定で ON（`[ui.sound] enabled = true`）。共有マシンでは `enabled = false` にする。
+音は既定でON（`[ui.sound] enabled = true`）。共有マシンでは`enabled = false`にする。
 
-## 日本語 IME 対策
+## 日本語IME対策
 
-`[experimental]` で 2 つ有効化している（いずれも macOS 向け）：
+`[experimental]`で2つ有効化している（いずれもmacOS向け）：
 
-- `switch_ascii_input_source_in_prefix` — IME が prefix 後のキーを飲み込むため、
-  prefix モード中だけ入力ソースを ASCII に切り替え、抜けたら元に戻す
-- `reveal_hidden_cursor_for_cjk_ime` — Claude Code / Codex が独自カーソルを描くせいで
-  IME 変換候補ウィンドウが迷子になるのを防ぐ。外側ターミナルに実カーソルを見せる
-  （`cjk_ime_agents = ["claude", "codex"]` に限定し、vim のノーマルモードに
+- `switch_ascii_input_source_in_prefix` — IMEがprefix後のキーを飲み込むため、
+  prefixモード中だけ入力ソースをASCIIに切り替え、抜けたら元に戻す
+- `reveal_hidden_cursor_for_cjk_ime` — Claude Code / Codexが独自カーソルを描くせいで
+  IME変換候補ウィンドウが迷子になるのを防ぐ。外側ターミナルに実カーソルを見せる
+  （`cjk_ime_agents = ["claude", "codex"]`に限定し、vimのノーマルモードに
   二重カーソルが出ないようにしている）
 
 ## CLI
@@ -154,5 +154,5 @@ herdr --help
 
 ## リモート / セッション継続
 
-デタッチ（`Ctrl+q` → `q`）してもサーバ上でエージェントは動き続ける。リモートに SSH して
-`herdr` を起動すれば、そのマシンのセッションを同じ操作感で扱える。
+デタッチ（`Ctrl+q` → `q`）してもサーバ上でエージェントは動き続ける。リモートにSSHして
+`herdr`を起動すれば、そのマシンのセッションを同じ操作感で扱える。

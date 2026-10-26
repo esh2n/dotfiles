@@ -3,7 +3,7 @@ title: Git Aliases
 description: 最小 keystroke で git 操作するための alias。
 ---
 
-小文字が通常操作、大文字が強力/破壊的な操作、という rule で統一。
+小文字が通常操作、大文字が強力/破壊的な操作、というruleで統一。
 
 ## 基本操作
 
@@ -20,8 +20,8 @@ description: 最小 keystroke で git 操作するための alias。
 
 | Alias | Command | 備考 |
 |-------|---------|------|
-| `gpso [branch]` | `git push origin` | 引数なしで interactive 選択 |
-| `gPso [branch]` | `git push --force origin` | 引数なしで interactive 選択 |
+| `gpso [branch]` | `git push origin` | 引数なしでinteractive選択 |
+| `gPso [branch]` | `git push --force origin` | 引数なしでinteractive選択 |
 | `gpl` | `git pull` | |
 | `gf` | `git fetch` | |
 
@@ -30,7 +30,7 @@ description: 最小 keystroke で git 操作するための alias。
 | Alias | Command | 備考 |
 |-------|---------|------|
 | `gb` | `git branch` | 一覧表示 |
-| `gsw [branch]` | `git switch` | 引数なしで interactive 選択 |
+| `gsw [branch]` | `git switch` | 引数なしでinteractive選択 |
 | `gswc` | `git switch -c` | 新規作成 |
 | `grn` | `git branch -m` | rename |
 
@@ -47,7 +47,7 @@ description: 最小 keystroke で git 操作するための alias。
 | Alias | Command | 備考 |
 |-------|---------|------|
 | `gd` | `git diff` | |
-| `gD` | `git diff --cached` | staged の diff |
+| `gD` | `git diff --cached` | stagedのdiff |
 | `gds` | `git diff --stat` | |
 
 ## Rebase
@@ -73,7 +73,7 @@ description: 最小 keystroke で git 操作するための alias。
 | Alias | Command | 備考 |
 |-------|---------|------|
 | `grt` | `git restore` | |
-| `gRt` | `git restore --staged` | stage 解除 |
+| `gRt` | `git restore --staged` | stage解除 |
 
 ## Stash
 
@@ -85,26 +85,26 @@ description: 最小 keystroke で git 操作するための alias。
 | `gstl` | `git stash list` |
 | `gstd` | `git stash drop` |
 
-## Interactive 操作 (skim ベース)
+## Interactive操作 (skimベース)
 
-引数ありで直接指定、引数なしで skim による interactive 選択に切り替わる alias。
+引数ありで直接指定、引数なしでskimによるinteractive選択に切り替わるalias。
 
 | Alias | 引数なし | 引数あり |
 |-------|---------|---------|
-| `gsw` | branch を選択して switch | 指定 branch に switch |
-| `gpso` | branch を選択して push | 指定 branch を push |
-| `gPso` | branch を選択して force push | 指定 branch を force push |
+| `gsw` | branchを選択してswitch | 指定branchにswitch |
+| `gpso` | branchを選択してpush | 指定branchをpush |
+| `gPso` | branchを選択してforce push | 指定branchをforce push |
 
-skim 専用の interactive alias。
+skim専用のinteractive alias。
 
 | Alias | 説明 |
 |-------|------|
-| `gbd` | local branch を選択して削除 |
-| `gme` | branch を選択して `--no-ff --edit` merge |
-| `gmesq` | branch を選択して `--squash` merge |
-| `gpr` | base branch を選択して PR 作成 |
-| `glo` | branch を選択して log 表示 |
-| `gtr` | 全 branch の log を graph 表示 |
+| `gbd` | local branchを選択して削除 |
+| `gme` | branchを選択して`--no-ff --edit` merge |
+| `gmesq` | branchを選択して`--squash` merge |
+| `gpr` | base branchを選択してPR作成 |
+| `glo` | branchを選択してlog表示 |
+| `gtr` | 全branchのlogをgraph表示 |
 
 ## その他
 
@@ -119,8 +119,8 @@ skim 専用の interactive alias。
 
 | Command | 説明 |
 |---------|------|
-| `gifit` | 2 つの commit を選択して difit で diff 表示 |
-| `gdif [N]` | 直近 N commit の diff を表示 (default: 1) |
+| `gifit` | 2つのcommitを選択してdifitでdiff表示 |
+| `gdif [N]` | 直近N commitのdiffを表示 (default: 1) |
 
 ```bash
 # interactive に commit 範囲を選択

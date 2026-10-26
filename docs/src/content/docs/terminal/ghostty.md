@@ -3,7 +3,7 @@ title: Ghostty
 description: GPU accelerated な terminal emulator の設定。背景透過と blur を効かせた構成。
 ---
 
-Ghostty は GPU accelerated な高速 terminal emulator。背景透過、blur、ligature 対応のフォント設定、quick terminal など。
+GhosttyはGPU acceleratedな高速terminal emulator。背景透過、blur、ligature対応のフォント設定、quick terminalなど。
 
 ## 外観
 
@@ -18,9 +18,9 @@ Ghostty は GPU accelerated な高速 terminal emulator。背景透過、blur、
 | Titlebar | hidden (macOS) |
 | Window shadow | 有効 |
 
-### Font の ligature
+### Fontのligature
 
-code の見た目を良くするために ligature を有効化している。
+codeの見た目を良くするためにligatureを有効化している。
 
 ```ini
 font-feature = +liga
@@ -28,9 +28,9 @@ font-feature = +calt
 font-feature = +ss01 ~ +ss05
 ```
 
-### Cell の調整
+### Cellの調整
 
-行間と underline の位置を微調整して可読性を上げている。
+行間とunderlineの位置を微調整して可読性を上げている。
 
 ```ini
 font-thicken = true
@@ -40,7 +40,7 @@ adjust-underline-position = 10%
 
 ## Quick Terminal
 
-`Cmd+Shift+Space` で画面上部から dropdown terminal を呼び出せる。autohide 付き。
+`Cmd+Shift+Space`で画面上部からdropdown terminalを呼び出せる。autohide付き。
 
 ```ini
 quick-terminal-position = top
@@ -50,7 +50,7 @@ quick-terminal-autohide = true
 
 ## Shell integration
 
-Zsh との integration が有効。cursor, title, sudo の feature を使う。
+Zshとのintegrationが有効。cursor, title, sudoのfeatureを使う。
 
 ```ini
 shell-integration = zsh
@@ -63,27 +63,27 @@ shell-integration-features = cursor,title,sudo
 
 | Key | 操作 |
 |-----|------|
-| `Cmd+T` | 新規 tab |
-| `Cmd+Shift+T` | 新規 window |
-| `Cmd+W` | tab を閉じる |
-| `Cmd+1-9` | tab 1-9 に切替 |
-| `Cmd+Tab` / `Cmd+Shift+Tab` | 次/前の tab |
+| `Cmd+T` | 新規tab |
+| `Cmd+Shift+T` | 新規window |
+| `Cmd+W` | tabを閉じる |
+| `Cmd+1-9` | tab 1-9に切替 |
+| `Cmd+Tab` / `Cmd+Shift+Tab` | 次/前のtab |
 
 ### Split
 
 | Key | 操作 |
 |-----|------|
-| `Cmd+D` | 右に split |
-| `Cmd+Shift+D` | 下に split |
-| `Cmd+Shift+矢印` | split 間の移動 |
-| `Cmd+Alt+矢印` | split の resize |
+| `Cmd+D` | 右にsplit |
+| `Cmd+Shift+D` | 下にsplit |
+| `Cmd+Shift+矢印` | split間の移動 |
+| `Cmd+Alt+矢印` | splitのresize |
 | `Cmd+Shift+Enter` | split zoom toggle |
 
 ### Navigation
 
 | Key | 操作 |
 |-----|------|
-| `Cmd+Left/Right` | 前/次の tab |
+| `Cmd+Left/Right` | 前/次のtab |
 | `Cmd+Up/Down` | page scroll |
 | `Shift+PageUp/Down` | page scroll |
 | `Cmd+Home/End` | scroll to top/bottom |
@@ -92,15 +92,15 @@ shell-integration-features = cursor,title,sudo
 
 | Key | 操作 |
 |-----|------|
-| `Cmd+K` | 画面 clear |
+| `Cmd+K` | 画面clear |
 | `Cmd+Enter` | fullscreen toggle |
-| `Cmd+Plus/Minus/0` | font size 変更/reset |
+| `Cmd+Plus/Minus/0` | font size変更/reset |
 | `Cmd+Shift+,` | config reload |
-| `Shift+Enter` | newline (Claude Code 対応) |
+| `Shift+Enter` | newline (Claude Code対応) |
 
-## Zellij との共存
+## Zellijとの共存
 
-Ghostty の `Alt+Left/Right` を unbind して、Zellij の keybinding と衝突しないようにしている。
+Ghosttyの`Alt+Left/Right`をunbindして、Zellijのkeybindingと衝突しないようにしている。
 
 ```ini
 keybind = alt+left=unbind
@@ -109,13 +109,13 @@ keybind = alt+right=unbind
 
 ## テーマ連動
 
-`theme-switch` で切り替えると、`~/.config/ghostty/theme` ファイルが更新される。
+`theme-switch`で切り替えると、`~/.config/ghostty/theme`ファイルが更新される。
 
 ## その他の設定
 
 | 項目 | 値 |
 |------|------|
-| Scrollback | 50,000 行 |
+| Scrollback | 50,000行 |
 | Mouse scroll multiplier | 3x |
 | Clipboard read/write | 許可 |
 | Mouse hide while typing | 有効 |

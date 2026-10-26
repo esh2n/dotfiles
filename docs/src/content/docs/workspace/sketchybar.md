@@ -3,7 +3,7 @@ title: Sketchybar
 description: Lua ベースの floating pill-style status bar。
 ---
 
-Sketchybar は macOS 用の高機能 status bar。Lua で設定を書き、floating pill-style のデザインで構成している。
+SketchybarはmacOS用の高機能status bar。Luaで設定を書き、floating pill-styleのデザインで構成している。
 
 ## 外観
 
@@ -17,9 +17,9 @@ Figma 風の floating pill bar。
 | Border | 2px (blue) |
 | Margin | 12px |
 | Y offset | 8px |
-| Background | Catppuccin Mocha の mantle (#181825, 94% opacity) |
+| Background | Catppuccin Mochaのmantle (#181825, 94% opacity) |
 
-## Module 構成
+## Module構成
 
 ```text
 ~/.config/sketchybar/
@@ -48,7 +48,7 @@ Figma 風の floating pill bar。
 
 ## Color palette
 
-Catppuccin Mocha ベースの色定義。
+Catppuccin Mochaベースの色定義。
 
 | Name | Color | 用途 |
 |------|-------|------|
@@ -71,18 +71,18 @@ Catppuccin Mocha ベースの色定義。
 | Paddings | 3px |
 | Group paddings | 5px |
 
-JetBrainsMono Nerd Font への切り替えも settings.lua のコメントを解除するだけで可能。
+JetBrainsMono Nerd Fontへの切り替えもsettings.luaのコメントを解除するだけで可能。
 
 ## Items
 
 ### Apple menu
-左端に Apple logo を表示。click で popup menu。
+左端にApple logoを表示。clickでpopup menu。
 
 ### Spaces
-AeroSpace の workspace 番号を表示。active workspace はハイライト。
+AeroSpaceのworkspace番号を表示。active workspaceはハイライト。
 
 ### Front app
-現在の active application 名を表示。
+現在のactive application名を表示。
 
 ### Calendar
 日付と時刻を表示。
@@ -91,8 +91,8 @@ AeroSpace の workspace 番号を表示。active workspace はハイライト。
 再生中の曲名とアーティストを表示。
 
 ### Widgets
-CPU usage、battery 残量などの system 情報。
+CPU usage、battery残量などのsystem情報。
 
 ## テーマ連動
 
-`colors.lua` は `~/.config/theme/current/sketchybar.lua` への symlink になっている。`dotctl theme set`（別名 `theme-switch`）は `current` を選んだテーマの palette に張り替え、`sketchybar --reload` でテーマを反映させる。
+`colors.lua`は`~/.config/theme/current/sketchybar.lua`へのsymlinkになっている。`dotctl theme set`（別名`theme-switch`）は`current`を選んだテーマのpaletteに張り替え、`sketchybar --reload`でテーマを反映させる。

@@ -3,13 +3,13 @@ title: Git Worktree (wtp)
 description: Git worktree で parallel に開発する CLI。
 ---
 
-wtp は git worktree を管理する CLI。stash や branch switch なしで、複数の branch を同時に作業できる。
+wtpはgit worktreeを管理するCLI。stashやbranch switchなしで、複数のbranchを同時に作業できる。
 
 ## いつ使うか
 
-- 複数の branch を同時に作業する場合
-- 2 つの実装を side by side で比較する場合
-- 別の directory で PR を review する場合
+- 複数のbranchを同時に作業する場合
+- 2つの実装をside by sideで比較する場合
+- 別のdirectoryでPRをreviewする場合
 
 ## 基本
 
@@ -30,15 +30,15 @@ wtp remove feature/user-auth
 cd "$(wtp cd feature/user-auth)"
 ```
 
-## Directory の置き場所
+## Directoryの置き場所
 
-worktree は `base_dir`（既定は `../worktrees`）の下に branch 名で作られる。移動は `cd "$(wtp cd <branch>)"`。
+worktreeは`base_dir`（既定は`../worktrees`）の下にbranch名で作られる。移動は`cd "$(wtp cd <branch>)"`。
 
-branch の type: `feature`, `bugfix`, `hotfix`, `experiment`, `refactor`
+branchのtype: `feature`, `bugfix`, `hotfix`, `experiment`, `refactor`
 
 ## Config
 
-リポジトリ直下の `.wtp.yml` に書く（`wtp init` が雛形を作る）:
+リポジトリ直下の`.wtp.yml`に書く（`wtp init`が雛形を作る）:
 
 ```yaml
 version: "1.0"
@@ -48,7 +48,7 @@ defaults:
 
 ## Recipes
 
-### Feature 作業中の hotfix
+### Feature作業中のhotfix
 
 ```bash
 # feature で作業中
@@ -65,7 +65,7 @@ cd ~/project-feature-auth
 wtp remove hotfix/critical-bug
 ```
 
-### Approach の比較
+### Approachの比較
 
 ```bash
 # Approach A
@@ -93,14 +93,14 @@ wtp remove review/pr-123
 
 | Command | 操作 |
 |---------|------|
-| `wt` | interactive menu (`Alt+W` でも起動) |
-| `wt list` | worktree 一覧 |
-| `wt cd` | worktree に switch (interactive) |
-| `wt add` | worktree を作成 |
-| `wt rm` | worktree を削除 (confirmation 付き) |
+| `wt` | interactive menu (`Alt+W`でも起動) |
+| `wt list` | worktree一覧 |
+| `wt cd` | worktreeにswitch (interactive) |
+| `wt add` | worktreeを作成 |
+| `wt rm` | worktreeを削除 (confirmation付き) |
 
 短縮形: `wtcd`, `wtadd`, `wtrm`, `wtls`
 
-Keybinding: `Alt+W` で menu を開く。
+Keybinding: `Alt+W`でmenuを開く。
 
-preview に最近の commit と git status が表示される。
+previewに最近のcommitとgit statusが表示される。

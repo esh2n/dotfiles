@@ -3,60 +3,60 @@ title: Keybindings
 description: WezTerm / Zellij / Herdr で統一された keybinding。
 ---
 
-WezTerm, Zellij, Herdr で共通の keybinding を使えるようにしている。prefix key は `Ctrl+q`。
+WezTerm, Zellij, Herdrで共通のkeybindingを使えるようにしている。prefix keyは`Ctrl+q`。
 
-Herdr は分割 (`Prefix + \` / `-`)・pane 移動 (`Prefix + h/j/k/l`)・タブ移動 (`Alt+h`/`Alt+l`) を
-この共通スキームに合わせている。Herdr 固有のキー・エージェント連携は [Herdr](/dotfiles/terminal/herdr/) を参照。
+Herdrは分割 (`Prefix + \` / `-`)・pane移動 (`Prefix + h/j/k/l`)・タブ移動 (`Alt+h`/`Alt+l`) を
+この共通スキームに合わせている。Herdr固有のキー・エージェント連携は [Herdr](/dotfiles/terminal/herdr/) を参照。
 
-## Pane 操作
+## Pane操作
 
 | 操作 | Key | 備考 |
 |------|-----|------|
 | 横分割 | `Prefix + \` | |
 | 縦分割 | `Prefix + -` | |
-| pane 移動 | `Prefix + h/j/k/l` | |
-| pane resize | `Prefix + H/J/K/L` | Zellij のみ。Herdr は `Prefix + r` |
-| pane 最大化 | `Prefix + z` | |
-| floating 切替 | `Prefix + w` | Zellij のみ |
-| 埋込/float 切替 | `Prefix + e` | Zellij のみ |
-| pane を閉じる | `Prefix + x` | |
+| pane移動 | `Prefix + h/j/k/l` | |
+| pane resize | `Prefix + H/J/K/L` | Zellijのみ。Herdrは`Prefix + r` |
+| pane最大化 | `Prefix + z` | |
+| floating切替 | `Prefix + w` | Zellijのみ |
+| 埋込/float切替 | `Prefix + e` | Zellijのみ |
+| paneを閉じる | `Prefix + x` | |
 
-## Tab 操作
+## Tab操作
 
 | 操作 | Key | 備考 |
 |------|-----|------|
-| 前の tab | Zellij `Prefix + Shift+Tab`、WezTerm `Cmd+[`、Herdr `Alt+h` | |
-| 次の tab | Zellij `Prefix + Tab`、WezTerm `Cmd+]`、Herdr `Alt+l` | |
-| Tab 1-5 | `Ctrl+1-5` | prefix 不要、Zellij のみ |
-| 新規 tab | `Prefix + t` | Zellij のみ |
+| 前のtab | Zellij `Prefix + Shift+Tab`、WezTerm `Cmd+[`、Herdr `Alt+h` | |
+| 次のtab | Zellij `Prefix + Tab`、WezTerm `Cmd+]`、Herdr `Alt+l` | |
+| Tab 1-5 | `Ctrl+1-5` | prefix不要、Zellijのみ |
+| 新規tab | `Prefix + t` | Zellijのみ |
 
 ## Copy / Scroll mode
 
 | 操作 | Key | 備考 |
 |------|-----|------|
-| mode に入る | `Prefix + [` | WezTerm は `Prefix + c` |
-| 移動 | `h/j/k/l`, `w/b/e`, `0/$` | Vim 式 |
-| 半 page scroll | `Ctrl+u/d` | |
-| 全 page scroll | `Ctrl+b/f` | |
-| 検索 | `/` → `n/N` | `Ctrl+r` で match type 切替 |
+| modeに入る | `Prefix + [` | WezTermは`Prefix + c` |
+| 移動 | `h/j/k/l`, `w/b/e`, `0/$` | Vim式 |
+| 半page scroll | `Ctrl+u/d` | |
+| 全page scroll | `Ctrl+b/f` | |
+| 検索 | `/` → `n/N` | `Ctrl+r`でmatch type切替 |
 | 選択開始 | `v` / `V` / `Ctrl+v` | 文字 / 行 / 矩形 |
-| copy して終了 | `y` | clipboard に copy |
-| mode を抜ける | `Esc` or `q` | |
+| copyして終了 | `y` | clipboardにcopy |
+| modeを抜ける | `Esc` or `q` | |
 
 ## Session
 
 | 操作 | Key | 備考 |
 |------|-----|------|
-| detach | `Prefix + d` | Zellij のみ。Herdr は `Prefix + q` |
+| detach | `Prefix + d` | Zellijのみ。Herdrは`Prefix + q` |
 
 ## Zellij plugin
 
 | 操作 | Key | 説明 |
 |------|-----|------|
 | Monocle | `Prefix + f` | fuzzy finder |
-| zellij-pane-picker | `Prefix + b` | 星を付けた pane に切替 |
+| zellij-pane-picker | `Prefix + b` | 星を付けたpaneに切替 |
 
-## Zellij session 管理
+## Zellij session管理
 
 ```bash
 # session 一覧
@@ -71,4 +71,4 @@ zellij attach <session-name>
 zellij delete-session <session-name>
 ```
 
-Zellij の session は明示的に削除するまで残る。
+Zellijのsessionは明示的に削除するまで残る。

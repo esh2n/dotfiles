@@ -3,7 +3,7 @@ title: Borders
 description: Active window を色付き border でハイライトする設定。
 ---
 
-Borders は macOS の active window に border を描画するツール。AeroSpace と組み合わせて、focus している window を視覚的に区別する。
+BordersはmacOSのactive windowにborderを描画するツール。AeroSpaceと組み合わせて、focusしているwindowを視覚的に区別する。
 
 ## 設定
 
@@ -17,7 +17,7 @@ Borders は macOS の active window に border を描画するツール。AeroSp
 
 ## テーマ連動
 
-`bordersrc` は `colors.sh` を source して active/inactive color を取得する。`theme-switch` で色が切り替わる。
+`bordersrc`は`colors.sh`をsourceしてactive/inactive colorを取得する。`theme-switch`で色が切り替わる。
 
 ```bash
 source "$(dirname "$0")/colors.sh"
@@ -33,10 +33,10 @@ options=(
 borders "${options[@]}"
 ```
 
-## Workspace CLI との連携
+## Workspace CLIとの連携
 
-Borders は `mado` の profile 切替で自動的に start / stop される
-（omniwm profile では停止）。個別操作には以下の alias を使う。
+Bordersは`mado`のprofile切替で自動的にstart / stopされる
+（omniwm profileでは停止）。個別操作には以下のaliasを使う。
 
 | Command | 操作 |
 |---------|------|

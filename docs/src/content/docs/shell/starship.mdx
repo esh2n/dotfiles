@@ -3,7 +3,7 @@ title: Starship
 description: 10 種類のテーマ palette を持つ Starship prompt の設定。
 ---
 
-Starship は cross-shell の prompt。Git status、言語 version、実行時間などを表示する。10 種類の theme palette を切り替え可能。
+Starshipはcross-shellのprompt。Git status、言語version、実行時間などを表示する。10種類のtheme paletteを切り替え可能。
 
 ## Prompt format
 
@@ -15,14 +15,14 @@ Starship は cross-shell の prompt。Git status、言語 version、実行時間
 </div>
 </figure>
 
-左から: directory, git branch, git status, 言語 version。右側に実行時間と exit status。
+左から: directory, git branch, git status, 言語version。右側に実行時間とexit status。
 
 ## 表示内容
 
 | Module | 表示 |
 |--------|------|
-| Directory | path (3 segment まで、icon 付き置換) |
-| Git branch | branch 名 (20 文字で truncate) |
+| Directory | path (3 segmentまで、icon付き置換) |
+| Git branch | branch名 (20文字でtruncate) |
 | Git status | ahead/behind, modified, staged, untracked, conflict |
 | Node.js | `⬢` + version |
 | Rust | `🦀` + version |
@@ -30,10 +30,10 @@ Starship は cross-shell の prompt。Git status、言語 version、実行時間
 | Python | `🐍` + version |
 | Docker | `🐳` + context |
 | Time | HH:MM |
-| Duration | 500ms 以上の command のみ表示 |
+| Duration | 500ms以上のcommandのみ表示 |
 | Status | exit code (非ゼロのみ) |
 
-## Git status の icon
+## Git statusのicon
 
 | Icon | 意味 |
 |------|------|
@@ -46,11 +46,11 @@ Starship は cross-shell の prompt。Git status、言語 version、実行時間
 | `●N` | N staged files |
 | `»N` | N renamed files |
 | `✘N` | N deleted files |
-| `⚑` | stash あり |
+| `⚑` | stashあり |
 
-## Directory の icon 置換
+## Directoryのicon置換
 
-特定の directory 名を icon に置換して短く表示する。
+特定のdirectory名をiconに置換して短く表示する。
 
 | Directory | Icon |
 |-----------|------|
@@ -63,26 +63,26 @@ Starship は cross-shell の prompt。Git status、言語 version、実行時間
 
 ## Theme palette
 
-`palette = "catppuccin"` で active palette を切り替える。10 種類の palette を定義済み。
+`palette = "catppuccin"`でactive paletteを切り替える。10種類のpaletteを定義済み。
 
 | Palette | 雰囲気 |
 |---------|--------|
-| Catppuccin | warm な pastel 系 |
-| Nord | cool な arctic palette |
-| Dracula | dark purple 系 |
+| Catppuccin | warmなpastel系 |
+| Nord | coolなarctic palette |
+| Dracula | dark purple系 |
 | Tokyo Night | deep blue + vibrant |
 | Gruvbox | earthy warm tone |
-| Everforest | soft green 系 |
-| One Dark | VS Code 風 |
+| Everforest | soft green系 |
+| One Dark | VS Code風 |
 | Rosé Pine | muted pink/blue |
-| Solarized | 定番の dual-tone |
-| Kanagawa | 日本画風 muted color |
+| Solarized | 定番のdual-tone |
+| Kanagawa | 日本画風muted color |
 
-各 palette は `pink`, `red`, `yellow`, `green`, `sky`, `sapphire`, `blue`, `overlay2` の 8 色を定義。module の `style` がこれらの色名を参照する。
+各paletteは`pink`, `red`, `yellow`, `green`, `sky`, `sapphire`, `blue`, `overlay2`の8色を定義。moduleの`style`がこれらの色名を参照する。
 
 ## テーマ連動
 
-`theme-switch` コマンドで palette 名を切り替える。Starship は config の変更を自動で検知するため、prompt を開き直せば反映される。
+`theme-switch`コマンドでpalette名を切り替える。Starshipはconfigの変更を自動で検知するため、promptを開き直せば反映される。
 
 ## 設定ファイル
 
@@ -90,4 +90,4 @@ Starship は cross-shell の prompt。Git status、言語 version、実行時間
 ~/.config/starship/starship.toml
 ```
 
-`command_timeout` は 2000ms に設定 (default の 500ms だと git 操作が timeout しやすい)。
+`command_timeout`は2000msに設定 (defaultの500msだとgit操作がtimeoutしやすい)。

@@ -3,16 +3,16 @@ title: AeroSpace
 description: Tiling window manager の設定と keybinding。
 ---
 
-macOS 用の tiling window manager。名前付き workspace でアプリを整理し、keyboard だけで window を操作する。
+macOS用のtiling window manager。名前付きworkspaceでアプリを整理し、keyboardだけでwindowを操作する。
 
-## Workspace 一覧
+## Workspace一覧
 
 | Key | Workspace | アプリ |
 |-----|-----------|--------|
 | `W` | Work | Cursor, VSCode |
 | `S` | Shell | Ghostty, Warp, WezTerm |
 | `B` | Browser | Chrome, Safari, Firefox, Dia |
-| `C` | Communication | Slack (sub monitor 推奨) |
+| `C` | Communication | Slack (sub monitor推奨) |
 | `M` | Music | Spotify, Apple Music |
 | `N` | Notion | document |
 | `D` | Discord | Discord |
@@ -21,20 +21,20 @@ macOS 用の tiling window manager。名前付き workspace でアプリを整�
 
 ## Main mode
 
-### Window 操作
+### Window操作
 
 | Key | 操作 |
 |-----|------|
-| `Alt+h/j/k/l` | focus 移動 (monitor をまたぐ) |
-| `Alt+Shift+h/j/k/l` | workspace 内で window を移動 |
+| `Alt+h/j/k/l` | focus移動 (monitorをまたぐ) |
+| `Alt+Shift+h/j/k/l` | workspace内でwindowを移動 |
 
 ### Multi-monitor
 
 | Key | 操作 |
 |-----|------|
-| `Alt+Ctrl+h/j/k/l` | window を別 monitor に移動 |
-| `Alt+Ctrl+n` | 次の monitor に移動 (循環) |
-| `Alt+Ctrl+p` | 前の monitor に移動 (循環) |
+| `Alt+Ctrl+h/j/k/l` | windowを別monitorに移動 |
+| `Alt+Ctrl+n` | 次のmonitorに移動 (循環) |
+| `Alt+Ctrl+p` | 前のmonitorに移動 (循環) |
 
 ### Layout
 
@@ -42,45 +42,45 @@ macOS 用の tiling window manager。名前付き workspace でアプリを整�
 |-----|------|
 | `Alt+r` | tile layout (横並び) |
 | `Alt+Shift+r` | accordion layout (重ね表示) |
-| `Alt+t` | floating / tiling 切替 |
+| `Alt+t` | floating / tiling切替 |
 | `Alt+f` | fullscreen |
 
 ### Resize
 
 | Key | 操作 |
 |-----|------|
-| `Alt+-` | size を 50 縮小 |
-| `Alt+=` | size を 50 拡大 |
+| `Alt+-` | sizeを50縮小 |
+| `Alt+=` | sizeを50拡大 |
 
-### Workspace 切替
-
-| Key | 操作 |
-|-----|------|
-| `Alt+1-5` | workspace 1-5 に切替 |
-| `Alt+w/b/c/g/m/n/s/d` | 名前付き workspace に切替 |
-| `Alt+Tab` | 直前の workspace に戻る |
-| `Alt+Shift+Tab` | workspace を次の monitor に移動 |
-
-### Window を workspace に移動
+### Workspace切替
 
 | Key | 操作 |
 |-----|------|
-| `Alt+Shift+1-5` | workspace 1-5 に移動して追従 |
-| `Alt+Shift+w/b/c/g/m/n/s/d` | 名前付き workspace に移動して追従 |
+| `Alt+1-5` | workspace 1-5に切替 |
+| `Alt+w/b/c/g/m/n/s/d` | 名前付きworkspaceに切替 |
+| `Alt+Tab` | 直前のworkspaceに戻る |
+| `Alt+Shift+Tab` | workspaceを次のmonitorに移動 |
+
+### Windowをworkspaceに移動
+
+| Key | 操作 |
+|-----|------|
+| `Alt+Shift+1-5` | workspace 1-5に移動して追従 |
+| `Alt+Shift+w/b/c/g/m/n/s/d` | 名前付きworkspaceに移動して追従 |
 
 ## Service mode
 
-入るキーは割り当てていない。`aerospace mode service` で入る。
+入るキーは割り当てていない。`aerospace mode service`で入る。
 
 | Key | 操作 |
 |-----|------|
-| `Esc` | config reload して main mode に戻る |
-| `Backspace` | 現在以外の window をすべて閉じる |
+| `Esc` | config reloadしてmain modeに戻る |
+| `Backspace` | 現在以外のwindowをすべて閉じる |
 
 ## 設定メモ
 
-- default layout は accordion (window 1 枚なら全面表示)
-- アプリは専用の workspace に自動で割り当てられる
-- padding: 上 52px (sketchybar 40px + 12px)、横 12px、縦 8px
-- Gather は floating mode で、どの monitor にも自由に移動できる
-- 各 monitor は独立した workspace を持つ
+- default layoutはaccordion (window 1枚なら全面表示)
+- アプリは専用のworkspaceに自動で割り当てられる
+- padding: 上52px (sketchybar 40px + 12px)、横12px、縦8px
+- Gatherはfloating modeで、どのmonitorにも自由に移動できる
+- 各monitorは独立したworkspaceを持つ
