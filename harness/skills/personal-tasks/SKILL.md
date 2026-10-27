@@ -36,26 +36,22 @@ todo tool, never here.
 
 ## Writing a task
 
-- A task is one next action the owner can finish in one sitting and check
-  off: 「レビューに返信する」, not 「返信して、CIを確かめて、draftを外す」.
-  Something the owner only waits for (CI to pass, a reply) is not an action:
-  fold it into the action that follows it, or tag it `+waiting`.
-- Several steps toward one finite outcome (a pull request, a migration, a
-  move) get a second-level project with one task per step. Name it with a
-  short summary of the outcome in the owner's language, taken from the pull
-  request's or ticket's title: `project:work.検索の並び順の修正`. Never name
-  it, or a description, by a number or ID (`pr-1234`, `#1234`): the owner
-  cannot tell what a number means at a glance. The number and the URL go in
-  an annotation. The descriptions then do not repeat the outcome's name.
-- The description is one short line in the owner's own language, ending in
-  the verb, the way the owner would write it on a note: 「レビューに返信する」.
-  Follow the writing rules: no space between Japanese and Latin letters,
-  digits or code, no parentheses packed with details, no symbols for words.
-- Details go in an annotation, not the description: the URL, what is already
-  done, why. Add the task, then `task project:<side> +LATEST annotate "<detail>"`.
-- When proposing, show each task's project and description on its own line,
-  with its annotations under it, so the owner can correct the split before
-  anything is added.
+- A task is a unit the owner tracks: one pull request, one ticket, one
+  errand, one thing someone waits on. Do not split it into the steps the
+  owner takes to finish it (reply to the review, run the test, mark it
+  ready); the owner keeps those in their head or in the pull request.
+- A second-level project is for an outcome that holds several such units
+  (`personal.moving`: the movers, the address change, the old flat), never
+  for one pull request.
+- The description says what the unit is, as a short summary of the pull
+  request's or ticket's title in the owner's own language, ending in the
+  verb: 「検索の並び順を直す」. Never write it as a number or
+  ID (`PR #1234`, `pr-1234`): the owner cannot tell what a number means at a
+  glance. Follow the writing rules: no space between Japanese and Latin
+  letters, digits or code, no parentheses packed with details.
+- The URL goes in an annotation: add the task, then
+  `task project:<side> +LATEST annotate "<url>"`. Leave out what is already
+  done and the reasons; the pull request holds them.
 
 ## Views
 
@@ -98,8 +94,13 @@ when you need fields exactly.
 - **Add only after the owner says yes.** When the owner mentions something
   they must do, propose it in one line — description, project, and only the
   priority or due the owner actually stated — and add it when they agree.
-  When the owner gives you the task outright (「〜をタスクに入れて」), that is
-  the yes. Anything you cannot place goes in with `+in` and no project.
+  When the owner names the task outright (「〜をタスクに入れて」), that is
+  the yes. When the owner asks you to add tasks without naming them
+  (「タスク追加しておいて」) and you work out what they are from the session,
+  that is not yet a yes for those tasks: what is left is the owner's call,
+  and they may count something done that you think is open. List what you
+  would add, one line each, ask which are still open, and add only those.
+  Anything you cannot place goes in with `+in` and no project.
 - **Never guess** `priority:H` or a `due`. If the owner did not say it is
   important or give a deadline, leave it out, or ask once.
 - **Complete, delete, modify, or change several tasks at once** only after
@@ -131,12 +132,7 @@ task add project:work priority:H due:2026-10-30 "Submit the expense report"
 task add project:personal.moving scheduled:monday "Ask three movers for a quote"
 task add +in "Something about the dentist"                # not sorted yet
 
-# three steps of one pull request: a second-level project named by what the
-# pull request does, short lines, the number and details in annotations
-task add project:work.検索の並び順の修正 "レビューに返信する"
+# one pull request is one task; its URL is an annotation
+task add project:work "検索の並び順を直す"
 task project:work +LATEST annotate "https://github.com/<org>/<repo>/pull/1234"
-task project:work +LATEST annotate "2件は直した。残る1件は直さない理由を書く"
-task add project:work.検索の並び順の修正 "結合テストをdevで流して結果をPRに書く"
-task add project:work.検索の並び順の修正 "draftを外す"
-task project:work +LATEST annotate "CIが通ってから"
 ```
