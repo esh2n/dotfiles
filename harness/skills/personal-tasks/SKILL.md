@@ -41,9 +41,12 @@ todo tool, never here.
   Something the owner only waits for (CI to pass, a reply) is not an action:
   fold it into the action that follows it, or tag it `+waiting`.
 - Several steps toward one finite outcome (a pull request, a migration, a
-  move) get a second-level project with one task per step, such as
-  `project:work.pr-1234`. The descriptions then do not repeat the outcome's
-  name.
+  move) get a second-level project with one task per step. Name it with a
+  short summary of the outcome in the owner's language, taken from the pull
+  request's or ticket's title: `project:work.検索の並び順の修正`. Never name
+  it, or a description, by a number or ID (`pr-1234`, `#1234`): the owner
+  cannot tell what a number means at a glance. The number and the URL go in
+  an annotation. The descriptions then do not repeat the outcome's name.
 - The description is one short line in the owner's own language, ending in
   the verb, the way the owner would write it on a note: 「レビューに返信する」.
   Follow the writing rules: no space between Japanese and Latin letters,
@@ -128,12 +131,12 @@ task add project:work priority:H due:2026-10-30 "Submit the expense report"
 task add project:personal.moving scheduled:monday "Ask three movers for a quote"
 task add +in "Something about the dentist"                # not sorted yet
 
-# three steps of one pull request: a second-level project, short lines,
-# the details in annotations
-task add project:work.pr-1234 "レビューに返信する"
+# three steps of one pull request: a second-level project named by what the
+# pull request does, short lines, the number and details in annotations
+task add project:work.検索の並び順の修正 "レビューに返信する"
 task project:work +LATEST annotate "https://github.com/<org>/<repo>/pull/1234"
 task project:work +LATEST annotate "2件は直した。残る1件は直さない理由を書く"
-task add project:work.pr-1234 "結合テストをdevで流して結果をPRに書く"
-task add project:work.pr-1234 "draftを外す"
+task add project:work.検索の並び順の修正 "結合テストをdevで流して結果をPRに書く"
+task add project:work.検索の並び順の修正 "draftを外す"
 task project:work +LATEST annotate "CIが通ってから"
 ```
