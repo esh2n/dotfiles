@@ -16,7 +16,7 @@ const serviceUsage = `usage: dotctl service restart <name> [--health URL]
 `
 
 // runService is `dotctl service restart <name> [--health URL]`.
-func runService(args []string, out, errOut io.Writer) int {
+func runService(home string, args []string, out, errOut io.Writer) int {
 	if len(args) < 2 || args[0] != "restart" {
 		io.WriteString(errOut, serviceUsage)
 		return 2
@@ -30,7 +30,7 @@ func runService(args []string, out, errOut io.Writer) int {
 		return 2
 	}
 	p := ui.Printer{Out: out, Err: errOut, Prefix: "service"}
-	if err := service.Restart(service.Env{Sys: sys.OS{}, UI: p, UID: os.Getuid()}, name, *health); err != nil {
+	if err := service.Restart(service.Env{Sys: sys.OS{}, UI: p, UID: os.Getuid(), Home: home}, name, *health); err != nil {
 		p.Error("%v", err)
 		return 1
 	}

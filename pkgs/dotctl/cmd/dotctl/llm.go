@@ -134,7 +134,7 @@ func runLLMUse(home string, args []string, out, errOut io.Writer) int {
 	p := ui.Printer{Out: out, Err: errOut, Prefix: "llm use"}
 	e := llm.Env{Home: home, Repo: repo, Sys: sys.OS{}, UI: p}
 	restart := func() error {
-		return service.Restart(service.Env{Sys: sys.OS{}, UI: p, UID: os.Getuid()}, "litellm-proxy", "http://127.0.0.1:4000/health/liveliness")
+		return service.Restart(service.Env{Sys: sys.OS{}, UI: p, UID: os.Getuid(), Home: home}, "litellm-proxy", "http://127.0.0.1:4000/health/liveliness")
 	}
 	if err := llm.Use(e, rest[0], rest[1:], restart); err != nil {
 		p.Error("%v", err)

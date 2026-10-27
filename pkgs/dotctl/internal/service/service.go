@@ -7,7 +7,10 @@ package service
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/ui"
@@ -16,6 +19,7 @@ import (
 // Sys is the part of the machine a restart needs.
 type Sys interface {
 	Quiet(name string, args ...string) error
+	Capture(timeout time.Duration, name string, args ...string) (stdout, stderr string, err error)
 	OS() string
 }
 
@@ -24,9 +28,11 @@ type Env struct {
 	Sys   Sys
 	UI    ui.Printer
 	UID   int
-	Get   func(url string) error // nil: an HTTP GET that must answer 2xx
-	Sleep func(time.Duration)    // nil: time.Sleep
-	Tries int                    // health probes; 0: 20
+	Home  string                  // the launchd agents' plists are in Home/Library/LaunchAgents
+	Get   func(url string) error  // nil: an HTTP GET that must answer 2xx
+	Stat  func(path string) error // nil: os.Stat
+	Sleep func(time.Duration)     // nil: time.Sleep
+	Tries int                     // health probes; 0: 20
 }
 
 var validName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
@@ -39,10 +45,8 @@ func Restart(e Env, name, health string) error {
 	var err error
 	switch e.Sys.OS() {
 	case "darwin":
-		label := "com.esh2n." + name
-		err = e.Sys.Quiet("launchctl", "kickstart", "-k", fmt.Sprintf("gui/%d/%s", e.UID, label))
-		if err != nil {
-			return fmt.Errorf("launchctl kickstart %s: %w (is it loaded? launchctl print gui/%d/%s)", label, err, e.UID, label)
+		if err = restartLaunchd(e, "com.esh2n."+name); err != nil {
+			return err
 		}
 	case "linux":
 		if err = e.Sys.Quiet("systemctl", "--user", "restart", name); err != nil {
@@ -56,6 +60,54 @@ func Restart(e Env, name, health string) error {
 		return nil
 	}
 	return waitHealthy(e, name, health)
+}
+
+// bootstrapTries spans launchd's default ExitTimeOut (20 s before it kills
+// the old process) and a margin: bootout returns at once, and bootstrap fails
+// (launchctl's error 5) until the old process has exited.
+const bootstrapTries = 25
+
+// restartLaunchd unloads the agent and loads it again, as Homebrew's
+// `brew services restart` does. Not `launchctl kickstart -k`: it waits out the
+// job's ThrottleInterval when the job was spawned recently (a job that exits
+// for want of a secret was), up to about twice that interval; a bootstrap
+// starts the job at once.
+func restartLaunchd(e Env, label string) error {
+	domain := fmt.Sprintf("gui/%d", e.UID)
+	plist := filepath.Join(e.Home, "Library", "LaunchAgents", label+".plist")
+	stat, sleep := e.Stat, e.Sleep
+	if stat == nil {
+		stat = func(p string) error { _, err := os.Stat(p); return err }
+	}
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+	// without its plist the job could not be loaded again, so it stays as it is
+	if err := stat(plist); err != nil {
+		return fmt.Errorf("%w (make up writes it); %s was left as it was", err, label)
+	}
+	// a bootout fails when the job is not loaded; the bootstrap loads it then
+	bootoutErr := launchctl(e, "bootout", domain+"/"+label)
+	var err error
+	for i := 0; i < bootstrapTries; i++ {
+		if i > 0 {
+			sleep(time.Second)
+		}
+		if err = launchctl(e, "bootstrap", domain, plist); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("launchctl bootstrap %s %s: %w (bootout: %v); %s is not loaded now — a disabled job fails here too: launchctl print-disabled %s",
+		domain, plist, err, bootoutErr, label, domain)
+}
+
+// launchctl runs launchctl and puts its own reason into the error.
+func launchctl(e Env, args ...string) error {
+	_, errOut, err := e.Sys.Capture(10*time.Second, "launchctl", args...)
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(errOut))
+	}
+	return nil
 }
 
 func waitHealthy(e Env, name, url string) error {

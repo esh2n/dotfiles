@@ -127,7 +127,7 @@ func run(args []string, out, errOut io.Writer) int {
 	case "cache-gc":
 		return runCacheGC(home, args[1:], nil, out, errOut)
 	case "service":
-		return runService(args[1:], out, errOut)
+		return runService(home, args[1:], out, errOut)
 	case "retire-old-layout":
 		return runRetire(home, args[1:], out, errOut)
 	case "help", "-h", "--help":
