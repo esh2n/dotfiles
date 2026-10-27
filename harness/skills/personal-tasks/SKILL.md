@@ -36,22 +36,25 @@ todo tool, never here.
 
 ## Writing a task
 
-- A task is a unit the owner tracks: one pull request, one ticket, one
-  errand, one thing someone waits on. Do not split it into the steps the
-  owner takes to finish it (reply to the review, run the test, mark it
-  ready); the owner keeps those in their head or in the pull request.
-- A second-level project is for an outcome that holds several such units
-  (`personal.moving`: the movers, the address change, the old flat), never
-  for one pull request.
-- The description says what the unit is, as a short summary of the pull
-  request's or ticket's title in the owner's own language, ending in the
-  verb: 「検索の並び順を直す」. Never write it as a number or
-  ID (`PR #1234`, `pr-1234`): the owner cannot tell what a number means at a
-  glance. Follow the writing rules: no space between Japanese and Latin
-  letters, digits or code, no parentheses packed with details.
-- The URL goes in an annotation: add the task, then
-  `task project:<side> +LATEST annotate "<url>"`. Leave out what is already
-  done and the reasons; the pull request holds them.
+How to split the work and where the details go is decided case by case
+with the owner, not by a fixed rule. Propose a split, say why in one line,
+and let the owner change it before anything is added.
+
+- Keep the split at the level the owner tracks. One pull request may be one
+  task, or a few when its parts are done at different times or wait on
+  different people; do not cut it into steps the owner does in one go.
+- What is done and what is left can go in the description, in an
+  annotation, or into separate tasks, whichever reads best for that work.
+- A second-level project is for an outcome that holds several tasks
+  (`personal.moving`), not a default for every pull request.
+- Write each description as a short line in the owner's own language,
+  summarising the pull request's or ticket's title rather than citing it,
+  and ending in the verb: 「検索の並び順を直す」. Never name work by a number
+  or ID (`PR #1234`, `pr-1234`); the owner cannot tell what a number means
+  at a glance. Put the number and the URL in an annotation
+  (`task project:<side> +LATEST annotate "<url>"` right after the add).
+- Follow the writing rules: no space between Japanese and Latin letters,
+  digits or code, no parentheses packed with details.
 
 ## Views
 
@@ -132,7 +135,7 @@ task add project:work priority:H due:2026-10-30 "Submit the expense report"
 task add project:personal.moving scheduled:monday "Ask three movers for a quote"
 task add +in "Something about the dentist"                # not sorted yet
 
-# one pull request is one task; its URL is an annotation
+# a pull request's URL goes in an annotation, not the description
 task add project:work "検索の並び順を直す"
 task project:work +LATEST annotate "https://github.com/<org>/<repo>/pull/1234"
 ```
