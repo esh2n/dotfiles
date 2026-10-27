@@ -34,6 +34,26 @@ todo tool, never here.
   waiting on someone else. Add no other tags without the owner asking.
 - No estimates.
 
+## Writing a task
+
+- A task is one next action the owner can finish in one sitting and check
+  off: 「レビューに返信する」, not 「返信して、CIを確かめて、draftを外す」.
+  Something the owner only waits for (CI to pass, a reply) is not an action:
+  fold it into the action that follows it, or tag it `+waiting`.
+- Several steps toward one finite outcome (a pull request, a migration, a
+  move) get a second-level project with one task per step, such as
+  `project:work.pr-1234`. The descriptions then do not repeat the outcome's
+  name.
+- The description is one short line in the owner's own language, ending in
+  the verb, the way the owner would write it on a note: 「レビューに返信する」.
+  Follow the writing rules: no space between Japanese and Latin letters,
+  digits or code, no parentheses packed with details, no symbols for words.
+- Details go in an annotation, not the description: the URL, what is already
+  done, why. Add the task, then `task project:<side> +LATEST annotate "<detail>"`.
+- When proposing, show each task's project and description on its own line,
+  with its annotations under it, so the owner can correct the split before
+  anything is added.
+
 ## Views
 
 | Command | Shows |
@@ -107,4 +127,13 @@ task add project:personal "Renew the passport"            # no deadline given
 task add project:work priority:H due:2026-10-30 "Submit the expense report"
 task add project:personal.moving scheduled:monday "Ask three movers for a quote"
 task add +in "Something about the dentist"                # not sorted yet
+
+# three steps of one pull request: a second-level project, short lines,
+# the details in annotations
+task add project:work.pr-1234 "レビューに返信する"
+task project:work +LATEST annotate "https://github.com/<org>/<repo>/pull/1234"
+task project:work +LATEST annotate "2件は直した。残る1件は直さない理由を書く"
+task add project:work.pr-1234 "結合テストをdevで流して結果をPRに書く"
+task add project:work.pr-1234 "draftを外す"
+task project:work +LATEST annotate "CIが通ってから"
 ```
