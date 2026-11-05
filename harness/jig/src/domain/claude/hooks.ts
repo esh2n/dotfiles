@@ -36,8 +36,8 @@ export type ClaudeHookEvent = (typeof CLAUDE_HOOK_EVENTS)[number];
  * The MCP tools on a shared place others see, which the guard's
  * `ask-mcp-shared-write` rule judges (`rules/decisions/2026-10-19-pstack-precedence-table.md`):
  * every Notion tool, from the house `notion-mcp` server and from Claude
- * Code's claude.ai connector. A hook only judges what its matcher names, so
- * without this tail the rule would never be asked. The matcher routes every
+ * Code's claude.ai connector. Claude Code's guard matcher is `*` and covers
+ * them already; Codex's registration (`cli/jig.ts`) names this tail. The matcher routes every
  * Notion tool and the rule tells reads from writes: Codex compiles matchers
  * with Rust's `regex` crate, which has no lookaround, so the read exclusion
  * cannot live here. Fail-safe either way: a tool Notion adds later reaches
@@ -47,17 +47,13 @@ export type ClaudeHookEvent = (typeof CLAUDE_HOOK_EVENTS)[number];
 export const SHARED_WRITE_MCP_MATCHER = "mcp__(?:claude_ai_Notion|notion-mcp)__notion-[a-z-]+";
 
 /**
- * The tools the guard is asked about. Read/Write/Edit/MultiEdit and Bash are
- * the harness's own; the serena tails are the MCP calls that *write* — a
- * symbol replacement is an edit that would otherwise reach disk unjudged;
- * the Notion tail is every Notion tool (above). Read-only MCP tools
- * stay unmatched and untaxed.
+ * Every tool call reaches the hook (`rules/decisions/2026-11-05-pre-tool-use-on-every-tool.md`):
+ * the reply-language check must run before Agent, Grep, Skill and the rest,
+ * not only before the tools the guard has rules for. Which calls the guard
+ * judges is still decided by `domain/policy/request.ts`; a tool it maps to no
+ * request gets no output at all, exactly as when the hook did not fire.
  */
-const GUARD_MATCHER = [
-  "Bash|Read|Write|Edit|MultiEdit|WebFetch",
-  "mcp__serena__(replace_symbol_body|insert_after_symbol|insert_before_symbol|replace_content|safe_delete_symbol)",
-  SHARED_WRITE_MCP_MATCHER,
-].join("|");
+const GUARD_MATCHER = "*";
 
 /**
  * What the PostToolUse hook is fired on. The formatter acts on the edit tools

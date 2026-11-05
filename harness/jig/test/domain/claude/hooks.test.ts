@@ -58,7 +58,9 @@ describe("the six hooks", () => {
     const group = (event: string): Record<string, unknown> =>
       (hooks[event] as Record<string, unknown>[])[0] ?? {};
 
-    expect(group("PreToolUse").matcher).toContain("Bash");
+    // Every tool: the reply-language check runs before Agent and Grep too
+    // (rules/decisions/2026-11-05-pre-tool-use-on-every-tool.md).
+    expect(group("PreToolUse").matcher).toBe("*");
     // Never Bash: the formatter formats the file a tool named. Skill and
     // SubagentHandback feed the findings check's record.
     expect(group("PostToolUse").matcher).toBe("Write|Edit|MultiEdit|Skill|SubagentHandback");
@@ -66,22 +68,6 @@ describe("the six hooks", () => {
     expect(group("SessionStart")).not.toHaveProperty("matcher");
     expect(group("UserPromptSubmit")).not.toHaveProperty("matcher");
     expect(group("Stop")).not.toHaveProperty("matcher");
-  });
-
-  test("the guard sees every Notion tool; the rule tells reads from writes (ask-mcp-shared-write)", () => {
-    const hooks = buildClaudeHooks(PATHS);
-    const pre = (hooks.PreToolUse as { matcher: string }[])[0]?.matcher ?? "(?!)";
-    const fires = (tool: string) => new RegExp(`^(?:${pre})$`).test(tool);
-    for (const tool of [
-      "mcp__claude_ai_Notion__notion-create-pages",
-      "mcp__notion-mcp__notion-delete-pages",
-      "mcp__claude_ai_Notion__notion-some-future-tool",
-      "mcp__claude_ai_Notion__notion-fetch",
-      "mcp__notion-mcp__notion-get-comments",
-    ]) {
-      expect(fires(tool)).toBe(true);
-    }
-    expect(fires("mcp__claude_ai_Gmail__authenticate")).toBe(false);
   });
 
   test("the shared-write matcher has no lookaround — Codex compiles matchers with Rust's regex crate", () => {

@@ -266,3 +266,42 @@ describe("the guard's verdict comes first", () => {
     expect(out?.permissionDecisionReason).not.toContain("reply language");
   });
 });
+
+describe("tools the guard has no rule for (the hook's matcher is `*`)", () => {
+  const OTHER_TOOLS: readonly [string, Record<string, unknown>][] = [
+    ["Agent", { description: "look around", prompt: "find the matcher" }],
+    ["Grep", { pattern: "matcher", path: "/repo" }],
+    ["Skill", { skill: "change-review" }],
+    ["mcp__claude-artifacts__publish_version", { content: "<!DOCTYPE html>" }],
+  ];
+
+  for (const [tool, input] of OTHER_TOOLS) {
+    test(`${tool}: an English passage before it is denied once`, async () => {
+      const transcript = () => jsonl(prompt("調べて"), said(ENGLISH), call("t2"));
+      const language = deps("Japanese", transcript);
+      const over = { tool_name: tool, tool_input: input };
+
+      const first = decision(await preToolUse(payload(over), ports, { replyLanguage: language }));
+      expect(first?.permissionDecision).toBe("deny");
+      expect(first?.permissionDecisionReason).toContain("jig guard (reply language):");
+      expect(await preToolUse(payload(over), ports, { replyLanguage: language })).toBe("");
+    });
+
+    test(`${tool}: a Japanese passage before it passes`, async () => {
+      const transcript = () => jsonl(prompt("調べて"), said(JAPANESE), call("t2"));
+      const over = { tool_name: tool, tool_input: input };
+      expect(
+        await preToolUse(payload(over), ports, { replyLanguage: deps("Japanese", transcript) }),
+      ).toBe("");
+    });
+
+    test(`${tool}: with no language setting the hook says nothing, as when it did not fire`, async () => {
+      const transcript = () => jsonl(prompt("調べて"), said(ENGLISH), call("t2"));
+      const over = { tool_name: tool, tool_input: input };
+      expect(
+        await preToolUse(payload(over), ports, { replyLanguage: deps(undefined, transcript) }),
+      ).toBe("");
+      expect(await preToolUse(payload(over), ports)).toBe("");
+    });
+  }
+});
