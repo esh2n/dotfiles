@@ -7,7 +7,7 @@ unverified:
   - "Freeburg（arXiv 2603.27006）のモデル別のMarkdownの量は要約経由で読んだ。人の基準値はMarkdownについて無い"
   - "井本賢氏の日本語の分析（箇条書きの記号でd +1.00）は査読前で、会社のブログ経由でしか読めていない"
   - "PRの説明、コミットメッセージ、Slackで、装飾の量を人とAIで比べた測定は見つからなかった"
-  - "日本語の企業のスタイルガイド（サイボウズ、freee、SmartHR、メルカリ、LINE）とIBM、Atlassianのガイドには届かなかった"
+  - "日本語の企業のスタイルガイド（サイボウズ、メルカリ、LINE）とIBM、Atlassianのガイドには届かなかった"
 sources_note: "URLs and quotes are inside the record."
 ---
 

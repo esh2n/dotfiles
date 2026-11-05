@@ -28,23 +28,23 @@ Assert only what the code or a measured value confirms (element position and siz
 
 ## Sources
 
-The project's own design system and tokens first. Then several public systems side by side — SmartHR Design System, デジタル庁デザインシステム, freee's design guidelines, Material Design, Apple Human Interface Guidelines, Nielsen Norman Group. Where they agree, that is the ground for the point. Where they disagree, present the options with who says what. A point you cannot source is not written.
+The project's own design system and tokens first. Then several public systems side by side — デジタル庁デザインシステム, Material Design, Apple Human Interface Guidelines, Nielsen Norman Group. Where they agree, that is the ground for the point. Where they disagree, present the options with who says what. A point you cannot source is not written.
 
 ## Checks
 
 | Viewpoint | When | Check | Sources |
 | --- | --- | --- | --- |
-| Proximity | elements are added, reordered, or their spacing changes | Related items sit closer than unrelated ones; equal levels have equal gaps. | SmartHR, デジタル庁, NN/g |
-| Who owns spacing | a child has `margin`, `space-*`, last-child special cases, negative margins, or both parent and child add space in one direction | Gaps between siblings belong to the parent's `gap` (or a stack); space between the parent's edge and its children is the parent's `padding`; a child does not carry outer margin; no `space-*` in wrapping or grid layouts; margin collapse. | Every Layout (Stack), Josh Comeau, SmartHR, Tailwind |
-| Spacing scale | off-scale values (13px, 22px) or raw px instead of tokens | The value is on the project's scale; the same kind of element gets the same value; line-height does not make the visual gap differ from the specified one. | project tokens; SmartHR (8px steps from a 16px base), デジタル庁 (8px base) |
-| Visual hierarchy | several elements compete, or a button or heading is added | One focal point and one primary action; three type sizes or fewer; emphasis not by colour alone. | NN/g, SmartHR |
-| Eye flow | lists, details, settings (F pattern); modals, login, landing (Z pattern); a primary action moves; width changes | Key information and the primary action lie on the flow; wider screens do not break it. Always phrase as a question: the measured support is weak. | SmartHR, NN/g |
+| Proximity | elements are added, reordered, or their spacing changes | Related items sit closer than unrelated ones; equal levels have equal gaps. | デジタル庁, NN/g |
+| Who owns spacing | a child has `margin`, `space-*`, last-child special cases, negative margins, or both parent and child add space in one direction | Gaps between siblings belong to the parent's `gap` (or a stack); space between the parent's edge and its children is the parent's `padding`; a child does not carry outer margin; no `space-*` in wrapping or grid layouts; margin collapse. | Every Layout (Stack), Josh Comeau, Tailwind |
+| Spacing scale | off-scale values (13px, 22px) or raw px instead of tokens | The value is on the project's scale; the same kind of element gets the same value; line-height does not make the visual gap differ from the specified one. | project tokens; デジタル庁 (8px base) |
+| Visual hierarchy | several elements compete, or a button or heading is added | One focal point and one primary action; three type sizes or fewer; emphasis not by colour alone. | NN/g |
+| Eye flow | lists, details, settings (F pattern); modals, login, landing (Z pattern); a primary action moves; width changes | Key information and the primary action lie on the flow; wider screens do not break it. Always phrase as a question: the measured support is weak. | NN/g |
 | Alignment and grid | rows, cards or forms are added | Left edges and baselines align; columns and gutters follow the scale. | ソシオメディア, Apple HIG, デジタル庁 |
 | Typography | font size, line height or max width changes; long text added | Body 16px or larger; line height 1.5 or more (1.2–1.3 for dense business screens); headings step down evenly. | デジタル庁 |
 | Colour and contrast | colours change, an accent is added | Body text 4.5:1, borders and icons 3:1 — assert only from computed colours; accents not multiplied on one screen. | デジタル庁, WCAG 2.2 |
-| Design-system consistency | something resembles an existing component, or uses off-token colour, shadow or radius | An existing component would do; same-level elements look the same; a border used where spacing and grouping would do. | project design system, SmartHR |
+| Design-system consistency | something resembles an existing component, or uses off-token colour, shadow or radius | An existing component would do; same-level elements look the same; a border used where spacing and grouping would do. | project design system |
 | Interaction states | buttons, links or inputs are added | hover, focus-visible, active, disabled are defined; focus outline not removed; empty, error, loading and long-text states exist and do not jump in height. | Vercel Web Interface Guidelines, Apple HIG |
-| Responsive breakage | screenshots at several widths, flex or grid changes | Narrow widths do not separate related items; wide widths do not strand actions. | SmartHR, NN/g |
+| Responsive breakage | screenshots at several widths, flex or grid changes | Narrow widths do not separate related items; wide widths do not strand actions. | NN/g |
 
 ## Calibration
 

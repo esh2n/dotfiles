@@ -23,7 +23,7 @@ rule: Review every change through the `change-review` skill: classify the diff (
    - `code-reviewer`（main / high）: 差分の正しさ。変更された言語の基準と関係する領域のチェックリストを読む。性能は節の一つ。
    - `security-reviewer`（complex / high）: 差分が持ち込んだ問題だけ。読み取り専用。攻撃者・能力・経路・影響を言えない指摘は出さない。信頼度は根拠の段階で決める。「疑わしきは報告」はやめる。
    - `workload-reviewer`（新設、main / high）: バックエンドはリクエストあたりのクエリ数、競合、再試行の増幅、先に詰まる資源、コスト。フロントエンドはユーザーストーリーを正常、エラー、空、遅い通信、二度押し、同時操作、権限、オフライン、一部失敗、戻る、古いキャッシュの各パターンで追う。ワークロードの記述が無ければ数値を出さず「足りない資料」として書く。
-   - `ui-reviewer`（新設、main / high）: 変更前後のスクリーンショットと差分をデザイナーの目で見る。根拠はプロジェクトのデザインシステムを先に、次に複数の公開のもの（SmartHR、デジタル庁、freee、Material、Apple HIG、NN/g）を並べ、一致は根拠、食い違いは選択肢として出す。仕様が決まっている変更（モードA）はすべて出典付きの提案、仕様が無い変更（モードB）は測れる破綻だけ指摘で好みは問い、判断がつかなければモードA。断定は実測値かコードで確かめられるものだけ。
+   - `ui-reviewer`（新設、main / high）: 変更前後のスクリーンショットと差分をデザイナーの目で見る。根拠はプロジェクトのデザインシステムを先に、次に複数の公開のもの（デジタル庁、Material、Apple HIG、NN/g）を並べ、一致は根拠、食い違いは選択肢として出す。仕様が決まっている変更（モードA）はすべて出典付きの提案、仕様が無い変更（モードB）は測れる破綻だけ指摘で好みは問い、判断がつかなければモードA。断定は実測値かコードで確かめられるものだけ。
    - `test-reviewer`（新設、main / high）: テストが振る舞いを守っているか。壊れても通るテストでカバレッジを水増ししない。
    - `review-verifier`（新設、tierとeffortは呼び出し元を継ぐ）: 指摘を1件受け取り、読み取りだけで反証を試み、holds / does not hold / cannot verifyを返す。反証できないことは正しさの証拠にしない。
 4. **指摘の形を一つにする。** 何が問題か（具体的な入力や状況）、なぜか（仕組み。専門用語は残し、初出でその場で説明する。たとえ話は使わない）、どう直すか（差分とその読み方）、どう確かめるか（テストかコマンド、出典のURL）。指摘、人への問い（トレードオフ、好み、設計判断）、足りない資料を分けて書く。実行したツールと立てたレビュアー、立てなかったレビュアーとその理由を報告に載せ、省略が見えるようにする。
@@ -68,4 +68,4 @@ rule: Review every change through the `change-review` skill: classify the diff (
 - スクリーンショット単独のUI不具合検出（適合率0.09）: https://arxiv.org/pdf/2607.04120 、UI診断のベンチマーク: https://arxiv.org/abs/2606.13192
 - OWASP Secure Code Review（差分と全体の二種類）: https://cheatsheetseries.owasp.org/cheatsheets/Secure_Code_Review_Cheat_Sheet.html 、ASVS 5.0: https://github.com/OWASP/ASVS
 - メタ安定障害と再試行の増幅: https://brooker.co.za/blog/2021/05/24/metastable.html 、https://sre.google/sre-book/addressing-cascading-failures/
-- デザインの根拠: https://smarthr.design/products/design-patterns/spacing-layout-pattern/ 、https://smarthr.design/products/design-patterns/visual-guidance/ 、https://design.digital.go.jp/dads/foundations/spacing/ 、https://design.digital.go.jp/dads/foundations/color/
+- デザインの根拠: https://design.digital.go.jp/dads/foundations/spacing/ 、https://design.digital.go.jp/dads/foundations/color/
