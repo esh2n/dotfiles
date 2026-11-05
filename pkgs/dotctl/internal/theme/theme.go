@@ -37,6 +37,7 @@ var Apps = []App{
 	{File: "ghostty", Pointer: "home/darwin/ghostty/theme", source: "home/darwin/ghostty/themes/%s"},
 	{File: "sketchybar.lua", Pointer: "home/darwin/sketchybar/config/colors.lua", source: "home/darwin/sketchybar/config/themes/%s.lua"},
 	{File: "borders.sh", Pointer: "home/darwin/borders/config/colors.sh", source: "home/darwin/borders/config/themes/%s.sh"},
+	{File: "herdr-app.json", Pointer: "home/darwin/herdr-app/themes/current.json", source: "home/darwin/herdr-app/themes/%s.json"},
 }
 
 // Env is the world a switch acts on; tests replace Run and Has.
@@ -136,6 +137,9 @@ func Init(e Env, fallback string) error {
 			return err
 		}
 	}
+	// settings.json and the pointer's link appear earlier in make up, so an
+	// open app already fell back to its default theme and will not retry alone
+	touchHerdr(e)
 	if e.omarchy() {
 		if err := writeOmarchyThemes(e); err != nil {
 			e.warn("omarchy: %v", err)
@@ -189,11 +193,25 @@ func reload(e Env) {
 			e.warn("borders: %v", err)
 		}
 	}
+	touchHerdr(e)
 	// WezTerm reloads when its config changes; touching it is enough.
 	wez := filepath.Join(e.Home, ".config", "wezterm", "wezterm.lua")
 	if _, err := os.Stat(wez); err == nil {
 		now := time.Now()
 		_ = os.Chtimes(wez, now, now)
+	}
+}
+
+// touchHerdr makes Herdr's app read its theme again: it polls settings.json
+// through its link, and a theme file behind a link sends no event.
+func touchHerdr(e Env) {
+	herdr := filepath.Join(e.Home, ".config", "herdr-app", "settings.json")
+	if _, err := os.Stat(herdr); err != nil {
+		return
+	}
+	now := time.Now()
+	if err := os.Chtimes(herdr, now, now); err != nil {
+		e.warn("herdr: %v", err)
 	}
 }
 

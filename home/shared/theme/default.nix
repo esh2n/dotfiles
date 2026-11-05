@@ -24,6 +24,7 @@ let
     ghostty = n: "home/darwin/ghostty/themes/${n}";
     "sketchybar.lua" = n: "home/darwin/sketchybar/config/themes/${n}.lua";
     "borders.sh" = n: "home/darwin/borders/config/themes/${n}.sh";
+    "herdr-app.json" = n: "home/darwin/herdr-app/themes/${n}.json";
   };
   themes = map (f: lib.removeSuffix ".lua" f) (
     builtins.attrNames (builtins.readDir (checkout + "/home/shared/theme/themes"))

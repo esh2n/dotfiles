@@ -2,6 +2,8 @@ package theme
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -69,5 +71,51 @@ func TestMissingThemeFilesAreWarnedAbout(t *testing.T) {
 	want := []string{"Wallpaper for 'nord' not found", "VSCode theme mapping not found for 'no-such-theme'"}
 	if !slices.Equal(warned, want) {
 		t.Fatalf("warned %q, want %q", warned, want)
+	}
+}
+
+func TestReloadTouchesHerdrSettingsSoTheAppReadsTheThemeAgain(t *testing.T) {
+	home := t.TempDir()
+	settings := filepath.Join(home, ".config", "herdr-app", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settings, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(settings, old, old); err != nil {
+		t.Fatal(err)
+	}
+	reload(Env{Home: home})
+	info, err := os.Stat(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.ModTime().After(old) {
+		t.Fatalf("settings.json keeps its old time %v", info.ModTime())
+	}
+}
+
+func TestInitTouchesHerdrSettingsBecauseThePointerAppearsOutsideTheAppsFolder(t *testing.T) {
+	e := newFixture(t).env()
+	settings := filepath.Join(e.Home, ".config", "herdr-app", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settings, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(settings, old, old); err != nil {
+		t.Fatal(err)
+	}
+	must(t, Init(e, "nord"))
+	info, err := os.Stat(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.ModTime().After(old) {
+		t.Fatalf("settings.json keeps its old time %v", info.ModTime())
 	}
 }
