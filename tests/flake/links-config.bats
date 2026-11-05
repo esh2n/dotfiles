@@ -44,6 +44,12 @@ target() { # target <json> <path under ~>
 	[ "$(target "$json" .config/ghostty/shaders)" = "${REPO_ROOT}/home/shared/ghostty/shaders" ]
 	[ "$(target "$json" .config/ghostty/platform)" = "${REPO_ROOT}/home/darwin/ghostty/platform" ]
 	[ "$(target "$json" .config/ghostty/theme)" = "${REPO_ROOT}/home/darwin/ghostty/theme" ]
+	# the app rewrites the rest of ~/.config/herdr-app, so only these are linked
+	[ "$(target "$json" .config/herdr-app/settings.json)" = "${REPO_ROOT}/home/darwin/herdr-app/settings.json" ]
+	[ "$(target "$json" .config/herdr-app/themes/catppuccin.json)" = "${REPO_ROOT}/home/darwin/herdr-app/themes/catppuccin.json" ]
+	[ "$(target "$json" .config/herdr-app)" = "<missing>" ]
+	[ -f "${REPO_ROOT}/home/darwin/herdr-app/settings.json" ]
+	[ -f "${REPO_ROOT}/home/darwin/herdr-app/themes/catppuccin.json" ]
 }
 
 @test "config links: linux gets the cross-platform dirs and none of Omarchy's own" {

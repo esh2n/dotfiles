@@ -71,6 +71,7 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/tailscale
           ../home/shared/herdr
           ../home/darwin/herdr
+          ../home/darwin/herdr-app
           ../home/darwin/aerospace
           ../home/darwin/hammerspoon
           ../home/darwin/omniwm

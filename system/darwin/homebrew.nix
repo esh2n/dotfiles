@@ -90,6 +90,13 @@ in
         # installs "T3 Code.app", so the two can coexist; remove the Alpha
         # copy by hand once the stable cask is in).
         "t3-code"
+        # Herdr's desktop app, apart from the terminal herdr in Nix. It updates
+        # itself and has no setting to stop that (herdrdev/herdr-app#207), and it
+        # installs and updates herdr-core. The cask pins the first install only:
+        # later updates are trusted on releases.herdr.dev alone.
+        # A copy from upstream's curl installer sits in ~/Applications, where
+        # brew does not look: remove it by hand, or both copies stay and update.
+        "herdr-app"
       ]
       ++ lib.optionals (on "models") [
         # LM Studio (https://formulae.brew.sh/cask/lm-studio — installs

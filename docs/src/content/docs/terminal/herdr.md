@@ -11,6 +11,11 @@ description: コーディングエージェント向けターミナルマルチ�
 - インストール: macOSは`pkgs.herdr`（`home/darwin/herdr/default.nix`）、LinuxはOmarchyの`/usr/bin/herdr`
 - prefix keyはtmux / Zellij / WezTermと統一で`Ctrl+q`
 
+macOSのデスクトップアプリHerdr（`herdr-app`）は、TUI版とは別のプログラムである。端末はherdr-core（`hc`）が動かし、TUI版とセッションも設定も共有しない。
+
+- インストール: caskの`herdr-app`（`system/darwin/homebrew.nix`）。アプリは自動更新し、herdr-coreも自分で導入する
+- 設定ファイル: `~/.config/herdr-app/settings.json`と`themes/catppuccin.json`を`home/darwin/herdr-app`へのリンクにする。`frame/`や`icons/`などアプリが書き換えるものはリンクしない。`keys.json`とレイアウトは今は管理していない
+
 ## 概念
 
 Workspace（リポジトリ単位）> Tab（作業 / エージェント単位）> Pane（実ターミナル）の3階層。

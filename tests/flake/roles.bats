@@ -79,10 +79,10 @@ brewlists() { # brewlists: casks and brews by name, as one JSON object
 	printf '{"roles": ["developer", "model-provider"]}\n' >"${DOTFILES_ROLES_FILE}"
 	run --separate-stderr brewlists
 	[[ "$output" == *'"docker/tap/sbx"'* && "$output" == *'"orbstack"'* && "$output" == *'"lm-studio"'* ]]
-	[[ "$output" != *'"cursor"'* && "$output" != *'"sketchybar"'* && "$output" != *'"font-fira-code"'* ]]
+	[[ "$output" != *'"cursor"'* && "$output" != *'"herdr-app"'* && "$output" != *'"sketchybar"'* && "$output" != *'"font-fira-code"'* ]]
 
 	printf '{"roles": ["developer", "desk-user"]}\n' >"${DOTFILES_ROLES_FILE}"
 	run --separate-stderr brewlists
-	[[ "$output" == *'"cursor"'* && "$output" == *'"sketchybar"'* && "$output" == *'"font-hackgen-nerd"'* && "$output" == *'"Dropover"'* ]]
+	[[ "$output" == *'"cursor"'* && "$output" == *'"herdr-app"'* && "$output" == *'"sketchybar"'* && "$output" == *'"font-hackgen-nerd"'* && "$output" == *'"Dropover"'* ]]
 	[[ "$output" != *'"lm-studio"'* ]]
 }
