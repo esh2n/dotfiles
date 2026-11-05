@@ -183,6 +183,77 @@
   ],
   "rules": [
     {
+      "id": "ask-harness-write",
+      "effect": "ask",
+      "action": "fs.write",
+      "subject": {
+        "path": "(?:^|/)dotfiles/harness/"
+      },
+      "why": "the harness is every project's base — the owner confirms each change",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-harness-edit",
+      "effect": "ask",
+      "action": "fs.edit",
+      "subject": {
+        "path": "(?:^|/)dotfiles/harness/"
+      },
+      "why": "the harness is every project's base — the owner confirms each change",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-harness-settings-write",
+      "effect": "ask",
+      "action": "fs.write",
+      "subject": {
+        "path": "(?:^|/)(?:\\.claude/settings(?:\\.local)?\\.json|\\.codex/config\\.toml)$"
+      },
+      "why": "a harness's own settings change how every session behaves — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-harness-settings-edit",
+      "effect": "ask",
+      "action": "fs.edit",
+      "subject": {
+        "path": "(?:^|/)(?:\\.claude/settings(?:\\.local)?\\.json|\\.codex/config\\.toml)$"
+      },
+      "why": "a harness's own settings change how every session behaves — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-jig-apply",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "jig|bun",
+        "argv": "(?:^|\\s|/)(?:jig(?:\\.ts)?\\s+)?apply\\b"
+      },
+      "why": "jig apply rewrites every harness's configuration — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
       "id": "ask-task-change",
       "effect": "ask",
       "action": "shell.exec",
