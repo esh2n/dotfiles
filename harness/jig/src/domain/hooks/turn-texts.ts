@@ -29,7 +29,6 @@ export interface TurnTexts {
   readonly feedback: readonly string[];
 }
 
-const NOT_FROM_THE_OWNER: ReadonlySet<unknown> = new Set(["task-notification", "peer"]);
 const FEEDBACK_PREFIX = "Stop hook feedback:";
 
 function parse(line: string): Entry | undefined {
@@ -49,9 +48,7 @@ function blocks(entry: Entry): readonly Block[] {
 
 function fromTheOwner(entry: Entry): boolean {
   if (entry.type !== "user" || entry.isMeta === true || entry.isSidechain === true) return false;
-  if (NOT_FROM_THE_OWNER.has(entry.origin?.kind)) return false;
-  const content = entry.message?.content;
-  if (typeof content === "string") return !content.startsWith("<task-notification>");
+  if (entry.origin?.kind === "task-notification") return false;
   return blocks(entry).every((block) => block.type !== "tool_result");
 }
 
