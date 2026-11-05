@@ -187,9 +187,9 @@
       "effect": "ask",
       "action": "fs.write",
       "subject": {
-        "path": "(?:^|/)dotfiles/harness/"
+        "path": "(?:^|[/@])(?:harness/(?:agents|bin|docs|hooks|jig|mcp|plugins|rules|scripts|skills|tools|workflows)|home/shared/harness)(?:/|$)|^@?(?:~|/Users/[^/]+|/home/[^/]+|/root|/var/root)/(?:\\.claude/(?:settings(?:\\.local)?\\.json$|(?:AGENTS|CLAUDE)\\.md$|(?:skills|agents|rules|scripts|workflows|hooks|commands)(?:/|$))|\\.claude\\.json$|\\.codex/(?:config\\.toml$|hooks\\.json$|AGENTS\\.md$|(?:agents|rules|skills)(?:/|$))|\\.config/codex/|\\.agents/skills(?:/|$)|\\.pi/agent/(?:settings\\.json$|models\\.json$|AGENTS\\.md$|mcp\\.json$|(?:extensions|themes|agents|prompts|skills|git|npm)(?:/|$))|\\.omp/(?:profiles/[^/]+/)?agent/(?:config\\.yml$|mcp\\.json$|models\\.yml$|lsp\\.yml$|AGENTS\\.md$|(?:agents|extensions|hooks|skills|commands|rules)(?:/|$))|\\.config/mcp/mcp\\.json$|\\.dsh/(?:AGENTS\\.md$|settings\\.yaml$|hooks\\.claude\\.json$|cordis\\.patch\\.yml$|profiles/)|\\.local/share/jig/|\\.local/state/jig/apply-manifest\\.json$)|(?:^|/)(?:\\.claude/settings(?:\\.local)?\\.json|\\.codex/(?:config\\.toml|hooks\\.json)|\\.pi/settings\\.json|\\.omp/config\\.yml)$|(?:^|/)(?:\\.pi|\\.omp)/(?:extensions|hooks)/"
       },
-      "why": "the harness is every project's base — the owner confirms each change",
+      "why": "the harness sources are every project's base, for every harness jig delivers to — the owner confirms each change",
       "profiles": [
         "minimal",
         "standard",
@@ -201,9 +201,9 @@
       "effect": "ask",
       "action": "fs.edit",
       "subject": {
-        "path": "(?:^|/)dotfiles/harness/"
+        "path": "(?:^|[/@])(?:harness/(?:agents|bin|docs|hooks|jig|mcp|plugins|rules|scripts|skills|tools|workflows)|home/shared/harness)(?:/|$)|^@?(?:~|/Users/[^/]+|/home/[^/]+|/root|/var/root)/(?:\\.claude/(?:settings(?:\\.local)?\\.json$|(?:AGENTS|CLAUDE)\\.md$|(?:skills|agents|rules|scripts|workflows|hooks|commands)(?:/|$))|\\.claude\\.json$|\\.codex/(?:config\\.toml$|hooks\\.json$|AGENTS\\.md$|(?:agents|rules|skills)(?:/|$))|\\.config/codex/|\\.agents/skills(?:/|$)|\\.pi/agent/(?:settings\\.json$|models\\.json$|AGENTS\\.md$|mcp\\.json$|(?:extensions|themes|agents|prompts|skills|git|npm)(?:/|$))|\\.omp/(?:profiles/[^/]+/)?agent/(?:config\\.yml$|mcp\\.json$|models\\.yml$|lsp\\.yml$|AGENTS\\.md$|(?:agents|extensions|hooks|skills|commands|rules)(?:/|$))|\\.config/mcp/mcp\\.json$|\\.dsh/(?:AGENTS\\.md$|settings\\.yaml$|hooks\\.claude\\.json$|cordis\\.patch\\.yml$|profiles/)|\\.local/share/jig/|\\.local/state/jig/apply-manifest\\.json$)|(?:^|/)(?:\\.claude/settings(?:\\.local)?\\.json|\\.codex/(?:config\\.toml|hooks\\.json)|\\.pi/settings\\.json|\\.omp/config\\.yml)$|(?:^|/)(?:\\.pi|\\.omp)/(?:extensions|hooks)/"
       },
-      "why": "the harness is every project's base — the owner confirms each change",
+      "why": "the harness sources are every project's base, for every harness jig delivers to — the owner confirms each change",
       "profiles": [
         "minimal",
         "standard",
@@ -211,42 +211,148 @@
       ]
     },
     {
-      "id": "ask-harness-settings-write",
-      "effect": "ask",
-      "action": "fs.write",
-      "subject": {
-        "path": "(?:^|/)(?:\\.claude/settings(?:\\.local)?\\.json|\\.codex/config\\.toml)$"
-      },
-      "why": "a harness's own settings change how every session behaves — the owner confirms",
-      "profiles": [
-        "minimal",
-        "standard",
-        "strict"
-      ]
-    },
-    {
-      "id": "ask-harness-settings-edit",
-      "effect": "ask",
-      "action": "fs.edit",
-      "subject": {
-        "path": "(?:^|/)(?:\\.claude/settings(?:\\.local)?\\.json|\\.codex/config\\.toml)$"
-      },
-      "why": "a harness's own settings change how every session behaves — the owner confirms",
-      "profiles": [
-        "minimal",
-        "standard",
-        "strict"
-      ]
-    },
-    {
-      "id": "ask-jig-apply",
+      "id": "ask-harness-redirect",
       "effect": "ask",
       "action": "shell.exec",
       "subject": {
-        "program": "jig|bun",
-        "argv": "(?:^|\\s|/)(?:jig(?:\\.ts)?\\s+)?apply\\b"
+        "path": "(?:^|[/@])(?:harness/(?:agents|bin|docs|hooks|jig|mcp|plugins|rules|scripts|skills|tools|workflows)|home/shared/harness)(?:/|$)|^(?:~|\\$HOME|\\$\\{HOME\\}|/Users/[^/]+|/home/[^/]+|/root|/var/root)/(?:\\.claude/(?:settings(?:\\.local)?\\.json$|(?:AGENTS|CLAUDE)\\.md$|(?:skills|agents|rules|scripts|workflows|hooks|commands)(?:/|$))|\\.claude\\.json$|\\.codex/(?:config\\.toml$|hooks\\.json$|AGENTS\\.md$|(?:agents|rules|skills)(?:/|$))|\\.config/codex/|\\.agents/skills(?:/|$)|\\.pi/agent/(?:settings\\.json$|models\\.json$|AGENTS\\.md$|mcp\\.json$|(?:extensions|themes|agents|prompts|skills|git|npm)(?:/|$))|\\.omp/(?:profiles/[^/]+/)?agent/(?:config\\.yml$|mcp\\.json$|models\\.yml$|lsp\\.yml$|AGENTS\\.md$|(?:agents|extensions|hooks|skills|commands|rules)(?:/|$))|\\.config/mcp/mcp\\.json$|\\.dsh/(?:AGENTS\\.md$|settings\\.yaml$|hooks\\.claude\\.json$|cordis\\.patch\\.yml$|profiles/)|\\.local/share/jig/|\\.local/state/jig/apply-manifest\\.json$)|(?:^|/)(?:\\.claude/settings(?:\\.local)?\\.json|\\.codex/(?:config\\.toml|hooks\\.json)|\\.pi/settings\\.json|\\.omp/config\\.yml)$|(?:^|/)(?:\\.pi|\\.omp)/(?:extensions|hooks)/"
       },
-      "why": "jig apply rewrites every harness's configuration — the owner confirms",
+      "why": "a shell command that writes the harness sources or a harness's configuration — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-harness-shell-write",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "tee|mv|cp|rm|unlink|install|ln|truncate|rsync|touch|patch|dd",
+        "argv": "(?:^|[\\s=/@])(?:harness/(?:agents|bin|docs|hooks|jig|mcp|plugins|rules|scripts|skills|tools|workflows)|home/shared/harness)(?:/|\\s|$)|(?:^|[\\s=@])(?:~|\\$HOME|\\$\\{HOME\\}|/Users/[^/\\s]+|/home/[^/\\s]+|/root|/var/root)/(?:\\.claude/(?:settings(?:\\.local)?\\.json(?=\\s|$)|(?:AGENTS|CLAUDE)\\.md(?=\\s|$)|(?:skills|agents|rules|scripts|workflows|hooks|commands)(?:/|(?=\\s|$)))|\\.claude\\.json(?=\\s|$)|\\.codex/(?:config\\.toml(?=\\s|$)|hooks\\.json(?=\\s|$)|AGENTS\\.md(?=\\s|$)|(?:agents|rules|skills)(?:/|(?=\\s|$)))|\\.config/codex/|\\.agents/skills(?:/|(?=\\s|$))|\\.pi/agent/(?:settings\\.json(?=\\s|$)|models\\.json(?=\\s|$)|AGENTS\\.md(?=\\s|$)|mcp\\.json(?=\\s|$)|(?:extensions|themes|agents|prompts|skills|git|npm)(?:/|(?=\\s|$)))|\\.omp/(?:profiles/[^/]+/)?agent/(?:config\\.yml(?=\\s|$)|mcp\\.json(?=\\s|$)|models\\.yml(?=\\s|$)|lsp\\.yml(?=\\s|$)|AGENTS\\.md(?=\\s|$)|(?:agents|extensions|hooks|skills|commands|rules)(?:/|(?=\\s|$)))|\\.config/mcp/mcp\\.json(?=\\s|$)|\\.dsh/(?:AGENTS\\.md(?=\\s|$)|settings\\.yaml(?=\\s|$)|hooks\\.claude\\.json(?=\\s|$)|cordis\\.patch\\.yml(?=\\s|$)|profiles/)|\\.local/share/jig/|\\.local/state/jig/apply-manifest\\.json(?=\\s|$))|(?:^|[\\s=/])(?:\\.claude/settings(?:\\.local)?\\.json|\\.codex/(?:config\\.toml|hooks\\.json)|\\.pi/settings\\.json|\\.omp/config\\.yml)(?=\\s|$)|(?:^|[\\s=/])(?:\\.pi|\\.omp)/(?:extensions|hooks)/"
+      },
+      "why": "a shell command that writes the harness sources or a harness's configuration — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-harness-sed-in-place",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "sed|gsed|perl|ruby",
+        "argv": "(?=.*(?:^|\\s)-[a-zA-Z]*i)(?=.*(?:(?:^|[\\s=/@])(?:harness/(?:agents|bin|docs|hooks|jig|mcp|plugins|rules|scripts|skills|tools|workflows)|home/shared/harness)(?:/|\\s|$)|(?:^|[\\s=@])(?:~|\\$HOME|\\$\\{HOME\\}|/Users/[^/\\s]+|/home/[^/\\s]+|/root|/var/root)/(?:\\.claude/(?:settings(?:\\.local)?\\.json(?=\\s|$)|(?:AGENTS|CLAUDE)\\.md(?=\\s|$)|(?:skills|agents|rules|scripts|workflows|hooks|commands)(?:/|(?=\\s|$)))|\\.claude\\.json(?=\\s|$)|\\.codex/(?:config\\.toml(?=\\s|$)|hooks\\.json(?=\\s|$)|AGENTS\\.md(?=\\s|$)|(?:agents|rules|skills)(?:/|(?=\\s|$)))|\\.config/codex/|\\.agents/skills(?:/|(?=\\s|$))|\\.pi/agent/(?:settings\\.json(?=\\s|$)|models\\.json(?=\\s|$)|AGENTS\\.md(?=\\s|$)|mcp\\.json(?=\\s|$)|(?:extensions|themes|agents|prompts|skills|git|npm)(?:/|(?=\\s|$)))|\\.omp/(?:profiles/[^/]+/)?agent/(?:config\\.yml(?=\\s|$)|mcp\\.json(?=\\s|$)|models\\.yml(?=\\s|$)|lsp\\.yml(?=\\s|$)|AGENTS\\.md(?=\\s|$)|(?:agents|extensions|hooks|skills|commands|rules)(?:/|(?=\\s|$)))|\\.config/mcp/mcp\\.json(?=\\s|$)|\\.dsh/(?:AGENTS\\.md(?=\\s|$)|settings\\.yaml(?=\\s|$)|hooks\\.claude\\.json(?=\\s|$)|cordis\\.patch\\.yml(?=\\s|$)|profiles/)|\\.local/share/jig/|\\.local/state/jig/apply-manifest\\.json(?=\\s|$))|(?:^|[\\s=/])(?:\\.claude/settings(?:\\.local)?\\.json|\\.codex/(?:config\\.toml|hooks\\.json)|\\.pi/settings\\.json|\\.omp/config\\.yml)(?=\\s|$)|(?:^|[\\s=/])(?:\\.pi|\\.omp)/(?:extensions|hooks)/))"
+      },
+      "why": "a shell command that writes the harness sources or a harness's configuration — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-jig-write",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "jig",
+        "argv": "^(?:apply(?=.*\\s--(?:write|take-over)(?:\\s|$))|setup(?:\\s|$)|codex\\s+register(?=.*\\s--(?:write|take-over)(?:\\s|$))|retire(?=.*\\s--(?:write|take-over)(?:\\s|$))|skills\\s+(?:hide|show)(?=.*\\s--(?:write|take-over)(?:\\s|$)))"
+      },
+      "why": "this rewrites the configuration of every harness jig delivers to — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-jig-write-runner",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "bun|bunx|node|npx|tsx|bash|sh|zsh|dash|fish",
+        "argv": "(?:^|[\\s/])jig(?:\\.ts|\\.js)?\\s+(?:apply(?=.*\\s--(?:write|take-over)(?:\\s|$))|setup(?:\\s|$)|codex\\s+register(?=.*\\s--(?:write|take-over)(?:\\s|$))|retire(?=.*\\s--(?:write|take-over)(?:\\s|$))|skills\\s+(?:hide|show)(?=.*\\s--(?:write|take-over)(?:\\s|$)))"
+      },
+      "why": "this rewrites the configuration of every harness jig delivers to — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-dotctl-harness",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "dotctl",
+        "argv": "^(?:up|setup)(?:\\s|$)"
+      },
+      "why": "this rewrites the configuration of every harness jig delivers to — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-nix-switch",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "nix|home-manager|darwin-rebuild|bootstrap\\.sh",
+        "argv": "(?:^|\\s)(?:switch|activate)(?:\\s|$)|#(?:dotctl|home-manager|darwin-rebuild)\\b.*(?:^|\\s)(?:up|switch)(?:\\s|$)|^$"
+      },
+      "why": "this rewrites the configuration of every harness jig delivers to — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-make-harness",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "make|gmake",
+        "argv": "(?:^|\\s)(?:up|claude)(?:\\s|$)"
+      },
+      "why": "this rewrites the configuration of every harness jig delivers to — the owner confirms",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-tier-switch",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "jig|dotctl",
+        "argv": "^(?:tiers|llm)\\s+use(?:\\s|$)"
+      },
+      "why": "switching a tier rewrites harness/policy/tiers.json, a file agents may not write — the owner runs it",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-tier-switch-runner",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "bun|bunx|node|npx|tsx|bash|sh|zsh|dash|fish|nix",
+        "argv": "(?:^|[\\s/#])(?:jig(?:\\.ts|\\.js)?\\s+tiers|dotctl(?:\\s+--)?\\s+llm)\\s+use(?:\\s|$)"
+      },
+      "why": "switching a tier rewrites harness/policy/tiers.json, a file agents may not write — the owner runs it",
       "profiles": [
         "minimal",
         "standard",

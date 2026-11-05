@@ -745,7 +745,7 @@ const CASES: readonly Case[] = [
   },
   {
     label: "serena editing an ordinary source file is allowed (no friction)",
-    call: mcpCall("mcp__serena__replace_content", "harness/jig/src/foo.ts"),
+    call: mcpCall("mcp__serena__replace_content", "packages/api/src/foo.ts"),
     profile: "standard",
     expected: "allow",
   },
@@ -1402,4 +1402,125 @@ describe("the real guard-rules.json — pstack precedence and GitHub comment rul
       );
     },
   );
+});
+
+// The rules that make an agent ask before it changes the harness: its sources
+// in any checkout of this repository (matched by layout, not by the clone's
+// directory name), the live configuration jig writes for every harness, the
+// project files a harness loads at start, and the commands that rewrite them.
+// Switching a tier is refused rather than asked: it rewrites the guarded
+// harness/policy/tiers.json, which only the owner changes.
+// They land together, so a file holding only some of them fails below; until
+// the owner promotes them the cases are skipped against the real file.
+const HARNESS_RULE_IDS = [
+  "ask-harness-write",
+  "ask-harness-edit",
+  "ask-harness-redirect",
+  "ask-harness-shell-write",
+  "ask-harness-sed-in-place",
+  "ask-jig-write",
+  "ask-jig-write-runner",
+  "ask-dotctl-harness",
+  "ask-nix-switch",
+  "ask-make-harness",
+  "forbid-tier-switch",
+  "forbid-tier-switch-runner",
+] as const;
+
+const HOME = "/Users/owner";
+const CLONE = `${HOME}/src/team-dots`;
+
+const HARNESS_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
+  ...[
+    ["a skill in a clone under another name asks", writeCall(`${CLONE}/harness/skills/x/SKILL.md`), "ask"],
+    ["the user-scope Claude Code skills ask", writeCall(`${HOME}/.claude/skills/x/SKILL.md`), "ask"],
+    ["the user-scope Claude Code settings ask", writeCall(`${HOME}/.claude/settings.json`), "ask"],
+    ["~/.claude.json asks", writeCall(`${HOME}/.claude.json`), "ask"],
+    ["a project's settings.local.json asks", writeCall(`${HOME}/proj/.claude/settings.local.json`), "ask"],
+    ["the auto memory stays free", writeCall(`${HOME}/.claude/projects/p/memory/MEMORY.md`), "allow"],
+    ["a project's own skill stays free", writeCall(`${HOME}/proj/.claude/skills/x/SKILL.md`), "allow"],
+    ["a project directory named harness stays free", writeCall(`${HOME}/proj/src/harness/x.go`), "allow"],
+    ["the guard policy itself stays on the floor", writeCall(`${CLONE}/harness/policy/guard-rules.json`), "deny"],
+    ["a pi extension in a project asks", writeCall(`${HOME}/proj/.pi/extensions/evil.ts`), "ask"],
+    ["the omp profile MCP list asks", writeCall(`${HOME}/.omp/profiles/work/agent/mcp.json`), "ask"],
+  ].map(([label, call, expected]) => ({
+    rule: "ask-harness-write",
+    label: label as string,
+    call: call as ToolCall,
+    profile: "standard" as const,
+    expected: expected as Outcome,
+  })),
+  {
+    rule: "ask-harness-edit",
+    label: "editing jig's own source asks",
+    call: editCall(`${HOME}/go/github.com/owner/dotfiles/harness/jig/src/a.ts`),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    rule: "ask-harness-edit",
+    label: "editing the shared pi extension asks",
+    call: editCall(`${CLONE}/home/shared/harness/pi/extensions/guard.ts`),
+    profile: "standard",
+    expected: "ask",
+  },
+  ...shellRows("ask-harness-redirect", [
+    ["a redirect into the Codex config asks", "echo x > ~/.codex/config.toml", "ask"],
+  ]),
+  ...shellRows("ask-harness-shell-write", [
+    ["copying into the Claude Code agents asks", "cp a.md ~/.claude/agents/a.md", "ask"],
+    ["reading a harness skill stays free", "cat harness/skills/x/SKILL.md", "allow"],
+  ]),
+  ...shellRows("ask-harness-sed-in-place", [
+    ["sed -i on a harness skill asks", "sed -i '' s/a/b/ harness/skills/x/SKILL.md", "ask"],
+  ]),
+  ...shellRows("ask-jig-write", [
+    ["a jig apply dry run stays free", "jig apply --target claude", "allow"],
+    ["jig apply --write asks", "jig apply --target claude --write", "ask"],
+    ["jig setup asks", "./harness/bin/jig setup", "ask"],
+    ["jig codex register --write asks", "jig codex register --write", "ask"],
+    ["jig tiers list stays free", "jig tiers list", "allow"],
+    ["an absolute jig path after cd asks", "cd /tmp && /Users/owner/bin/jig apply --write --target codex", "ask"],
+  ]),
+  ...shellRows("ask-jig-write-runner", [
+    ["jig through bash asks", "bash ./harness/bin/jig apply --target all --write", "ask"],
+    ["jig through bun asks", "bun harness/jig/src/cli/jig.ts apply --target pi --write", "ask"],
+  ]),
+  ...shellRows("ask-dotctl-harness", [
+    ["dotctl up asks", "dotctl up", "ask"],
+    ["dotctl through nix run asks", "nix run .#dotctl -- up --repo .", "ask"],
+    ["dotctl llm check stays free", "dotctl llm check", "allow"],
+  ]),
+  ...shellRows("ask-nix-switch", [
+    ["home-manager switch asks", "home-manager switch --flake .#linux", "ask"],
+    ["nix build stays free", "nix build .#dotctl", "allow"],
+  ]),
+  ...shellRows("forbid-tier-switch", [
+    ["jig tiers use is refused", "jig tiers use main deepseek-flash", "deny"],
+    ["dotctl llm use is refused", "dotctl llm use main x", "deny"],
+  ]),
+  ...shellRows("forbid-tier-switch-runner", [
+    ["jig tiers use through bun is refused", "bun harness/jig/src/cli/jig.ts tiers use main x", "deny"],
+    ["dotctl llm use through nix run is refused", "nix run .#dotctl -- llm use main x", "deny"],
+  ]),
+  ...shellRows("ask-make-harness", [
+    ["make up asks", "make up", "ask"],
+    ["bun test stays free", "bun test", "allow"],
+  ]),
+];
+
+describe("the real guard-rules.json — asking before the harness changes", () => {
+  const policy = loadRealPolicy();
+  const present = new Set(policy.rules.map((rule) => rule.id));
+
+  test("the twelve rules are all present or all absent, never a partial promotion", () => {
+    const count = HARNESS_RULE_IDS.filter((id) => present.has(id)).length;
+    expect([0, HARNESS_RULE_IDS.length]).toContain(count);
+  });
+
+  for (const { rule, label, call, profile, expected } of HARNESS_RULE_CASES) {
+    test.skipIf(!present.has(rule))(`${rule}: ${label}`, () => {
+      expect(decide(policy, call, profile)).toBe(expected);
+    });
+  }
 });
