@@ -30,6 +30,11 @@
  * gate blocks once (the `stop_hook_active` guard above is the "once") with a
  * one-line reason telling the owner to install it.
  *
+ * `rules/decisions/2026-11-05-reply-language-check-on-stop.md` adds the reply-language
+ * check: when the settings' `language` is supported and any text the model wrote this turn
+ * (between tool calls, or `last_assistant_message`) is mostly in another language, it blocks
+ * once naming those passages, never after `stop_hook_active`.
+ *
  * It blocks with `{"decision":"block","reason":...}` rather than exit code 2:
  * same effect, but the reason reaches the model as data instead of as scraped
  * stderr. Everything else — an unparseable payload, a project with no
@@ -52,7 +57,14 @@ import { missingFindingsHooks, staleSettingsNotice } from "../../domain/hooks/fi
 import type { ReadDir } from "../../domain/hooks/format";
 import { gatePlanFor, gateWantsChangedFiles, projectHooksFor, tail } from "../../domain/hooks/gate";
 import { missingToolReason } from "../../domain/hooks/project-hooks";
+import {
+  judgeReplyLanguage,
+  passageExcerpt,
+  replyLanguageReason,
+  replyLanguageRule,
+} from "../../domain/hooks/reply-language";
 import type { RunResult, Runner } from "../../domain/hooks/run";
+import { type TurnTexts, currentTurnTexts } from "../../domain/hooks/turn-texts";
 import type { Logger } from "../../domain/ports";
 import { changedFiles } from "../../infra/proc/changed-files";
 
@@ -87,6 +99,13 @@ interface StopPayload {
   readonly session_id?: unknown;
   /** In-flight tasks; a `subagent` entry carries `agent_type` (https://code.claude.com/docs/en/hooks, Stop input). */
   readonly background_tasks?: unknown;
+  /**
+   * The turn's final reply text. The docs point Stop hooks here rather than at
+   * `transcript_path`, which is written asynchronously and can still end at an older message.
+   */
+  readonly last_assistant_message?: unknown;
+  /** Where the turn's earlier texts are read from. */
+  readonly transcript_path?: unknown;
 }
 
 /**
@@ -114,6 +133,14 @@ export interface StopGateDeps {
   readonly logger?: Logger;
   /** The findings check (`2026-10-23-findings-verification-check.md`); absent, it does not run. */
   readonly findings?: FindingsDeps;
+  /** The reply-language check (`2026-11-05-reply-language-check-on-stop.md`); absent, it does not run. */
+  readonly replyLanguage?: ReplyLanguageDeps;
+}
+
+export interface ReplyLanguageDeps {
+  /** Claude Code's `language` setting; absent or unsupported, the check does not run. */
+  readonly setting: () => Promise<unknown>;
+  readonly readTranscript: (path: string) => Promise<string>;
 }
 
 const OUTCOME = {
@@ -249,13 +276,90 @@ export async function stopGate(stdin: string, deps: StopGateDeps): Promise<strin
     if (typecheck !== undefined) await recordTypecheckBlock(payload, deps);
   }
 
-  const reasons = [...findings.reasons, ...(typecheck === undefined ? [] : [typecheck])];
+  // Never after a hook-forced continuation, whichever check forced it: once per turn.
+  let language: string | undefined;
+  if (payload.stop_hook_active !== true) {
+    try {
+      language = await replyLanguageStep(payload, deps);
+    } catch (error) {
+      // Its failure must not cost the typecheck's and the findings check's answers.
+      deps.logger?.debug("gate.reply-language-failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const reasons = [
+    ...findings.reasons,
+    ...(typecheck === undefined ? [] : [typecheck]),
+    ...(language === undefined ? [] : [language]),
+  ];
   const systemMessage =
     findings.notices.length === 0 ? {} : { systemMessage: findings.notices.join("\n") };
   if (reasons.length > 0) {
     return `${JSON.stringify({ decision: "block", reason: reasons.join("\n\n"), ...systemMessage })}\n`;
   }
   return findings.notices.length === 0 ? "" : `${JSON.stringify(systemMessage)}\n`;
+}
+
+/**
+ * The turn's texts: the earlier ones from the transcript, the final one from
+ * `last_assistant_message`, because the transcript can lag behind the turn's last message.
+ */
+async function turnTexts(
+  payload: StopPayload,
+  deps: ReplyLanguageDeps,
+  logger: Logger | undefined,
+): Promise<TurnTexts> {
+  const final =
+    typeof payload.last_assistant_message === "string" ? [payload.last_assistant_message] : [];
+  if (typeof payload.transcript_path !== "string" || payload.transcript_path === "") {
+    return { texts: final, feedback: [] };
+  }
+  let earlier: TurnTexts;
+  try {
+    earlier = currentTurnTexts(await deps.readTranscript(payload.transcript_path));
+  } catch (error) {
+    logger?.debug("gate.reply-language-transcript-unreadable", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return { texts: final, feedback: [] };
+  }
+  const texts = [...new Set([...earlier.texts, ...final].map((text) => text.trim()))];
+  return { texts, feedback: earlier.feedback };
+}
+
+/** The reason to have the turn's off-language texts restated, or `undefined` when there are none or nothing can be judged. */
+async function replyLanguageStep(
+  payload: StopPayload,
+  deps: StopGateDeps,
+): Promise<string | undefined> {
+  if (deps.replyLanguage === undefined) return undefined;
+  let setting: unknown;
+  try {
+    setting = await deps.replyLanguage.setting();
+  } catch (error) {
+    deps.logger?.debug("gate.reply-language-unreadable", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+  const rule = replyLanguageRule(setting);
+  if (rule === undefined) return undefined;
+  const turn = await turnTexts(payload, deps.replyLanguage, deps.logger);
+  // A passage an earlier stop of this turn already named cannot be unwritten; naming it again
+  // after a background-task wake-up would only repeat the block.
+  const off = turn.texts.filter(
+    (text) =>
+      judgeReplyLanguage(text, rule) === "off-language" &&
+      !turn.feedback.some((given) => given.includes(passageExcerpt(text))),
+  );
+  deps.logger?.debug("gate.reply-language", {
+    language: rule.name,
+    texts: turn.texts.length,
+    off: off.length,
+  });
+  return off.length === 0 ? undefined : replyLanguageReason(rule, off);
 }
 
 /**

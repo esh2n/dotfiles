@@ -660,6 +660,16 @@ export async function main(argv: readonly string[]): Promise<number> {
               harness: harnessFlag(argv) ?? "claude",
               settings: () => readClaudeSettings(resolveClaudeApplyPaths().settings),
             },
+            replyLanguage: {
+              setting: async () => {
+                const settings = await readClaudeSettings(resolveClaudeApplyPaths().settings);
+                const value = settings?.value;
+                return typeof value === "object" && value !== null && "language" in value
+                  ? value.language
+                  : undefined;
+              },
+              readTranscript: (path) => readFile(path, "utf8"),
+            },
           }),
         );
         return 0;
@@ -936,7 +946,9 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  findings-verifier was last used, reported findings with no verifier finished or running\n" +
           "  stop the turn, twice per use at most, then the owner is told. post-tool-use-format,\n" +
           "  user-prompt-submit and hooks subagent-stop record what it reads, under\n" +
-          "  $JIG_STATE_DIR/skill-runs/ (one file per day, 14 days kept).\n" +
+          "  $JIG_STATE_DIR/skill-runs/ (one file per day, 14 days kept). When settings.json sets a\n" +
+          "  supported language (Japanese), text the model wrote this turn that is mostly in another\n" +
+          "  language also blocks once, naming those passages.\n" +
           "  apply --target claude composes ~/.claude/settings.json's hooks, permissions and sandbox\n" +
           "  from policy/guard-rules.json; every other key in the live file is preserved (a leftover\n" +
           "  mcpServers key is removed: Claude Code never read it there). Dry-run prints the whole-file\n" +
