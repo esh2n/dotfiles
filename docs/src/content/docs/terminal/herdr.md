@@ -14,7 +14,9 @@ description: コーディングエージェント向けターミナルマルチ�
 macOSのデスクトップアプリHerdr（`herdr-app`）は、TUI版とは別のプログラムである。端末はherdr-core（`hc`）が動かし、TUI版とセッションも設定も共有しない。
 
 - インストール: caskの`herdr-app`（`system/darwin/homebrew.nix`）。アプリは自動更新し、herdr-coreも自分で導入する
-- 設定ファイル: `~/.config/herdr-app/settings.json`と`themes/catppuccin.json`を`home/darwin/herdr-app`へのリンクにする。`frame/`や`icons/`などアプリが書き換えるものはリンクしない。`keys.json`とレイアウトは今は管理していない
+- 設定ファイル: `~/.config/herdr-app/settings.json`と`themes/current.json`を`home/darwin/herdr-app`へのリンクにする。`keys.json`と`mods/prefix`もリンクする。`frame/`や`icons/`などアプリが書き換えるものはリンクしない。レイアウトは今は管理していない
+- キー: `Ctrl+q`のあとに次のキーを押すと`mods/prefix`のmodが受け取る。`Ctrl+q`を2回押すと端末のプログラムへ届く
+- テーマ: `dotctl theme set`で切り替わる。`themes/current.json`が今のテーマを指し、アプリは10秒以内に読み直す。アプリの画面でダークテーマを選ぶと、その選択がレイアウトの状態に残り、`dotctl theme set`が届かなくなる。パレットの［Reset layout］で消せる。`terminals`と`win98`のレイアウトは自分のテーマを持つので追従しない
 
 ## 概念
 
