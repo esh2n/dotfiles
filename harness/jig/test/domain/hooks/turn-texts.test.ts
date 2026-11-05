@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { currentTurnTexts } from "../../../src/domain/hooks/turn-texts";
+import { currentTurnTexts, passageBeforeToolCall } from "../../../src/domain/hooks/turn-texts";
 
 const prompt = (text: string) => ({
   type: "user",
@@ -86,5 +86,53 @@ describe("the owner's current turn", () => {
 
   test("an empty transcript has no turn", () => {
     expect(currentTurnTexts("")).toEqual({ texts: [], feedback: [] });
+  });
+});
+
+describe("the passage before a tool call", () => {
+  const call = { type: "assistant", message: { content: [{ type: "tool_use", id: "t2" }] } };
+
+  test("is what the model wrote after its last tool result, joined", () => {
+    expect(
+      passageBeforeToolCall(
+        jsonl(prompt("p"), said("old"), toolUse, toolResult, said("one"), said("two"), call),
+      ),
+    ).toBe("one\n\ntwo");
+  });
+
+  test("starts after the owner's message on the turn's first call", () => {
+    expect(
+      passageBeforeToolCall(jsonl(said("earlier turn"), prompt("p"), said("first"), call)),
+    ).toBe("first");
+  });
+
+  test("is empty when nothing was written since the last tool result", () => {
+    expect(passageBeforeToolCall(jsonl(prompt("p"), said("x"), toolUse, toolResult, call))).toBe(
+      "",
+    );
+  });
+
+  test("hook feedback, task notifications and a subagent's entries do not end it", () => {
+    const sideResult = { ...toolResult, isSidechain: true };
+    expect(
+      passageBeforeToolCall(
+        jsonl(
+          prompt("p"),
+          toolUse,
+          toolResult,
+          said("a"),
+          hookFeedback("f"),
+          taskNotification,
+          sideResult,
+          said("side", { isSidechain: true }),
+          said("b"),
+          call,
+        ),
+      ),
+    ).toBe("a\n\nb");
+  });
+
+  test("is undefined when the tail never reaches a tool result or the owner's message", () => {
+    expect(passageBeforeToolCall(`{"type":"us\n${jsonl(said("cut"), call)}`)).toBeUndefined();
   });
 });

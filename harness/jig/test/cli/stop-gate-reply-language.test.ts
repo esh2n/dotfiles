@@ -113,6 +113,53 @@ describe("the turn's texts across tool calls and wake-ups", () => {
       }),
     ).toBe("");
   });
+  test("a passage the guard already denied before a tool call is not named again", async () => {
+    const denied = {
+      type: "user",
+      message: {
+        content: [
+          {
+            type: "tool_result",
+            is_error: true,
+            content: [
+              {
+                type: "text",
+                text: `jig guard (reply language): Claude Code's \`language\` setting asks for Japanese, but ...\n"${ENGLISH_BETWEEN_TOOLS}"`,
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const transcript = jsonl(
+      prompt("直して"),
+      said(ENGLISH_BETWEEN_TOOLS),
+      agentCall,
+      denied,
+      said(JAPANESE),
+    );
+    expect(
+      await stopGate(payload({ last_assistant_message: JAPANESE }), {
+        run: passing,
+        exists: noProject,
+        replyLanguage: language("Japanese", transcript),
+      }),
+    ).toBe("");
+  });
+
+  test("an ordinary tool result quoting a passage does not count as naming it", async () => {
+    const quoted = {
+      type: "user",
+      message: { content: [{ type: "tool_result", content: ENGLISH_BETWEEN_TOOLS }] },
+    };
+    const transcript = jsonl(prompt("直して"), said(ENGLISH_BETWEEN_TOOLS), agentCall, quoted);
+    const out = await stopGate(payload({ last_assistant_message: JAPANESE }), {
+      run: passing,
+      exists: noProject,
+      replyLanguage: language("Japanese", transcript),
+    });
+    expect(blocked(out).reason).toContain("Before running the full check");
+  });
 });
 
 describe("the reply-language check", () => {

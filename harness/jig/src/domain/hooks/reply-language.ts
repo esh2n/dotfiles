@@ -1,10 +1,13 @@
 /**
  * Whether the turn's replies are written in the language Claude Code's `language`
- * setting asks for (`rules/decisions/2026-11-05-reply-language-check-on-stop.md`).
+ * setting asks for (`rules/decisions/2026-11-05-reply-language-check-on-stop.md`, and before
+ * each tool call `rules/decisions/2026-11-05-reply-language-check-on-pre-tool-use.md`).
  *
  * Only the prose is judged: code, URLs and paths are removed first, because a reply in
  * the right language still names files, commands and identifiers in Latin letters.
  */
+
+import { LANGUAGE_DENIAL_MARKER } from "./turn-texts";
 
 export type ReplyLanguageVerdict = "matches" | "off-language" | "too-short";
 
@@ -85,5 +88,14 @@ export function replyLanguageReason(rule: LanguageRule, passages: readonly strin
     ...listed,
     ...(rest > 0 ? [`…and ${rest} more.`] : []),
     `Write your final message in ${rule.name}, restating in ${rule.name} what these passages said; keep code, commands, paths and identifiers as they are. This check runs once per turn, so the next stop ends the turn.`,
+  ].join("\n");
+}
+
+/** The guard's reason for denying a tool call whose preceding passage is off-language. */
+export function toolCallLanguageReason(rule: LanguageRule, passage: string): string {
+  return [
+    `${LANGUAGE_DENIAL_MARKER} Claude Code's \`language\` setting asks for ${rule.name}, but the passage you wrote before this tool call is mostly in another language:`,
+    `"${passageExcerpt(passage)}"`,
+    `Write that passage again in ${rule.name} before running the tool, keeping code, commands, paths and identifiers as they are; then make the same tool call again. Each passage is denied once, so the call after the rewrite goes through.`,
   ].join("\n");
 }

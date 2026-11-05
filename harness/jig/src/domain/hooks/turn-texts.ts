@@ -12,6 +12,7 @@
 interface Block {
   readonly type?: unknown;
   readonly text?: unknown;
+  readonly content?: unknown;
 }
 
 interface Entry {
@@ -25,11 +26,17 @@ interface Entry {
 export interface TurnTexts {
   /** What the model wrote this turn, in order. */
   readonly texts: readonly string[];
-  /** The Stop hook feedback given this turn, so a passage it already named is not named twice. */
+  /**
+   * The Stop hook feedback and the guard's reply-language denials given this turn, so a
+   * passage either already named is not named twice.
+   */
   readonly feedback: readonly string[];
 }
 
 const FEEDBACK_PREFIX = "Stop hook feedback:";
+
+/** Opens the guard's reply-language denial, which Claude Code hands back as the tool result. */
+export const LANGUAGE_DENIAL_MARKER = "jig guard (reply language):";
 
 function parse(line: string): Entry | undefined {
   if (line.trim() === "") return undefined;
@@ -52,11 +59,30 @@ function fromTheOwner(entry: Entry): boolean {
   return blocks(entry).every((block) => block.type !== "tool_result");
 }
 
-function feedback(entry: Entry): string | undefined {
+function isToolResult(entry: Entry): boolean {
+  return (
+    entry.type === "user" &&
+    entry.isSidechain !== true &&
+    blocks(entry).some((block) => block.type === "tool_result")
+  );
+}
+
+function resultTexts(block: Block): readonly string[] {
+  if (typeof block.content === "string") return [block.content];
+  if (!Array.isArray(block.content)) return [];
+  return (block.content as Block[]).flatMap((part) =>
+    typeof part.text === "string" ? [part.text] : [],
+  );
+}
+
+function feedback(entry: Entry): readonly string[] {
+  if (entry.type !== "user") return [];
   const content = entry.message?.content;
-  return entry.type === "user" && typeof content === "string" && content.startsWith(FEEDBACK_PREFIX)
-    ? content
-    : undefined;
+  if (typeof content === "string") return content.startsWith(FEEDBACK_PREFIX) ? [content] : [];
+  return blocks(entry)
+    .filter((block) => block.type === "tool_result")
+    .flatMap(resultTexts)
+    .filter((text) => text.includes(LANGUAGE_DENIAL_MARKER));
 }
 
 function texts(entry: Entry): readonly string[] {
@@ -78,8 +104,25 @@ export function currentTurnTexts(transcript: string): TurnTexts {
     if (entry === undefined) continue;
     if (fromTheOwner(entry)) break;
     found.unshift(...texts(entry));
-    const said = feedback(entry);
-    if (said !== undefined) given.unshift(said);
+    given.unshift(...feedback(entry));
   }
   return { texts: found, feedback: given };
+}
+
+/**
+ * What the model wrote after its last tool result (or the owner's message) in the current
+ * turn: the passage the owner sees just before the tool call a PreToolUse hook is judging.
+ * The transcript may be only its tail; when the tail does not reach back to that boundary,
+ * this is `undefined` so that nothing is judged on a cut passage.
+ */
+export function passageBeforeToolCall(transcript: string): string | undefined {
+  const lines = transcript.split("\n");
+  const found: string[] = [];
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const entry = parse(lines[i] ?? "");
+    if (entry === undefined) continue;
+    if (fromTheOwner(entry) || isToolResult(entry)) return found.join("\n\n");
+    found.unshift(...texts(entry));
+  }
+  return undefined;
 }
