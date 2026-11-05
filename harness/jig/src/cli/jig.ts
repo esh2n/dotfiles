@@ -43,8 +43,6 @@ import { readAudit, readClaudeCalls, readCodexCalls } from "../infra/coverage/re
 import { createHttpDecisionClient } from "../infra/decision/http-decision-client";
 import { RemoteDecisionProvider } from "../infra/decision/remote-provider";
 import { BunFileSystem } from "../infra/fs/bun-fs";
-import { claimOnce } from "../infra/fs/once-keys";
-import { readTail } from "../infra/fs/read-tail";
 import { commandExists, createPrompter, spawnHarness } from "../infra/interactive/prompter";
 import { ConsoleLogger } from "../infra/logger/console-logger";
 import { appendRouterLog } from "../infra/logs/router-log";
@@ -374,20 +372,6 @@ async function readClaudeSettings(
   }
 }
 
-/** Claude Code's `language` setting from the user settings file; `undefined` when absent or unreadable. */
-async function claudeLanguageSetting(): Promise<unknown> {
-  const value = (await readClaudeSettings(resolveClaudeApplyPaths().settings))?.value;
-  return typeof value === "object" && value !== null && "language" in value
-    ? value.language
-    : undefined;
-}
-
-/**
- * How much of the transcript the guard reads before each call. What follows the last tool
- * result is a few entries, but one attachment entry measured 178 KB, so 1 MiB.
- */
-const TRANSCRIPT_TAIL_BYTES = 1024 * 1024;
-
 /**
  * How Claude Code should invoke jig from a hook: absolute paths only, for the
  * same reason the Codex registration uses them — a hook runs in whatever
@@ -585,23 +569,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         const stdin = await new Response(Bun.stdin.stream()).text();
         const harness = harnessFlag(argv);
         process.stdout.write(
-          await preToolUse(stdin, ports, {
-            ...(harness === undefined ? {} : { harness }),
-            ...((harness ?? process.env.JIG_HARNESS ?? "claude") === "claude"
-              ? {
-                  replyLanguage: {
-                    setting: claudeLanguageSetting,
-                    readTranscriptTail: (path) => readTail(path, TRANSCRIPT_TAIL_BYTES),
-                    claimDenial: (key) =>
-                      claimOnce(
-                        join(resolveStateDir(process.env), "reply-language-denials"),
-                        key,
-                        500,
-                      ),
-                  },
-                }
-              : {}),
-          }),
+          await preToolUse(stdin, ports, harness === undefined ? {} : { harness }),
         );
         return 0;
       }
@@ -691,10 +659,6 @@ export async function main(argv: readonly string[]): Promise<number> {
               now: () => new Date(),
               harness: harnessFlag(argv) ?? "claude",
               settings: () => readClaudeSettings(resolveClaudeApplyPaths().settings),
-            },
-            replyLanguage: {
-              setting: claudeLanguageSetting,
-              readTranscript: (path) => readFile(path, "utf8"),
             },
           }),
         );
@@ -972,9 +936,7 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  findings-verifier was last used, reported findings with no verifier finished or running\n" +
           "  stop the turn, twice per use at most, then the owner is told. post-tool-use-format,\n" +
           "  user-prompt-submit and hooks subagent-stop record what it reads, under\n" +
-          "  $JIG_STATE_DIR/skill-runs/ (one file per day, 14 days kept). When settings.json sets a\n" +
-          "  supported language (Japanese), text the model wrote this turn that is mostly in another\n" +
-          "  language also blocks once, naming those passages.\n" +
+          "  $JIG_STATE_DIR/skill-runs/ (one file per day, 14 days kept).\n" +
           "  apply --target claude composes ~/.claude/settings.json's hooks, permissions and sandbox\n" +
           "  from policy/guard-rules.json; every other key in the live file is preserved (a leftover\n" +
           "  mcpServers key is removed: Claude Code never read it there). Dry-run prints the whole-file\n" +

@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   resolvePolicyPath,
   resolveProfile,
@@ -8,12 +7,6 @@ import { loadGuardPolicy } from "../../app/hooks/load-policy";
 import { type LoadedPolicy, runHook } from "../../app/hooks/run-hook";
 import { sessionModel } from "../../app/hooks/session-model";
 import type { ToolCall } from "../../domain/hooks/decision";
-import {
-  judgeReplyLanguage,
-  replyLanguageRule,
-  toolCallLanguageReason,
-} from "../../domain/hooks/reply-language";
-import { passageBeforeToolCall } from "../../domain/hooks/turn-texts";
 import type { Principal } from "../../domain/policy/request";
 import type { Ports } from "../../domain/ports";
 
@@ -25,9 +18,6 @@ interface PreToolUsePayload {
   permission_mode?: string;
   /** Claude Code and codex both name the per-call id `tool_use_id`. */
   tool_use_id?: string;
-  transcript_path?: unknown;
-  /** Set when the call comes from a subagent (https://code.claude.com/docs/en/hooks, common input fields). */
-  agent_id?: unknown;
 }
 
 /** Harnesses whose hook protocol carries an `ask`; every other one gets a deny instead. */
@@ -42,42 +32,6 @@ export interface PreToolUseOptions {
    * environment form. Defaults to `claude`, the format's native speaker.
    */
   readonly harness?: string;
-  /** The reply-language check (`2026-11-05-reply-language-check-on-pre-tool-use.md`); absent, it does not run. */
-  readonly replyLanguage?: ToolCallLanguageDeps;
-}
-
-export interface ToolCallLanguageDeps {
-  /** Claude Code's `language` setting; absent or unsupported, the check does not run. */
-  readonly setting: () => Promise<unknown>;
-  /** The transcript's last bytes: the check only needs what follows the last tool result. */
-  readonly readTranscriptTail: (path: string) => Promise<string>;
-  /** Records a denied passage's key and answers whether it was new, so each passage is denied once. */
-  readonly claimDenial: (key: string) => Promise<boolean>;
-}
-
-/**
- * The reason to deny this call because the passage written just before it is off-language,
- * or `undefined`. A subagent's call is never judged: its text is not shown to the owner, and
- * `transcript_path` names the parent session's transcript.
- */
-async function replyLanguageDenial(
-  payload: PreToolUsePayload,
-  deps: ToolCallLanguageDeps,
-): Promise<string | undefined> {
-  if (payload.agent_id !== undefined) return undefined;
-  const path = payload.transcript_path;
-  if (typeof path !== "string" || path === "") return undefined;
-  const rule = replyLanguageRule(await deps.setting());
-  if (rule === undefined) return undefined;
-  const passage = passageBeforeToolCall(await deps.readTranscriptTail(path));
-  if (passage === undefined || judgeReplyLanguage(passage, rule) !== "off-language") {
-    return undefined;
-  }
-  const key = createHash("sha256")
-    .update(`${payload.session_id ?? ""}\n${passage.trim()}`)
-    .digest("hex")
-    .slice(0, 32);
-  return (await deps.claimDenial(key)) ? toolCallLanguageReason(rule, passage) : undefined;
 }
 
 function hookOutput(decision: { kind: string; reason?: string }): string {
@@ -141,11 +95,6 @@ async function loadPolicy(path: string, fs: Ports["fs"]): Promise<PolicyLoad> {
  * Same precedent as
  * domains/dev/config/claude-profiles/personal/hooks/git-guard.sh (see its
  * comment near the "Release WITHOUT a permissionDecision" note).
- *
- * `rules/decisions/2026-11-05-reply-language-check-on-pre-tool-use.md` adds one check
- * after the guard: a call the guard lets through is denied, once per passage, when the
- * text the model wrote since its last tool result is mostly not in the language Claude
- * Code's `language` setting asks for.
  */
 export async function preToolUse(
   stdin: string,
@@ -212,21 +161,8 @@ export async function preToolUse(
   });
 
   // No matching rule: stay silent toward the permission system rather than
-  // emitting an explicit "allow" (see the doc comment above). Only a call the
-  // guard lets through is checked for the passage before it, so the guard's own
-  // deny and ask always stand; a failure of the check lets the call through.
-  if (decision.kind === "allow") {
-    if (options.replyLanguage === undefined) return "";
-    let reason: string | undefined;
-    try {
-      reason = await replyLanguageDenial(payload, options.replyLanguage);
-    } catch (error) {
-      ports.logger.debug("guard.reply-language-failed", {
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-    return reason === undefined ? "" : hookOutput({ kind: "deny", reason });
-  }
+  // emitting an explicit "allow" (see the doc comment above).
+  if (decision.kind === "allow") return "";
 
   // codex has no "ask": its dispatcher rejects the value and, worse, treats
   // the rejection as a hook failure and lets the call through. A question
