@@ -34,6 +34,28 @@ todo tool, never here.
   waiting on someone else. Add no other tags without the owner asking.
 - No estimates.
 
+## Writing a task
+
+How to split the work and where the details go is decided case by case
+with the owner, not by a fixed rule. Propose a split, say why in one line,
+and let the owner change it before anything is added.
+
+- Keep the split at the level the owner tracks. One pull request may be one
+  task, or a few when its parts are done at different times or wait on
+  different people; do not cut it into steps the owner does in one go.
+- What is done and what is left can go in the description, in an
+  annotation, or into separate tasks, whichever reads best for that work.
+- A second-level project is for an outcome that holds several tasks
+  (`personal.moving`), not a default for every pull request.
+- Write each description as a short line in the owner's own language,
+  summarising the pull request's or ticket's title rather than citing it,
+  and ending in the verb: 「検索の並び順を直す」. Never name work by a number
+  or ID (`PR #1234`, `pr-1234`); the owner cannot tell what a number means
+  at a glance. Put the number and the URL in an annotation
+  (`task project:<side> +LATEST annotate "<url>"` right after the add).
+- Follow the writing rules: no space between Japanese and Latin letters,
+  digits or code, no parentheses packed with details.
+
 ## Views
 
 | Command | Shows |
@@ -75,8 +97,13 @@ when you need fields exactly.
 - **Add only after the owner says yes.** When the owner mentions something
   they must do, propose it in one line — description, project, and only the
   priority or due the owner actually stated — and add it when they agree.
-  When the owner gives you the task outright (「〜をタスクに入れて」), that is
-  the yes. Anything you cannot place goes in with `+in` and no project.
+  When the owner names the task outright (「〜をタスクに入れて」), that is
+  the yes. When the owner asks you to add tasks without naming them
+  (「タスク追加しておいて」) and you work out what they are from the session,
+  that is not yet a yes for those tasks: what is left is the owner's call,
+  and they may count something done that you think is open. List what you
+  would add, one line each, ask which are still open, and add only those.
+  Anything you cannot place goes in with `+in` and no project.
 - **Never guess** `priority:H` or a `due`. If the owner did not say it is
   important or give a deadline, leave it out, or ask once.
 - **Complete, delete, modify, or change several tasks at once** only after
@@ -107,4 +134,8 @@ task add project:personal "Renew the passport"            # no deadline given
 task add project:work priority:H due:2026-10-30 "Submit the expense report"
 task add project:personal.moving scheduled:monday "Ask three movers for a quote"
 task add +in "Something about the dentist"                # not sorted yet
+
+# a pull request's URL goes in an annotation, not the description
+task add project:work "検索の並び順を直す"
+task project:work +LATEST annotate "https://github.com/<org>/<repo>/pull/1234"
 ```
