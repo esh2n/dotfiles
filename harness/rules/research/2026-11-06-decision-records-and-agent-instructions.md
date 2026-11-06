@@ -10,7 +10,7 @@
 
 1. **決定の記録を何十件も毎回読み込ませている前例は、ベンダーにも実践者にも大きなリポジトリにも無い。** 記録を持つリポジトリは、リンクか一件一行の索引だけを指示ファイルに置き、本文は必要なときに読ませる（n8n、deliberate-lab、beads、airflow、elasticsearch-java）。全部を毎回のファイルに入れていたのはruflo（71,369バイト）だけで、存在しないADRを引く不具合（#3179）と、ADRが毎回のファイルの規則を上書きした例（ADR-513）を抱える。
 2. **AIに下書きさせるのは普通だが、人の段を通らない記録は決定として扱わない。** n8nのAGENTS.mdは"Write an ADR only when asked ... let the human decide"と書き、記録に`Decision Owner`の欄を持たせてCIで形式を検査する。evolu.devは"A Proposed ADR does not bind"、Duncan Davidsonは"Treat accepted ADRs as binding. Proposed ADRs are non-binding context."と書く。Boris ChernyのチームはPRのレビューを通してからCLAUDE.mdに入れ、Peter SteinbergerのAGENTS.MDは、本人の承認を日付つきで書く（53行目、"Team server deployments/cutovers require Peter's explicit per-deployment approval (September 13, 2026)"）。pstackの`reflect`は承認まで書き換えを待つ。
-3. **人の段が無い記録は、間違うか読まれない。** obra/claude-memory-extractorのREADMEには、作者自身の"All prose was written by Claude. Even the research report that it claims I wrote."という注記がある。Equal ExpertsはAIに書かせたADRで、存在しない資料の引用と、実際の決定に合わない理由を報告した。ECCの自動で書かれる「instinct」は、確信度0.7以上を"Auto-approved"とし、Pestのリポジトリに"Use playwright as the test framework"と書いた（#2841）。測定では、エージェント自身が書いたskillは、skillが無いときより成功率を8.1〜11.5ポイント下げた（SkillsBench、arXiv 2602.12670、コーディングに限らない）。
+3. **人の段が無い記録は、間違うか読まれない。** obra/claude-memory-extractorのREADMEには、作者自身の"All prose was written by Claude. Even the research report that it claims I wrote."という注記がある。Equal ExpertsはAIに書かせたADRで、存在しない資料の引用と、実際の決定に合わない理由を報告した。ECCのGitHub App（ECC Tools）が生成した「instinct」のファイルは、Pestのリポジトリに"Use playwright as the test framework"と書いた（#2841）。ECCのcontinuous-learning-v2のskillは確信度0.7以上を"Auto-approved"とするが、#2841はこのskillではなくGitHub Appの件である。測定では、エージェント自身が書いたskillは、skillが無いときより成功率を8.1〜11.5ポイント下げた（SkillsBench、arXiv 2602.12670、コーディングに限らない）。
 4. **AIを縛るのは仕組みで行う。** Mitchell Hashimoto、Steinberger、Mario Zechner（pi）は、AIの失敗から一行を足し、守らせられるものはhook、pre-commit、道具にする。n8n、beads、rigortype/rigorは、記録の形式や索引の上限をCIとテストで検査する。CLAUDE.mdの安全の規則のうち、組み込みの制御と対応していたのは4.4〜16%だった（arXiv 2608.23550）。
 5. **一人の開発者がADRを試して戻した報告がある。** Greg Smethellsは、40件のうち意味があるのは5件ほどで、エージェントが毎回読み直していたと書き、100行までの設計ファイルとgitの履歴に戻した。ruby-gitのADRの説明は"At a hundred entries nobody reads any of it"と書き、書く条件を三つ（戻しにくい、コードだけでは理由が分からない、捨てた案に残す価値のある理由がある）に絞る。どちらも数字の測定ではない。
 6. **理由を残す効果の測定は一件だけで、合成の設定である。** 規則ごとに理由を注記し、実行するモデルに見せる前に取り除く形は、指示の肥大を止め、遵守を最大23.1%上げた（arXiv 2608.11095、コーディングではない）。ADRを渡すかどうかでコーディングの成功率を比べた測定は見つからない。
@@ -48,7 +48,7 @@
 | PAIR-code/deliberate-lab | `.agents/decisions/`に4件 | AGENTS.mdに一件一行の索引、本文は必要なとき | `status: draft / ratified / superseded` | なし |
 | gastownhall/beads | `engdocs/adr/` | 下位の`engdocs/AGENTS.md`からリンク | 人 | リンク切れをテストで検査 |
 | ruvnet/ruflo | 312件 | 番号を71KBの毎回のファイルに直書き | `authors: claude (Claude Code)`、承認なし | 不具合 #3179 |
-| affaan-m/ECC | 自動の「instinct」 | SessionStartで差し込み | 0.7以上は"Auto-approved" | 不具合 #2841、#2746 |
+| affaan-m/ECC | 自動の「instinct」 | SessionStartで差し込み | skillは0.7以上を"Auto-approved" | 不具合 #2746（skill）、#2841（GitHub App） |
 | github/spec-kit | constitution | `/plan`が読む | エージェントが書き、人の確認は想定だけ | 文の関門だけ。#4431で肥大 |
 | BMAD-METHOD | 実装の文脈と計画の文脈を分ける | 前者だけ毎回 | "you approve every change" | `lint_spine.py` |
 
@@ -79,6 +79,7 @@
 - ADRを渡すとエージェントの成果が上がるという測定も無い。
 - 人の段を通した記録が正しく保たれるという測定も無い。肯定側は体験談である。
 - 理由を添えるかは前例が割れる（Kiroは添えよ、pstackは混乱するときだけ）。
+- 毎回読み込む側を支える報告が一件ある。Spec Kitの#4200では、一つの拡張の手順を毎回読み込ませると適合の点が平均+0.16上がり、コマンドで呼ばせると+0.10だった（作者自身の計測、一つの拡張だけ）。
 
 ## 受け入れられたやり方と、各方式の失敗（判断）
 
