@@ -128,26 +128,34 @@ func checkTier(repo, tier string) error {
 	return fmt.Errorf("unknown tier %q (one of %s)", tier, strings.Join(names, ", "))
 }
 
+// structuredMaxTokens is the main tier's own cap. It bounds what one call can
+// spend, and reasoning is likely counted in it, so a much lower cap risks a
+// blank answer.
+const structuredMaxTokens = 16384
+
 // chatPayload asks for json_object with the schema in the system text:
 // DeepSeek, which the main and complex tiers run on, takes only `text` or
 // `json_object` (https://api-docs.deepseek.com/api/create-chat-completion),
 // although LiteLLM's model map marks deepseek-flash supports_response_schema.
 // Its JSON Output also needs the word "json" in the prompt
 // (https://api-docs.deepseek.com/guides/json_mode).
-// structuredMaxTokens is the main tier's own cap. It bounds what one call can
-// spend, and reasoning is likely counted in it, so a much lower cap risks a
-// blank answer.
-const structuredMaxTokens = 16384
-
+// The executor tier sends no response_format, because its Mac deployment, LM
+// Studio, answers 400 to json_object and may leave content empty under
+// json_schema (lmstudio-bug-tracker issues 189 and 1773); parseChatAnswer
+// still refuses anything but one object.
 func chatPayload(tier string, r StructuredRequest) ([]byte, error) {
 	type message struct {
 		Role    string `json:"role"`
 		Content string `json:"content"`
 	}
+	format := map[string]string{"type": "json_object"}
+	if tier == "executor" {
+		format = nil
+	}
 	return json.Marshal(struct {
 		Model          string            `json:"model"`
 		Messages       []message         `json:"messages"`
-		ResponseFormat map[string]string `json:"response_format"`
+		ResponseFormat map[string]string `json:"response_format,omitempty"`
 		MaxTokens      int               `json:"max_tokens"`
 	}{
 		Model: tier,
@@ -155,7 +163,7 @@ func chatPayload(tier string, r StructuredRequest) ([]byte, error) {
 			{"system", r.System + "\n\nAnswer with one JSON object and nothing else. It must conform to this JSON Schema:\n" + string(r.Schema)},
 			{"user", r.User},
 		},
-		ResponseFormat: map[string]string{"type": "json_object"},
+		ResponseFormat: format,
 		MaxTokens:      structuredMaxTokens,
 	})
 }

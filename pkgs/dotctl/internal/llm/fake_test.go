@@ -84,6 +84,7 @@ var errFake = fakeErr{}
 func (f *fakeSys) Has(name string) bool { return f.have[name] }
 func (f *fakeSys) OS() string           { return f.os }
 
+//declscope:package
 func (f *fakeSys) ran(prefix string) bool {
 	for _, c := range f.calls {
 		if strings.HasPrefix(c, prefix) {

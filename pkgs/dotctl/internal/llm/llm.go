@@ -91,6 +91,7 @@ type Env struct {
 	TailscaleApp string
 }
 
+//declscope:package
 func (e Env) withDefaults() Env {
 	if e.URLs == (URLs{}) {
 		e.URLs = Local
@@ -163,6 +164,8 @@ func (e Env) waitFor(url string) bool {
 
 // proxyKey is the LiteLLM master key, as litellm/proxy-key.sh resolves it
 // (the OS secret store's op token, then op read); "" when it does not.
+//
+//declscope:package
 func (e Env) proxyKey() string {
 	out, _, err := e.run(30*time.Second, e.litellm("proxy-key.sh"))
 	if err != nil {

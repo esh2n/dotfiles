@@ -362,3 +362,21 @@ func TestStructuredCapsTheAnswer(t *testing.T) {
 		t.Fatalf("max_tokens = %d, want %d", v.MaxTokens, structuredMaxTokens)
 	}
 }
+
+func TestExecutorAsksForNoResponseFormatBecauseLMStudioRejectsJSONObject(t *testing.T) {
+	sent, err := chatPayload("executor", StructuredRequest{System: "s", User: "u", Schema: []byte(`{}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(sent, &got); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got["response_format"]; ok {
+		t.Errorf("response_format sent: %v", got["response_format"])
+	}
+	msgs := got["messages"].([]any)
+	if system := msgs[0].(map[string]any)["content"].(string); !strings.Contains(system, "JSON Schema") {
+		t.Errorf("schema missing from system text: %q", system)
+	}
+}
