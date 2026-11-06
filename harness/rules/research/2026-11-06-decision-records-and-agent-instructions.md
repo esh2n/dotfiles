@@ -9,7 +9,7 @@
 ## 結論
 
 1. **決定の記録を何十件も毎回読み込ませている前例は、ベンダーにも実践者にも大きなリポジトリにも無い。** 記録を持つリポジトリは、リンクか一件一行の索引だけを指示ファイルに置き、本文は必要なときに読ませる（n8n、deliberate-lab、beads、airflow、elasticsearch-java）。全部を毎回のファイルに入れていたのはruflo（71,369バイト）だけで、存在しないADRを引く不具合（#3179）と、ADRが毎回のファイルの規則を上書きした例（ADR-513）を抱える。
-2. **AIに下書きさせるのは普通だが、人の段を通らない記録は決定として扱わない。** n8nのAGENTS.mdは"Write an ADR only when asked ... let the human decide"と書き、記録に`Decision Owner`の欄を持たせてCIで形式を検査する。evolu.devは"A Proposed ADR does not bind"、Duncan Davidsonは"Treat accepted ADRs as binding. Proposed ADRs are non-binding context."と書く。Boris ChernyのチームはPRのレビューを通してからCLAUDE.mdに入れ、Peter Steinbergerは規則の行に"(Peter-confirmed)"と日付を付ける。pstackの`reflect`は承認まで書き換えを待つ。
+2. **AIに下書きさせるのは普通だが、人の段を通らない記録は決定として扱わない。** n8nのAGENTS.mdは"Write an ADR only when asked ... let the human decide"と書き、記録に`Decision Owner`の欄を持たせてCIで形式を検査する。evolu.devは"A Proposed ADR does not bind"、Duncan Davidsonは"Treat accepted ADRs as binding. Proposed ADRs are non-binding context."と書く。Boris ChernyのチームはPRのレビューを通してからCLAUDE.mdに入れ、Peter SteinbergerのAGENTS.MDは、本人の承認を日付つきで書く（53行目、"Team server deployments/cutovers require Peter's explicit per-deployment approval (September 13, 2026)"）。pstackの`reflect`は承認まで書き換えを待つ。
 3. **人の段が無い記録は、間違うか読まれない。** obra/claude-memory-extractorのREADMEには、作者自身の"All prose was written by Claude. Even the research report that it claims I wrote."という注記がある。Equal ExpertsはAIに書かせたADRで、存在しない資料の引用と、実際の決定に合わない理由を報告した。ECCの自動で書かれる「instinct」は、確信度0.7以上を"Auto-approved"とし、Pestのリポジトリに"Use playwright as the test framework"と書いた（#2841）。測定では、エージェント自身が書いたskillは、skillが無いときより成功率を8.1〜11.5ポイント下げた（SkillsBench、arXiv 2602.12670、コーディングに限らない）。
 4. **AIを縛るのは仕組みで行う。** Mitchell Hashimoto、Steinberger、Mario Zechner（pi）は、AIの失敗から一行を足し、守らせられるものはhook、pre-commit、道具にする。n8n、beads、rigortype/rigorは、記録の形式や索引の上限をCIとテストで検査する。CLAUDE.mdの安全の規則のうち、組み込みの制御と対応していたのは4.4〜16%だった（arXiv 2608.23550）。
 5. **一人の開発者がADRを試して戻した報告がある。** Greg Smethellsは、40件のうち意味があるのは5件ほどで、エージェントが毎回読み直していたと書き、100行までの設計ファイルとgitの履歴に戻した。ruby-gitのADRの説明は"At a hundred entries nobody reads any of it"と書き、書く条件を三つ（戻しにくい、コードだけでは理由が分からない、捨てた案に残す価値のある理由がある）に絞る。どちらも数字の測定ではない。
@@ -93,7 +93,7 @@
 
 - 決定の記録をすべて消すのが良いこと。一人の体験談（Smethells）しか無い。
 - 記録を残すとエージェントの成果が上がること。
-- 承認の印の決まった形。Steinbergerの"(Peter-confirmed)"とn8nの`Decision Owner`は文で、検証できる署名ではない。
+- 承認の印の決まった形。SteinbergerのAGENTS.MDにある日付つきの承認の文とn8nの`Decision Owner`は文で、検証できる署名ではない。
 
 ## 前例なし
 
