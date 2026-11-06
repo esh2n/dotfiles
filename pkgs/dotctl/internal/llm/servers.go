@@ -166,6 +166,8 @@ func changeModel(e Env, server, action, model string) error {
 }
 
 // call sends one request to LiteLLM with the proxy key.
+//
+//declscope:package
 func (e Env) call(method, url, key string, payload []byte, timeout time.Duration) ([]byte, int, error) {
 	c := *e.HTTP
 	c.Timeout = timeout

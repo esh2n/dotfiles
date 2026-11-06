@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/llm"
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/service"
@@ -19,6 +21,8 @@ const llmUsage = `usage: dotctl llm setup [--repo DIR] [--model-provider] [--obs
        dotctl llm use [--repo DIR] <tier> <model>...   point a tier at catalog models (harness/policy/models.json)
        dotctl llm models [--repo DIR]                  what each model server (linux, mac) has, and what is loaded
        dotctl llm load|unload [--repo DIR] <server> <model>   change what a model server has loaded
+       dotctl llm structured [--repo DIR] --tier <tier> --input <file> [--timeout 120s]
+                                                       one JSON object from a tier; the file is {system, user, schema}
 `
 
 // runLLM is `dotctl llm setup|check`: the home LLM's command steps (what
@@ -29,6 +33,9 @@ func runLLM(home string, args []string, out, errOut io.Writer) int {
 	}
 	if len(args) > 0 && (args[0] == "models" || args[0] == "load" || args[0] == "unload") {
 		return runLLMServers(home, args[0], args[1:], out, errOut)
+	}
+	if len(args) > 0 && args[0] == "structured" {
+		return runLLMStructured(home, args[1:], out, errOut)
 	}
 	if len(args) == 0 || (args[0] != "setup" && args[0] != "check") {
 		fmt.Fprint(errOut, llmUsage)
@@ -196,4 +203,69 @@ func runLLMServers(home, verb string, args []string, out, errOut io.Writer) int 
 	}
 	p.Success("%sed %s on %s", verb, rest[1], rest[0])
 	return 0
+}
+
+// runLLMStructured is `dotctl llm structured`, for a program that holds no
+// key and reads its result from stdout: stdout carries the object and nothing
+// else, and every failure is one line on stderr.
+func runLLMStructured(home string, args []string, out, errOut io.Writer) int {
+	p := structuredPrinter(errOut)
+	fs := flag.NewFlagSet("llm structured", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	repo := fs.String("repo", os.Getenv("DOTFILES_ROOT"), "the checkout (default $DOTFILES_ROOT)")
+	tier := fs.String("tier", "", "the tier to ask")
+	input := fs.String("input", "", "the JSON file holding system, user and schema")
+	timeout := fs.Duration("timeout", 120*time.Second, "how long to wait for the answer")
+	err := fs.Parse(args)
+	switch {
+	case errors.Is(err, flag.ErrHelp):
+		fmt.Fprint(errOut, llmUsage)
+		return 0
+	case err != nil:
+		p.Error("%v", oneLine(err.Error()))
+		return 2
+	case fs.NArg() > 0:
+		p.Error("unexpected argument %q", oneLine(fs.Arg(0)))
+		return 2
+	case *tier == "":
+		p.Error("--tier is required")
+		return 2
+	case *input == "":
+		p.Error("--input is required")
+		return 2
+	case *repo == "":
+		p.Error("the checkout is unknown; pass --repo or set DOTFILES_ROOT")
+		return 2
+	}
+	e := llm.Env{Home: home, Repo: *repo, Sys: sys.OS{}, UI: p}
+	return answerStructured(e, *tier, *input, *timeout, out, errOut)
+}
+
+func answerStructured(e llm.Env, tier, input string, timeout time.Duration, out, errOut io.Writer) int {
+	p := structuredPrinter(errOut)
+	r, err := llm.LoadStructuredRequest(input)
+	if err != nil {
+		p.Error("%s", oneLine(err.Error()))
+		return 1
+	}
+	answer, err := llm.Structured(e, tier, r, timeout)
+	if err != nil {
+		p.Error("%s", oneLine(err.Error()))
+		return 1
+	}
+	if _, err := fmt.Fprintf(out, "%s\n", answer); err != nil {
+		p.Error("%s", oneLine(err.Error()))
+		return 1
+	}
+	return 0
+}
+
+// structuredPrinter sends everything to stderr, so that no helper can reach
+// the stdout the caller parses.
+func structuredPrinter(errOut io.Writer) ui.Printer {
+	return ui.Printer{Out: errOut, Err: errOut, Prefix: "llm structured"}
+}
+
+func oneLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }

@@ -25,6 +25,7 @@ commands:
   llm use <tier> <model>...              point a tier at catalog models (harness/policy/models.json)
   llm models                             what each model server has, and what is loaded
   llm load|unload <server> <model>       change what a model server has loaded
+  llm structured --tier <tier> --input <file>   one JSON object from a tier, for a program holding no key
   nvim <custom|nvchad|lazyvim|astrovim>  point ~/.config/nvim at a distribution
   nvim current                           name the active distribution
   nvim list                              list distributions, marking the active one
