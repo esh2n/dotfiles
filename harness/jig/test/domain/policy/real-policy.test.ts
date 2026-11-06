@@ -1432,17 +1432,49 @@ const CLONE = `${HOME}/src/team-dots`;
 
 const HARNESS_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
   ...[
-    ["a skill in a clone under another name asks", writeCall(`${CLONE}/harness/skills/x/SKILL.md`), "ask"],
-    ["the user-scope Claude Code skills ask", writeCall(`${HOME}/.claude/skills/x/SKILL.md`), "ask"],
+    [
+      "a skill in a clone under another name asks",
+      writeCall(`${CLONE}/harness/skills/x/SKILL.md`),
+      "ask",
+    ],
+    [
+      "the user-scope Claude Code skills ask",
+      writeCall(`${HOME}/.claude/skills/x/SKILL.md`),
+      "ask",
+    ],
     ["the user-scope Claude Code settings ask", writeCall(`${HOME}/.claude/settings.json`), "ask"],
     ["~/.claude.json asks", writeCall(`${HOME}/.claude.json`), "ask"],
-    ["a project's settings.local.json asks", writeCall(`${HOME}/proj/.claude/settings.local.json`), "ask"],
-    ["the auto memory stays free", writeCall(`${HOME}/.claude/projects/p/memory/MEMORY.md`), "allow"],
-    ["a project's own skill stays free", writeCall(`${HOME}/proj/.claude/skills/x/SKILL.md`), "allow"],
-    ["a project directory named harness stays free", writeCall(`${HOME}/proj/src/harness/x.go`), "allow"],
-    ["the guard policy itself stays on the floor", writeCall(`${CLONE}/harness/policy/guard-rules.json`), "deny"],
+    [
+      "a project's settings.local.json asks",
+      writeCall(`${HOME}/proj/.claude/settings.local.json`),
+      "ask",
+    ],
+    [
+      "the auto memory stays free",
+      writeCall(`${HOME}/.claude/projects/p/memory/MEMORY.md`),
+      "allow",
+    ],
+    [
+      "a project's own skill stays free",
+      writeCall(`${HOME}/proj/.claude/skills/x/SKILL.md`),
+      "allow",
+    ],
+    [
+      "a project directory named harness stays free",
+      writeCall(`${HOME}/proj/src/harness/x.go`),
+      "allow",
+    ],
+    [
+      "the guard policy itself stays on the floor",
+      writeCall(`${CLONE}/harness/policy/guard-rules.json`),
+      "deny",
+    ],
     ["a pi extension in a project asks", writeCall(`${HOME}/proj/.pi/extensions/evil.ts`), "ask"],
-    ["the omp profile MCP list asks", writeCall(`${HOME}/.omp/profiles/work/agent/mcp.json`), "ask"],
+    [
+      "the omp profile MCP list asks",
+      writeCall(`${HOME}/.omp/profiles/work/agent/mcp.json`),
+      "ask",
+    ],
   ].map(([label, call, expected]) => ({
     rule: "ask-harness-write",
     label: label as string,
@@ -1480,7 +1512,11 @@ const HARNESS_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
     ["jig setup asks", "./harness/bin/jig setup", "ask"],
     ["jig codex register --write asks", "jig codex register --write", "ask"],
     ["jig tiers list stays free", "jig tiers list", "allow"],
-    ["an absolute jig path after cd asks", "cd /tmp && /Users/owner/bin/jig apply --write --target codex", "ask"],
+    [
+      "an absolute jig path after cd asks",
+      "cd /tmp && /Users/owner/bin/jig apply --write --target codex",
+      "ask",
+    ],
   ]),
   ...shellRows("ask-jig-write-runner", [
     ["jig through bash asks", "bash ./harness/bin/jig apply --target all --write", "ask"],
@@ -1500,7 +1536,11 @@ const HARNESS_RULE_CASES: readonly (Case & { readonly rule: string })[] = [
     ["dotctl llm use is refused", "dotctl llm use main x", "deny"],
   ]),
   ...shellRows("forbid-tier-switch-runner", [
-    ["jig tiers use through bun is refused", "bun harness/jig/src/cli/jig.ts tiers use main x", "deny"],
+    [
+      "jig tiers use through bun is refused",
+      "bun harness/jig/src/cli/jig.ts tiers use main x",
+      "deny",
+    ],
     ["dotctl llm use through nix run is refused", "nix run .#dotctl -- llm use main x", "deny"],
   ]),
   ...shellRows("ask-make-harness", [
