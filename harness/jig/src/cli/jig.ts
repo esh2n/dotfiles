@@ -131,7 +131,6 @@ function resolveClaudeApplyPaths(): ClaudeApplyPaths {
     repoClaudeMd: join(resolveApplyRoot(), "CLAUDE.md"),
     guardRules: join(harness, "policy", "guard-rules.json"),
     mcpServers: join(harness, "mcp", "servers.json"),
-    decisions: join(harness, "rules", "decisions"),
     settings: join(claudeDir, "settings.json"),
     // Claude Code keeps .claude.json in CLAUDE_CONFIG_DIR when that is set,
     // otherwise beside ~/.claude in the home directory.
@@ -170,7 +169,6 @@ function resolveCodexApplyPaths(): CodexApplyPaths {
     harnessRoot: harness,
     pluginsDir: resolvePluginsDir(process.env),
     mcpServers: join(harness, "mcp", "servers.json"),
-    decisions: join(harness, "rules", "decisions"),
     formerSkillRoots: [join(resolveApplyRoot(), "domains", "dev", "config", "claude-profiles")],
     agentsSkills: join(homedir(), ".agents", "skills"),
     codexSkills: join(codexHome, "skills"),
@@ -290,7 +288,6 @@ function resolvePiApplyPaths(): PiApplyPaths {
     harnessRoot: harness,
     pluginsDir: resolvePluginsDir(process.env),
     mcpServers: join(harness, "mcp", "servers.json"),
-    decisions: join(harness, "rules", "decisions"),
     formerSkillRoots: [join(resolveApplyRoot(), "domains", "dev", "config", "claude-profiles")],
     agentsSkills: join(homedir(), ".agents", "skills"),
     agentDir,
@@ -323,7 +320,6 @@ function resolveDshApplyPaths(): DshApplyPaths {
   return {
     harnessRoot: harness,
     mcpServers: join(harness, "mcp", "servers.json"),
-    decisions: join(harness, "rules", "decisions"),
     dshHome: dshHome.dir,
     dshHomeVia: dshHome.via,
     profilesDir: join(dshHome.dir, DSH_PROFILES_DIR),

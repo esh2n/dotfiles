@@ -353,10 +353,27 @@ function linkLine(label: string, link: LinkReport, width = PAD): string {
   return `  ${label.padEnd(width)}${describeLink(link).padEnd(20)} → ${link.target}`;
 }
 
+/** The repository AGENTS.md jig used to write, and what apply does with it now. */
+function repoAgentsMdLines(report: ClaudeApplyReport): readonly string[] {
+  const repo = report.repoAgentsMd;
+  if (repo === undefined || repo.action === "absent") return [];
+  return repo.action === "remove"
+    ? [
+        "",
+        `repository AGENTS.md: remove  ${repo.path}${repo.link === undefined ? "" : ` and the link ${repo.link}`}`,
+        "  decision notes are no longer rendered into AGENTS.md",
+      ]
+    : [
+        "",
+        `repository AGENTS.md: kept  ${repo.path}`,
+        "  decision notes are no longer rendered, but this file is not jig's last write; delete it yourself when it is no longer needed.",
+      ];
+}
+
 /** The generated file: its outcome, its size against the Codex limit, and what went in. */
 function agentsMdLines(report: ClaudeApplyReport): readonly string[] {
   const { agentsMd } = report;
-  const lines: string[] = [
+  return [
     `AGENTS.md: ${agentsMd.outcome}  ${agentsMd.path}  (${agentsMd.bytes} bytes${agentsMd.overLimit ? ` — WARNING: over ${AGENTS_MD_BYTE_LIMIT} bytes; Codex truncates AGENTS.md there` : ""})`,
     ...(agentsMd.backupPath === undefined
       ? []
@@ -366,36 +383,8 @@ function agentsMdLines(report: ClaudeApplyReport): readonly string[] {
     `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     "--- AGENTS.md (generated) ---",
     agentsMd.content.trimEnd(),
-    ...(report.repoAgentsMd === undefined
-      ? []
-      : [
-          "",
-          `repository AGENTS.md: ${report.repoAgentsMd.outcome}  ${report.repoAgentsMd.path}  (${report.repoAgentsMd.bytes} bytes; the decisions marked \`scope: repo\`, untracked)`,
-          ...(report.repoAgentsMd.outcome === "conflict"
-            ? [
-                "  CONFLICT: edited since jig wrote it; left as it is and skipped (the rest of the apply goes on).",
-                "  Its source is the notes marked `scope: repo`: edit those, then delete this file to regenerate it.",
-              ]
-            : []),
-        ]),
+    ...repoAgentsMdLines(report),
   ];
-
-  const missingRule = agentsMd.skipped.filter((skipped) => skipped.missingRule);
-  if (missingRule.length > 0) {
-    lines.push(
-      "",
-      `  WARNING: ${missingRule.length} accepted decision note(s) carry no \`rule:\` line and are NOT bound:`,
-      ...missingRule.map((skipped) => `    - ${skipped.file}`),
-      "    A human writes that line at the time of the ruling; the generator never invents it.",
-    );
-  }
-  const other = agentsMd.skipped.filter((skipped) => !skipped.missingRule);
-  if (other.length > 0) {
-    lines.push(
-      `  (${other.length} not rendered: ${other.map((s) => `${s.file} — ${s.reason}`).join("; ")})`,
-    );
-  }
-  return lines;
 }
 
 /** One line per single symlink destination: the state, and for replace/backup what is there now. */

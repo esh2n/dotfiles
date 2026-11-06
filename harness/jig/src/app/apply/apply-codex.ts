@@ -98,8 +98,6 @@ export interface CodexApplyPaths {
   readonly pluginsDir?: string;
   /** `harness/mcp/servers.json`. */
   readonly mcpServers: string;
-  /** `harness/rules/decisions/`. */
-  readonly decisions: string;
   /**
    * The trees yoki-switch linked skills from (`claude-profiles/{core,packs,personal}/skills`
    * and their parents): a link under one of them is stale, not somebody's.

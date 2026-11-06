@@ -78,8 +78,6 @@ export interface DshApplyPaths {
   readonly harnessRoot: string;
   /** `harness/mcp/servers.json`. */
   readonly mcpServers: string;
-  /** `harness/rules/decisions/`. */
-  readonly decisions: string;
   /** DSH's harness home: `~/.dsh`, or `DSH_HOME`. */
   readonly dshHome: string;
   /** Which rule chose it, for the dry-run. */

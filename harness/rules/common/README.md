@@ -14,19 +14,16 @@ every harness receives through its skills mount
 only `common/`, `decisions/`, `knowledge/` and `research/`; `common/` is never
 linked under `~/.claude/rules`, or it would load twice.
 
-Two things the generated AGENTS.md carries besides these rules:
+The generated AGENTS.md carries one more line besides these rules: a bold
+line pointing at both indexes, `../knowledge/INDEX.md` (settled facts) and
+`../research/INDEX.md` (research of the last 14 days) — read them before
+researching, do not re-investigate settled facts. jig renders it because the
+links must be absolute.
 
-- one bold line pointing at both indexes, `../knowledge/INDEX.md` (settled
-  facts) and `../research/INDEX.md` (research of the last 14 days) — read them
-  before researching, do not re-investigate settled facts
-  (`../decisions/2026-09-22-writeup-markdown-source-two-builds.md`,
-  `../decisions/2026-09-27-records-flow-and-stock.md`)
-- one plain line per accepted decision note, `- <rule> (<file>)`, its `rule:`
-  line copied verbatim; the notes' directory is named once per section. A note
-  with `scope: repo` under its `rule:` line goes only into the dotfiles
-  checkout's own untracked AGENTS.md
-  (`../decisions/2026-09-23-model-facing-english.md`,
-  `../decisions/2026-10-18-decision-scope.md`)
+Decision notes (`../decisions/`) are not rendered into AGENTS.md
+(accepted by the owner, 2026-11-06). A requirement every
+session must follow is written here, in a skill, or as a guard rule or test;
+never in a decision note alone.
 
 Everything here is written in English: it is read by the model, not the owner.
 Codex truncates AGENTS.md at 32 KiB, so the generator reports the byte size and

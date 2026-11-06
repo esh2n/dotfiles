@@ -14,12 +14,9 @@
 import {
   AGENTS_MD_BYTE_LIMIT,
   type RuleSource,
-  type SkippedDecision,
   agentsMdBytes,
-  decisionLines,
   isCommonRule,
   renderAgentsMd,
-  renderRepoAgentsMd,
 } from "../../domain/claude/agents-md";
 import {
   type LinkPlan,
@@ -51,8 +48,6 @@ export interface AgentsMdReport {
   readonly diff: string;
   /** `rules/common/*.md` rendered in, in order. */
   readonly commonFiles: readonly string[];
-  /** Decision notes the renderer skipped, with why. */
-  readonly skipped: readonly SkippedDecision[];
   /**
    * Set when a file jig never wrote stands at the path: on `--write` it is
    * renamed to this before the first generated file lands, so the hand-written
@@ -106,25 +101,18 @@ export async function readMarkdownDir(
   return sources;
 }
 
-/** The generated AGENTS.md: one source (`rules/`), rendered once, whichever harness's directory it lands in. */
+/** The generated AGENTS.md: one source (`rules/common/`), rendered once, whichever harness's directory it lands in. */
 export async function buildAgentsMd(
   ports: ClaudeApplyPorts,
-  paths: { readonly harnessRoot: string; readonly decisions: string },
+  paths: { readonly harnessRoot: string },
 ): Promise<{
   readonly content: string;
-  /** The dotfiles repository's own AGENTS.md: the repo-scoped decisions. */
-  readonly repoContent: string;
   readonly commonFiles: readonly string[];
-  readonly skipped: readonly SkippedDecision[];
 }> {
   const common = await readMarkdownDir(ports, `${paths.harnessRoot}/rules/common`, isCommonRule);
-  const notes = await readMarkdownDir(ports, paths.decisions, (name) => name.endsWith(".md"));
-  const decisions = decisionLines(notes);
   return {
-    content: renderAgentsMd({ harnessRoot: paths.harnessRoot, common, decisions }),
-    repoContent: renderRepoAgentsMd({ harnessRoot: paths.harnessRoot, decisions }),
+    content: renderAgentsMd({ harnessRoot: paths.harnessRoot, common }),
     commonFiles: common.map((source) => source.file),
-    skipped: decisions.skipped,
   };
 }
 
@@ -137,10 +125,7 @@ export async function planAgentsMd(
   ports: ClaudeApplyPorts,
   input: {
     readonly path: string;
-    readonly generated: Pick<
-      Awaited<ReturnType<typeof buildAgentsMd>>,
-      "content" | "commonFiles" | "skipped"
-    >;
+    readonly generated: Pick<Awaited<ReturnType<typeof buildAgentsMd>>, "content" | "commonFiles">;
     readonly manifest: Readonly<Record<string, string>>;
     readonly now: Date;
   },
@@ -161,7 +146,6 @@ export async function planAgentsMd(
     outcome: plan.action,
     diff: unifiedDiff(input.path, current ?? "", "generated", input.generated.content),
     commonFiles: input.generated.commonFiles,
-    skipped: input.generated.skipped,
     ...(plan.action === "write" && current !== undefined && input.manifest[input.path] === undefined
       ? { backupPath: backupPath(input.path, input.now) }
       : {}),

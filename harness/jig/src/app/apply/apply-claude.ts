@@ -121,17 +121,17 @@ export interface ClaudeApplyPaths {
   readonly guardRules: string;
   /** `harness/mcp/servers.json`. */
   readonly mcpServers: string;
-  /** `harness/rules/decisions/`. */
-  readonly decisions: string;
   /**
    * Where external skill packs are checked out (`resolvePluginsDir`); their
    * skills and agents are linked beside the house's. Absent: none.
    */
   readonly pluginsDir?: string;
   /**
-   * Destination: the dotfiles checkout's own `AGENTS.md` (untracked), with
-   * the repo-scoped decisions, and the `CLAUDE.md` link beside it. Absent:
-   * not delivered.
+   * The dotfiles checkout's own `AGENTS.md` and the `CLAUDE.md` link beside
+   * it, which jig wrote while it rendered the repo-scoped decision notes
+   * there. Nothing is rendered into them any more (accepted by the owner,
+   * 2026-11-06); apply removes
+   * the pair when the file is still jig's last write. Absent: not looked at.
    */
   readonly repoAgentsMd?: string;
   readonly repoClaudeMd?: string;
@@ -160,6 +160,19 @@ export interface ClaudeApplyPaths {
 }
 
 export type ClaudeOutcome = "write" | "noop" | "conflict";
+
+/**
+ * What happens to the repository AGENTS.md jig used to write: `remove` when
+ * it is byte for byte jig's last write (with the `CLAUDE.md` link, when that
+ * still points at it), `keep` when it was edited or jig has no record of it —
+ * reported, never deleted — and `absent` when nothing is there.
+ */
+export interface RepoAgentsMdReport {
+  readonly path: string;
+  readonly action: "remove" | "keep" | "absent";
+  /** The `CLAUDE.md` link removed with it, when it points at `AGENTS.md`. */
+  readonly link?: string;
+}
 
 /**
  * A managed directory whose source tree may not exist yet (milestone 4:
@@ -198,8 +211,8 @@ export interface ClaudeApplyReport {
   /** The six hook command lines, for the dry-run listing. */
   readonly hookCommands: readonly { readonly event: string; readonly command: string }[];
   readonly agentsMd: AgentsMdReport;
-  /** The dotfiles repository's own AGENTS.md, when `paths.repoAgentsMd` names it. */
-  readonly repoAgentsMd?: AgentsMdReport;
+  /** The retired repository AGENTS.md, when `paths.repoAgentsMd` names it. */
+  readonly repoAgentsMd?: RepoAgentsMdReport;
   /** Single symlinks: `CLAUDE.md` only. */
   readonly links: readonly LinkReport[];
   readonly skillsDir: ManagedDirReport;
@@ -269,12 +282,24 @@ async function planLinks(
 ): Promise<readonly LinkReport[]> {
   // CLAUDE.md's target is relative on purpose: the two files sit side by side
   // and a moved `~/.claude` keeps the pair intact.
-  return [
-    await planSingleLink(ports, paths.claudeMd, "AGENTS.md", now),
-    ...(paths.repoClaudeMd === undefined
-      ? []
-      : [await planSingleLink(ports, paths.repoClaudeMd, "AGENTS.md", now)]),
-  ];
+  return [await planSingleLink(ports, paths.claudeMd, "AGENTS.md", now)];
+}
+
+async function planRepoAgentsMd(
+  ports: ClaudeApplyPorts,
+  paths: ClaudeApplyPaths,
+  manifest: Readonly<Record<string, string>>,
+): Promise<RepoAgentsMdReport | undefined> {
+  if (paths.repoAgentsMd === undefined) return undefined;
+  const path = paths.repoAgentsMd;
+  const current = await ports.readFile(path);
+  if (current === undefined) return { path, action: "absent" };
+  if (manifest[path] !== ports.sha256(current)) return { path, action: "keep" };
+  if (paths.repoClaudeMd === undefined) return { path, action: "remove" };
+  const link = await ports.inspect(paths.repoClaudeMd);
+  return link.kind === "symlink" && link.target === "AGENTS.md"
+    ? { path, action: "remove", link: paths.repoClaudeMd }
+    : { path, action: "remove" };
 }
 
 async function planSkillsDir(
@@ -351,7 +376,7 @@ function needsWrite(report: Omit<ClaudeApplyReport, "outcome" | "wrote" | "messa
   return (
     report.settingsOutcome === "write" ||
     report.agentsMd.outcome === "write" ||
-    report.repoAgentsMd?.outcome === "write" ||
+    report.repoAgentsMd?.action === "remove" ||
     report.links.some((link) => link.state !== "ok") ||
     managedDirChanges(report.skillsDir) ||
     claudeAgentsChanges(report.agentsDir) ||
@@ -418,15 +443,7 @@ export async function applyClaude(
     manifest,
     now,
   });
-  const repoAgentsMd =
-    paths.repoAgentsMd === undefined
-      ? undefined
-      : await planAgentsMd(ports, {
-          path: paths.repoAgentsMd,
-          generated: { content: built.repoContent, commonFiles: [], skipped: [] },
-          manifest,
-          now,
-        });
+  const repoAgentsMd = await planRepoAgentsMd(ports, paths, manifest);
 
   const hookCommands = Object.entries(hooks).map(([event, value]) => ({
     event,
@@ -490,7 +507,11 @@ export async function applyClaude(
       manifest[ownedKey(paths)] = ports.sha256(ownedView(composition.settings));
     }
     if (agentsMd.outcome === "write") await applyAgentsMd(ports, agentsMd, manifest);
-    if (repoAgentsMd?.outcome === "write") await applyAgentsMd(ports, repoAgentsMd, manifest);
+    if (repoAgentsMd?.action === "remove") {
+      await ports.remove(repoAgentsMd.path);
+      if (repoAgentsMd.link !== undefined) await ports.remove(repoAgentsMd.link);
+      delete manifest[repoAgentsMd.path];
+    }
     if (mcp.outcome === "write" && mcp.content !== undefined)
       await ports.writeAtomic(paths.claudeJson, mcp.content);
     manifest[mcpOwnedKey(paths)] = JSON.stringify(mcp.owned);
@@ -499,9 +520,6 @@ export async function applyClaude(
     manifest[ownedKey(paths)] ??= ports.sha256(ownedView(composition.settings));
     delete manifest[paths.settings]; // the whole-file hash it replaces
     manifest[paths.agentsMd] ??= ports.sha256(agentsMd.content);
-    if (repoAgentsMd !== undefined) {
-      manifest[repoAgentsMd.path] ??= ports.sha256(repoAgentsMd.content);
-    }
     await applyClaudeAgents(ports, base.agentsDir, manifest);
     await ports.writeManifest(manifest);
     await ports.writeProvenance(dirOf(paths.settings), {

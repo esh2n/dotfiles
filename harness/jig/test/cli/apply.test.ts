@@ -180,7 +180,6 @@ describe("applyCli --target claude", () => {
     harnessRoot: H,
     guardRules: `${H}/policy/guard-rules.json`,
     mcpServers: `${H}/mcp/servers.json`,
-    decisions: `${H}/rules/decisions`,
     settings: `${CLAUDE}/settings.json`,
     claudeJson: "/home/u/.claude.json",
     agentsMd: `${CLAUDE}/AGENTS.md`,
@@ -197,7 +196,7 @@ describe("applyCli --target claude", () => {
   const SOURCES: Record<string, string> = {
     [CLAUDE_PATHS.guardRules]: JSON.stringify({ version: 1, floor: [], rules: [] }),
     [CLAUDE_PATHS.mcpServers]: JSON.stringify({ schemaVersion: "jig.mcp.v1", servers: [] }),
-    [`${CLAUDE_PATHS.decisions}/a.md`]: "# 題\n\nStatus: accepted — x\n\nrule: Do the thing.\n",
+    [`${H}/rules/decisions/a.md`]: "# 題\n\nStatus: accepted — x\n\nrule: Do the thing.\n",
     [`${H}/rules/common/README.md`]: "# rules/common\n",
   };
 
@@ -288,17 +287,6 @@ describe("applyCli --target claude", () => {
     const result = await applyCli(["--target", "claude"], ports, paths, claudeContext());
     expect(result.stdout).toContain("sandbox: off on the host");
     expect(result.stdout).toContain("jig's guard and auto mode's classifier");
-  });
-
-  test("an accepted note with no rule line is a WARNING, not a silent omission", async () => {
-    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
-    const context = claudeContext({
-      [`${CLAUDE_PATHS.decisions}/b.md`]: "# 題\n\nStatus: accepted — x\n",
-    });
-    const result = await applyCli(["--target", "claude"], ports, paths, context);
-
-    expect(result.stdout).toContain("WARNING: 1 accepted decision note(s) carry no `rule:` line");
-    expect(result.stdout).toContain("- b.md");
   });
 
   test("AGENTS.md: its outcome, byte size and sources, and the generated text itself", async () => {
@@ -542,7 +530,6 @@ describe("applyCli --target codex", () => {
   const CODEX_PATHS = {
     harnessRoot: H,
     mcpServers: `${H}/mcp/servers.json`,
-    decisions: `${H}/rules/decisions`,
     formerSkillRoots: [OLD],
     agentsSkills: "/home/u/.agents/skills",
     codexSkills: `${CODEX}/skills`,
@@ -572,7 +559,7 @@ describe("applyCli --target codex", () => {
         },
       ],
     }),
-    [`${CODEX_PATHS.decisions}/a.md`]: "# 題\n\nStatus: accepted — x\n\nrule: Do the thing.\n",
+    [`${H}/rules/decisions/a.md`]: "# 題\n\nStatus: accepted — x\n\nrule: Do the thing.\n",
     [`${H}/rules/common/core.md`]: "# Core\n\nBe brief.\n",
     [`${H}/skills/README.md`]: "# skills\n",
     [`${H}/skills/writeup/SKILL.md`]: "---\nname: writeup\n---\n",
@@ -928,7 +915,6 @@ describe("applyCli --target pi", () => {
   const PI_PATHS = {
     harnessRoot: H,
     mcpServers: `${H}/mcp/servers.json`,
-    decisions: `${H}/rules/decisions`,
     formerSkillRoots: [OLD],
     agentsSkills: "/home/u/.agents/skills",
     agentDir: PI,
@@ -1111,7 +1097,6 @@ describe("applyCli --target dsh", () => {
   const DSH_PATHS = {
     harnessRoot: H,
     mcpServers: `${H}/mcp/servers.json`,
-    decisions: `${H}/rules/decisions`,
     dshHome: DSH,
     dshHomeVia: "default" as const,
     profilesDir: PROFILES,

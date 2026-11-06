@@ -16,7 +16,6 @@ const AGENTS_SKILLS = "/home/u/.agents/skills";
 const PATHS: CodexApplyPaths = {
   harnessRoot: H,
   mcpServers: `${H}/mcp/servers.json`,
-  decisions: `${H}/rules/decisions`,
   formerSkillRoots: [OLD],
   agentsSkills: AGENTS_SKILLS,
   codexSkills: `${CODEX}/skills`,
@@ -82,7 +81,7 @@ function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
     ...seed,
     files: {
       [PATHS.mcpServers]: MCP_SOURCE,
-      [`${PATHS.decisions}/2026-09-22-one.md`]: DECISION,
+      [`${H}/rules/decisions/2026-09-22-one.md`]: DECISION,
       [`${H}/rules/common/README.md`]: "# rules/common\n",
       [`${H}/rules/common/core.md`]: "# Core\n\nBe brief.\n",
       [`${H}/skills/README.md`]: "# skills\n",
@@ -267,7 +266,7 @@ describe("AGENTS.md", () => {
     const { ports, files, manifest } = fakePorts(YOKI_SWITCH_MACHINE);
     const dry = await run(ports);
     expect(dry.agentsMd.content).toContain("# Core\n\nBe brief.");
-    expect(dry.agentsMd.content).toContain("- Do the one thing. (2026-09-22-one.md)");
+    expect(dry.agentsMd.content).not.toContain("Do the one thing.");
     expect(dry.agentsMd.backupPath).toBe(`${PATHS.agentsMd}.pre-jig.20260923-000000`);
     expect(dry.agentsMd.diff).toContain("yoki:begin");
 

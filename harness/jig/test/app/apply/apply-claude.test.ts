@@ -12,7 +12,6 @@ const PATHS: ClaudeApplyPaths = {
   harnessRoot: H,
   guardRules: `${H}/policy/guard-rules.json`,
   mcpServers: `${H}/mcp/servers.json`,
-  decisions: `${H}/rules/decisions`,
   settings: `${CLAUDE}/settings.json`,
   claudeJson: "/home/u/.claude.json",
   agentsMd: `${CLAUDE}/AGENTS.md`,
@@ -81,6 +80,7 @@ const MCP_SOURCE = JSON.stringify({
 });
 
 const DECISION = "# 決定の題\n\nStatus: accepted — 理由（2026-09-22）\n\nrule: Do the one thing.\n";
+const DECISIONS = `${H}/rules/decisions`;
 
 /** The sources every test starts from; the destination side is the seed. */
 function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
@@ -89,7 +89,7 @@ function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
     files: {
       [PATHS.guardRules]: GUARD_RULES,
       [PATHS.mcpServers]: MCP_SOURCE,
-      [`${PATHS.decisions}/2026-09-22-one.md`]: DECISION,
+      [`${DECISIONS}/2026-09-22-one.md`]: DECISION,
       [`${H}/rules/common/README.md`]: "# rules/common\n",
       [`${H}/rules/research/INDEX.md`]: "# index\n",
       [`${H}/skills/README.md`]: "# skills\n",
@@ -421,36 +421,37 @@ describe("a machine with no settings.json yet", () => {
 });
 
 describe("AGENTS.md", () => {
-  test("the repo-scoped decisions go to the checkout's own AGENTS.md, with a CLAUDE.md link, and leave the global one", async () => {
-    const { ports, files, links } = fakePorts({
-      files: {
-        [`${PATHS.decisions}/2026-09-23-repo.md`]:
-          "# 題\n\nStatus: accepted — 理由（2026-09-23）\n\nrule: Build dotctl in Go.\nscope: repo\n",
-      },
-    });
+  test("the repository AGENTS.md jig wrote is removed with its CLAUDE.md link; an edited one is kept", async () => {
     const paths = { ...PATHS, repoAgentsMd: "/repo/AGENTS.md", repoClaudeMd: "/repo/CLAUDE.md" };
-    const report = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: true }, ports);
+    const written = "<!-- generated -->\n## Decisions for this repository\n";
+    const { ports, files, links, manifest } = fakePorts({
+      files: { "/repo/AGENTS.md": written },
+      links: { "/repo/CLAUDE.md": "AGENTS.md" },
+    });
+    manifest["/repo/AGENTS.md"] = ports.sha256(written);
+    const dry = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: false }, ports);
+    expect(dry.repoAgentsMd).toEqual({
+      path: "/repo/AGENTS.md",
+      action: "remove",
+      link: "/repo/CLAUDE.md",
+    });
+    expect(files["/repo/AGENTS.md"]).toBe(written);
 
-    expect(report.agentsMd.content).toContain("- Do the one thing. (2026-09-22-one.md)");
-    expect(report.agentsMd.content).not.toContain("Build dotctl in Go.");
-    expect(files["/repo/AGENTS.md"]).toContain("## Decisions for this repository");
-    expect(files["/repo/AGENTS.md"]).toContain("- Build dotctl in Go. (2026-09-23-repo.md)");
-    expect(files["/repo/AGENTS.md"]).not.toContain("Do the one thing.");
-    expect(links["/repo/CLAUDE.md"]).toBe("AGENTS.md");
+    await applyClaude({ paths, hookPaths: HOOK_PATHS, write: true }, ports);
+    expect(files["/repo/AGENTS.md"]).toBeUndefined();
+    expect(links["/repo/CLAUDE.md"]).toBeUndefined();
+    expect(manifest["/repo/AGENTS.md"]).toBeUndefined();
     const again = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: false }, ports);
-    expect(again.repoAgentsMd?.outcome).toBe("noop");
+    expect(again.repoAgentsMd?.action).toBe("absent");
 
-    // a hand edit there is skipped, and does not stop the rest of the apply
-    files["/repo/AGENTS.md"] = "edited by hand\n";
-    files[`${H}/rules/common/z-new.md`] = "# New\n\nnew rule\n";
-    const edited = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: true }, ports);
-    expect(edited.repoAgentsMd?.outcome).toBe("conflict");
-    expect(edited.outcome).toBe("write");
-    expect(files["/repo/AGENTS.md"]).toBe("edited by hand\n");
-    expect(files[PATHS.agentsMd]).toContain("new rule");
+    const edited = fakePorts({ files: { "/repo/AGENTS.md": "edited by hand\n" } });
+    edited.manifest["/repo/AGENTS.md"] = edited.ports.sha256(written);
+    const kept = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: true }, edited.ports);
+    expect(kept.repoAgentsMd?.action).toBe("keep");
+    expect(edited.files["/repo/AGENTS.md"]).toBe("edited by hand\n");
   });
 
-  test("is generated from rules/common and rules/decisions, the notes' directory named once, and sized", async () => {
+  test("is generated from rules/common alone, decision notes left out, and sized", async () => {
     const { ports } = fakePorts({
       files: {
         [`${H}/rules/common/b-git.md`]: "# Git\n\nCommit small.\n",
@@ -468,10 +469,8 @@ describe("AGENTS.md", () => {
     expect(agentsMd.content.indexOf("# Core")).toBeLessThan(agentsMd.content.indexOf("# Git"));
     expect(agentsMd.content).not.toContain("paths: []");
     expect(agentsMd.content).toContain(`](${H}/rules/research/INDEX.md)`);
-    // The note's `rule:` line, not its Japanese title.
-    expect(agentsMd.content).toContain("- Do the one thing. (2026-09-22-one.md)");
-    expect(agentsMd.content).toContain(`${H}/rules/decisions/.`);
-    expect(agentsMd.content).not.toContain("決定の題");
+    expect(agentsMd.content).not.toContain("Do the one thing.");
+    expect(agentsMd.content).not.toContain("rules/decisions");
     expect(agentsMd.bytes).toBe(Buffer.byteLength(agentsMd.content));
     expect(agentsMd.overLimit).toBe(false);
   });
@@ -490,19 +489,6 @@ describe("AGENTS.md", () => {
     const report = await run(ports);
     expect(report.agentsMd.overLimit).toBe(true);
     expect(report.outcome).toBe("write");
-  });
-
-  test("an accepted note with no rule line is reported as a gap, not quietly dropped", async () => {
-    const { ports } = fakePorts({
-      files: { [`${PATHS.decisions}/2026-09-23-two.md`]: "# 題\n\nStatus: accepted — 理由\n" },
-    });
-    const report = await run(ports);
-
-    expect(report.agentsMd.skipped).toContainEqual({
-      file: "2026-09-23-two.md",
-      reason: expect.stringContaining("no `rule:` line"),
-      missingRule: true,
-    });
   });
 
   test("--write lands it, records its hash, and keeps a file jig never wrote under a dated name", async () => {

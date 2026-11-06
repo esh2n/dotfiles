@@ -81,8 +81,6 @@ export interface PiApplyPaths {
   readonly pluginsDir?: string;
   /** `harness/mcp/servers.json`. */
   readonly mcpServers: string;
-  /** `harness/rules/decisions/`. */
-  readonly decisions: string;
   /** The trees yoki-switch linked skills from: a link under one of them is stale, not somebody's. */
   readonly formerSkillRoots: readonly string[];
   /** Destination: `~/.agents/skills`, the cross-harness mount, one link per skill. */

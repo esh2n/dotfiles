@@ -21,8 +21,6 @@
 
 Status: accepted | rejected | superseded by <file> — <一言>
 
-rule: <人が書く英語の一行。生成器がそのまま AGENTS.md に写す>
-scope: repo   ← この dotfiles の作り方だけを決めるメモのときだけ書く
 
 ## Problem
 ## Decision
@@ -33,11 +31,11 @@ scope: repo   ← この dotfiles の作り方だけを決めるメモのとき�
 
 `## Alternatives considered`は必須です。却下した案を書かない決定は、後で蒸し返されます。
 
-AGENTS.mdに描かれるのは`Status: accepted`で`rule:`行を持つメモだけです(`harness/jig/src/domain/claude/agents-md.ts`)。実装が済んでもStatusは`accepted`のままにします。`implemented`など別の語に変えると、その決定は黙ってAGENTS.mdから消えます。
+決定メモは人が読む記録です。jigはAGENTS.mdに入れず、AIがセッションのたびに読むこともありません(持ち主の裁定、2026-11-06)。古いメモにある`rule:`行と`scope: repo`行は、書かれた当時の形の名残で、今はどこにも写されません。
 
 ## 運用
 
-- 行動を縛る決定は、`rule:`行が生成されるAGENTS.mdに`- <rule> (<ファイル名>)`の一行として入ります(太字にしない。メモの置き場所は節の頭で一度だけ書く)。`scope: repo`のメモは、このdotfilesのチェックアウトの追跡されないAGENTS.mdにだけ入ります(`2026-10-18-decision-scope.md`)。全ハーネスが起動時に読むのはAGENTS.mdの連鎖だけです。
+- AIの行動を縛る決定は、メモとは別に、`../common/`の規則、skill、guardの規則、テストのどれかに書きます。メモに書いただけでは、AIはそれを読みません。
 - 機械で検査できる決定(禁止コマンド、禁止パス、禁止依存)は、同じコミットで`../../policy/guard-rules.json`かlintに変換し、その検査の文言からこのメモへリンクします。散文だけのルールは守られたり守られなかったりします。
 - 採択後は「決定」を書き換えません。覆すときは新しいメモを書き、古いメモのStatusを`superseded by`にします。「事実」(パス、名前)は最新に保ちます。
 - HTMLのページ(writeup、Artifact)は人間向けの投影であって、元ではありません。エージェントは読みません。

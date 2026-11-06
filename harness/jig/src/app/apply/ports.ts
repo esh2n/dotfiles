@@ -60,7 +60,7 @@ export interface ClaudeApplyPorts extends ApplyPorts {
   /** `symlink(2)`: `target` is stored as given (relative stays relative). The path must not exist. */
   symlink(target: string, path: string): Promise<void>;
   rename(from: string, to: string): Promise<void>;
-  /** A symlink (the link itself, never what it points at) or a directory tree. */
+  /** A file, a symlink (the link itself, never what it points at) or a directory tree. */
   remove(path: string): Promise<void>;
   /** Creates parents as needed; an existing directory is fine. */
   mkdir(path: string): Promise<void>;
