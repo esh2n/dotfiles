@@ -23,6 +23,14 @@
 - 実行中の通信を一覧する手段はない。`litellm_in_flight_requests`はラベルなしの件数で、全HTTPを数える。
 - Claude CodeとCodexの通信はLiteLLMを通らないので、どの記録にも現れない。
 
+## Claude CodeとCodexの通信の取得
+
+- Claude Codeの対応手段はOpenTelemetryの`claude_code.api_request`と`claude_code.api_error`で、モデル、時間、トークン、費用を持つ。受信側が要り、実行中の通信は取れない。`~/.claude/settings.json`は今`CLAUDE_CODE_ENABLE_TELEMETRY`が`"0"`である。
+- セッションログは公式が内部形式とし、「can break on any release」と書く。Codexの保守者も、文書で永続と明示したもの以外は保証しないと書く（openai/codex#45251）。
+- ログの解析は壊れても気づきにくい。ccusageは約2倍の過大集計（#1762）とトークンの約3分の1の取りこぼし（#1888）を出し、Codexでは0ターンと読む報告がある（openai/codex#43593）。
+- Codexの実行ログには通信の開始も、APIのエラーの記録もない。OpenTelemetryの属性の一覧も文書にない。
+- フックでの取得は6フックの決定に反し、Claude Codeに通信ごとのフックもない。OpenTelemetryはフックではないので反しない。
+
 ## AIによる変更の分類
 
 - `pulls.review`は、ファイルごとの一覧と20万文字までの差分をモデルに渡し、全ファイルが1回ずつ分類されたかを検査し、足りなければ1回再試行する。分類結果はHEADごとに保存し、自動ではやり直さない。
@@ -44,3 +52,8 @@
 - https://github.com/vytasgavelis/herdr-reviewer
 - https://github.com/Mantiq-com/herdr-commit-review
 - https://github.com/BerriAI/litellm
+- https://code.claude.com/docs/en/monitoring-usage
+- https://github.com/openai/codex/issues/45251
+- https://github.com/openai/codex/issues/43593
+- https://github.com/ccusage/ccusage/issues/1762
+- https://github.com/ccusage/ccusage/issues/1888
