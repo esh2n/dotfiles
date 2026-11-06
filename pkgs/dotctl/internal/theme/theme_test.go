@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 )
 
 type fixture struct {
@@ -191,5 +192,28 @@ func TestSetRefusesNamesOutsideThePalettes(t *testing.T) {
 	}
 	if got, _ := Current(e); got != "nord" {
 		t.Fatalf("current moved to %q", got)
+	}
+}
+
+func TestInitTouchesHerdrSettingsBecauseThePointerAppearsOutsideTheAppsFolder(t *testing.T) {
+	e := newFixture(t).env()
+	settings := filepath.Join(e.Home, ".config", "herdr-app", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settings, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(settings, old, old); err != nil {
+		t.Fatal(err)
+	}
+	must(t, Init(e, "nord"))
+	info, err := os.Stat(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.ModTime().After(old) {
+		t.Fatalf("settings.json keeps its old time %v", info.ModTime())
 	}
 }
