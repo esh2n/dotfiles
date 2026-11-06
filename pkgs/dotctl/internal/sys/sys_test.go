@@ -40,3 +40,28 @@ func TestExecPassesEnvAndStdin(t *testing.T) {
 		t.Fatalf("got %q %v", out, err)
 	}
 }
+
+func TestCaptureReturnsSoonAfterTheTimeoutWhenAChildKeepsThePipes(t *testing.T) {
+	start := time.Now()
+	_, _, err := OS{}.Capture(50*time.Millisecond, "sh", "-c", "sleep 5 & wait")
+	if err == nil || !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("err: %v", err)
+	}
+	if took := time.Since(start); took > 4*time.Second {
+		t.Fatalf("took %v", took)
+	}
+}
+
+func TestCaptureSucceedsWhenTheCommandLeavesAChildHoldingThePipes(t *testing.T) {
+	start := time.Now()
+	out, _, err := OS{}.Capture(10*time.Second, "sh", "-c", "sleep 5 & echo done")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if strings.TrimSpace(out) != "done" {
+		t.Fatalf("out: %q", out)
+	}
+	if took := time.Since(start); took > 4*time.Second {
+		t.Fatalf("took %v", took)
+	}
+}

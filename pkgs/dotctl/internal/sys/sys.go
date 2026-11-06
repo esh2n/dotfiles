@@ -51,6 +51,10 @@ type Cmd struct {
 	Timeout time.Duration // 0: none
 }
 
+// pipeWaitDelay bounds the wait for a pipe held open by a child that outlives
+// the command: a killed `timeout` leaves its `op` running with our pipes.
+const pipeWaitDelay = 2 * time.Second
+
 // Exec runs a command silently and returns its stdout and stderr. Past its
 // timeout the command is killed and the error says so.
 func (OS) Exec(c Cmd) (string, string, error) {
@@ -61,6 +65,9 @@ func (OS) Exec(c Cmd) (string, string, error) {
 		defer cancel()
 	}
 	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
+	if c.Timeout > 0 {
+		cmd.WaitDelay = pipeWaitDelay
+	}
 	if len(c.Env) > 0 {
 		cmd.Env = WithEnv(os.Environ(), c.Env)
 	}
@@ -69,6 +76,8 @@ func (OS) Exec(c Cmd) (string, string, error) {
 	err := cmd.Run()
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		err = errors.New("timed out after " + c.Timeout.String())
+	} else if errors.Is(err, exec.ErrWaitDelay) {
+		err = nil
 	}
 	return out.String(), errOut.String(), err
 }
